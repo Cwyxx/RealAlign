@@ -36,6 +36,8 @@ def exp_config():
     ###### Training ######
     config.train.train_batch_size = 2
     config.train.gradient_accumulation_steps = 2
+    config.train.eta = 1.0
+    config.train.guidance_scale = 7.5
     config.resume_from = None
     config.num_epochs = 5
     config.pipeline_num_inference_steps = 50

@@ -8,7 +8,7 @@ def basic_config():
     
     ###### General ######
     # random seed for reproducibility.
-    config.seed = 1
+    config.seed = 42 # 1
     # number of checkpoints to keep before overwriting old ones.
     config.num_checkpoint_limit = None
     # allow tf32 on Ampere GPUs, which can speed up training.
@@ -22,9 +22,9 @@ def basic_config():
     ###### Model Setting ######
     config.pretrained = pretrained = ml_collections.ConfigDict()
     # base model to load. either a path to a local directory, or a model name from the HuggingFace model hub.
-    pretrained.model = "CompVis/stable-diffusion-v1-4"# default "runwayml/stable-diffusion-v1-5"
+    pretrained.model = "runwayml/stable-diffusion-v1-5" # "CompVis/stable-diffusion-v1-4"# default "runwayml/stable-diffusion-v1-5"
     config.use_lora = True
-    config.lora_rank = 128 # default 4
+    config.lora_rank = 4 # 128 # default 4
     
     ###### Preference Model ######
     config.preference_model_func_cfg = dict(
@@ -37,7 +37,7 @@ def basic_config():
     ###### Compare Function ######
     config.compare_func_cfg = dict(
         type="preference_score_compare",
-        threshold=0.0,
+        threshold=0.3,
     )
     
     ##### dataset #####
@@ -45,11 +45,10 @@ def basic_config():
         type="PromptDataset",
         meta_json_path='assets/prompts/spo_4k.json',
         pretrained_tokenzier_path='laion/CLIP-ViT-H-14-laion2B-s32B-b79K'
-        # origin pretrained_tokenzier_path='laion/CLIP-ViT-H-14-laion2B-s32B-b79K',
     )
     
     ##### dataloader ####
-    config.dataloader_num_workers = 1
+    config.dataloader_num_workers = 16
     config.dataloader_shuffle = True
     config.dataloader_pin_memory = True
     config.dataloader_drop_last = False
@@ -68,10 +67,10 @@ def basic_config():
     # being fully deterministic and 1.0 being equivalent to the DDPM sampler.
     sample.eta = 1.0
     # classifier-free guidance weight. 1.0 is no guidance.
-    sample.guidance_scale = 7.5 # origin 5.0
-    sample.sample_batch_size = 1 # origin 10
+    sample.guidance_scale = 5.0 # 7.5 # origin 5.0
+    sample.sample_batch_size = 2 # 1 # origin 10
     # number of x_{t-1} sampled at each timestep.
-    sample.num_sample_each_step = 4 # origin 2
+    sample.num_sample_each_step = 2 # 4 # origin 2
 
     config.train = train = ml_collections.ConfigDict()
     # early stop 
@@ -81,25 +80,23 @@ def basic_config():
     # whether to use the 8bit Adam optimizer from bitsandbytes.
     train.use_8bit_adam = False
     # learning rate.
-    train.learning_rate = 1e-05 # origin 6e-5
+    train.learning_rate = 6e-5 # 1e-05 # origin 6e-5
     # Adam beta1.
     train.adam_beta1 = 0.9
     # Adam beta2.
     train.adam_beta2 = 0.999
     # Adam weight decay.
-    train.adam_weight_decay = 1e-2 # origin. 1e-4
+    train.adam_weight_decay = 1e-4 # 1e-2 # origin. 1e-4
     # Adam epsilon.
     train.adam_epsilon = 1e-8
     # number of gradient accumulation steps. the effective batch size is `batch_size * num_gpus *
     # gradient_accumulation_steps`.
-    train.gradient_accumulation_steps = 4 # origin. 1
+    train.gradient_accumulation_steps = 1 # origin. 1
     # maximum gradient norm for gradient clipping.
-    train.max_grad_norm = 0.1 # origin. 1
+    train.max_grad_norm = 1.0 # 0.1 # origin. 1.0
     # whether or not to use classifier-free guidance during training. if enabled, the same guidance scale used during
     # sampling will be used during training.
     train.cfg = True
-    train.guidance_scale = 7.5
-    train.eta = 1.0
 
     train.divert_start_step = 4
     # coefficient of the KL divergence

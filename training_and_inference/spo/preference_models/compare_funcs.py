@@ -8,11 +8,26 @@ def preference_score_compare(scores, threshold):
     # 2, b
     indices = indices[[0, -1], :]
     scores = scores[[0, -1], :]
-    # scores = scores.softmax(dim=0)
+    scores = scores.softmax(dim=0)
     # b
     valid_samples = scores[0] - scores[1] > threshold
     return indices, valid_samples
 
+@COMPARE_FUNCS.register_module()
+def aggregate_rewards_by_rank_compare(scores, threshold, aigi_detector_weight):
+    reward_model_scores, aigi_detector_scores = scores
+    
+    def get_ranks(tensor_scores):
+        indices_desc = torch.argsort(tensor_scores, dim=0)
+        rank = torch.argsort(indices_desc, dim=0)
+        return rank
+    
+    reward_model_scores_rank = get_ranks(reward_model_scores)
+    aigi_detector_scores_rank = get_ranks(aigi_detector_scores)
+    weight_rank = (1 - aigi_detector_weight) * reward_model_scores_rank + aigi_detector_weight * aigi_detector_scores_rank
+    
+    return preference_score_compare(weight_rank, threshold)
+    
 @COMPARE_FUNCS.register_module()
 def spo_reward_aigi_detector_compare(scores, threshold, aigi_detector_weight):
     # def normalize_scores(scores, eps=1e-6):
