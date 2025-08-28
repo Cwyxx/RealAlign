@@ -218,16 +218,16 @@ def aigi_detector_preference_model_func_builder(cfg):
             torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
         
-    elif cfg.aigi_detector == "rine": # -> wait for check.
-        from .rine_models.utils import get_our_trained_model as rine_get_models
-        cfg.ncls = "ldm"
-        cfg.ckpt_path = cfg.aigi_detector_path
-        aigi_detector = rine_get_models(ncls=cfg.ncls, device=cfg.device, opt=cfg)
+    # elif cfg.aigi_detector == "rine": # -> wait for check.
+    #     from .rine_models.utils import get_our_trained_model as rine_get_models
+    #     cfg.ncls = "ldm"
+    #     cfg.ckpt_path = cfg.aigi_detector_path
+    #     aigi_detector = rine_get_models(ncls=cfg.ncls, device=cfg.device, opt=cfg)
         
-        _transform = torchvision.transforms.Compose([
-            torchvision.transforms.CenterCrop(224),
-            torchvision.transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
-        ])
+    #     _transform = torchvision.transforms.Compose([
+    #         torchvision.transforms.CenterCrop(224),
+    #         torchvision.transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+    #     ])
         
     elif cfg.aigi_detector == "code":
         from .code_models.models import VITContrastiveHF as CoDE_Model
