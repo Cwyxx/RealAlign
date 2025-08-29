@@ -14,14 +14,13 @@ def exp_config():
     config.use_lora = True
     config.lora_rank = 4
     ###### Training ######
-    config.train.learning_rate = 6e-5
     config.sample.guidance_scale = 5.0
-    config.sample_batch_size = 2
+    config.sample_batch_size = 4
     config.train.learning_rate = 6e-5
     config.train.adam_weight_decay = 1e-4
     config.train.gradient_accumulation_steps = 1
     config.train.max_grad_norm = 1.0
-    config.sample.num_sample_each_step = 2
+    config.sample.num_sample_each_step = 4
     
     ##### dataset #####
     config.dataset_cfg = dict(
@@ -53,7 +52,7 @@ def exp_config():
     
     ###### Compare Function ######
     aigi_detector_weight = 0.5
-    compare_func_threshold = 0.3
+    compare_func_threshold = 0.9
     config.compare_func_cfg = dict(
         type="aggregate_rewards_by_rank_compare",
         threshold=compare_func_threshold,
@@ -62,18 +61,18 @@ def exp_config():
     
     
     ###### Training ######
-    config.sample.sample_batch_size = 2
+    config.sample.sample_batch_size = 4
     config.sample.num_sample_each_step = 4
-    config.train.train_batch_size = 8
+    config.train.train_batch_size = 4
     config.train.gradient_accumulation_steps = 1 # total_train_batch_size = 4 * 1 * 8 = 32
-    config.num_epochs = 10
+    config.num_epochs = 4
     
     #### logging ####
     config.train.early_stop_threshold = None
-    config.train.save_and_eval_batch_interval = 250
+    config.train.save_and_eval_batch_interval = 25
     config.wandb_project_name = "spo-sdv1-5"
     config.logdir = f"/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_5/spo_4k/{config.wandb_project_name}"
-    config.run_name = f"{config.wandb_project_name}-{preference_model}_{1-aigi_detector_weight}-{aigi_detector}_{aigi_detector_weight}-comp_func_threshold_{compare_func_threshold}"
+    config.run_name = f"{config.wandb_project_name}-{preference_model}_{1-aigi_detector_weight}-{aigi_detector}_{aigi_detector_weight}-comp_func_threshold_{compare_func_threshold}-lr_{config.train.learning_rate}-max_gn_{config.train.max_grad_norm}-comp_{compare_func_threshold}"
     config.validation_prompts = [ 'a cat.', 'a dog', 'a horse.', 'A bus stopped on the side of the road while people board it.', 'A woman holding a plate of cake in her hand.']
     config.num_validation_images = 1
     
