@@ -219,28 +219,6 @@ def main(_):
         )
         unet.add_adapter(unet_lora_config)
         
-        if hasattr(config.pretrained, "lora_path") and config.pretrained.lora_path is not None:
-            lora_state_dict, network_alphas = StableDiffusionPipeline.lora_state_dict(
-                config.pretrained.lora_path,          
-                weight_name="pytorch_lora_weights.safetensors"
-            )
-            unet_state_dict = {
-                k.replace("unet.", ""): v
-                for k, v in lora_state_dict.items()
-                if k.startswith("unet.")
-            }
-            unet_state_dict = convert_unet_state_dict_to_peft(unet_state_dict)
-            incompatible_keys = set_peft_model_state_dict(unet, unet_state_dict, adapter_name="default")
-            if incompatible_keys is not None:
-                # check only for unexpected keys
-                unexpected_keys = getattr(incompatible_keys, "unexpected_keys", None)
-                if unexpected_keys:
-                    logger.warning(
-                        f"Loading adapter weights from state_dict led to unexpected keys not found in the model: "
-                        f" {unexpected_keys}. "
-                    )
-            logger.info(f"Reuse lora weights from {config.pretrained.lora_path}")
-            
         if accelerator.mixed_precision == "fp16":
             # only upcast trainable parameters (LoRA) into fp32
             cast_training_params(unet, dtype=torch.float32)
@@ -385,7 +363,6 @@ def main(_):
         first_epoch = 0
         global_step = 0
     
-    save_and_evaluation(accelerator, unet, pipeline, config, first_epoch, global_step)
     exced_early_stop_threshold_step = 0
     TERMINATE = False
     for epoch in tqdm(
