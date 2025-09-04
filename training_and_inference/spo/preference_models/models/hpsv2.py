@@ -5,7 +5,7 @@ from hpsv2.src.open_clip import create_model_and_transforms, get_tokenizer
 class HPSv2:
     def __init__(self):
         model_name = "ViT-H-14"
-        self.model, self.preprocess_train, self.preprocess_val = create_model_and_transforms(
+        self.model, _, _ = create_model_and_transforms(
             model_name,
             'laion2B-s32B-b79K',
             jit=False,
@@ -25,17 +25,8 @@ class HPSv2:
         self.tokenizer = get_tokenizer(model_name)
         self.target_size = 224
         checkpoint_path="/data_center/data2/dataset/chenwy/21164-data/model-ckpt/hpsv2/HPS_v2_compressed.pt"
-        checkpoint = torch.load(checkpoint_path)
+        checkpoint = torch.load(checkpoint_path, map_location='cpu')
         self.model.load_state_dict(checkpoint['state_dict'])
         self.model.eval()
         
-    def requires_grad_(self, require_grad):
-        self.model.requires_grad_(require_grad)
-        
-    def to(self, device, dtype):
-        self.model.to(device, dtype=dtype)
-        
-    def eval(self):
-        self.model.eval()
-        return self.model
         

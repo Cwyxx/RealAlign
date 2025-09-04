@@ -1,4 +1,4 @@
-from configs.basic_config import basic_config
+from training_and_inference.configs.spo_config.basic_config import basic_config
 
 def get_config():
     return exp_config()

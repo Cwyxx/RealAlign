@@ -28,8 +28,7 @@ def step_aware_preference_model_func_builder(cfg):
 @PREFERENCE_MODEL_FUNC_BUILDERS.register_module(name='hpsv2_preference_model_func')
 def hpsv2_preference_model_func_builder(cfg):
     from .models.hpsv2 import HPSv2
-    hpsv2 = HPSv2()
-    hpsv2.eval().to(cfg.device)
+    hpsv2 = HPSv2().eval().to(cfg.device)
     hpsv2.requires_grad_(False)
     _transform = torchvision.transforms.Compose([
             torchvision.transforms.Resize(224, interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
@@ -255,8 +254,8 @@ def aigi_detector_preference_model_func_builder(cfg):
         elif cfg.aigi_detector in [ "univfd", "dinov2", "dinov2-full_train"]:
             outputs = torch.sigmoid(logits) # 0 -> real, 1 -> fake
             
-        if cfg.return_label:
-            outputs = ( outputs > 0.5 ).long()
+        # if cfg.return_label:
+        #     outputs = ( outputs > 0.5 ).long()
             
         scores = 1 - outputs
         return scores
