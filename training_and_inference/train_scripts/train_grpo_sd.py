@@ -15,6 +15,7 @@ import json
 
 import tqdm
 import torch
+import torch.distributed as dist
 import swanlab
 
 from absl import app, flags
@@ -139,6 +140,9 @@ def main(_):
         # the total number of optimizer steps to accumulate across.
         gradient_accumulation_steps=config.train.gradient_accumulation_steps * num_train_timesteps,
     )
+    # number of timesteps (ignore the x0 latents) within each trajectory to train on. latents: [noise, x3, x2], next_latents: [x3, x2, x1]
+    num_train_timesteps = int((config.sample.num_steps-1) * config.train.timestep_fraction)
+    
     if accelerator.is_main_process:
         if not getattr(config, 'debug', False):
             accelerator.init_trackers(
@@ -198,7 +202,6 @@ def main(_):
     pipeline.scheduler.alphas_cumprod = pipeline.scheduler.alphas_cumprod.to(accelerator.device)
     
     preference_model_fn = get_preference_model_func(config.preference_model_func_cfg, accelerator.device)
-    compare_func = get_compare_func(config.compare_func_cfg)
 
     # Move unet, vae and text_encoder to device and cast to inference_dtype
     pipeline.vae.to(accelerator.device, dtype=inference_dtype)
@@ -208,10 +211,6 @@ def main(_):
         unet.requires_grad_(False)
     else:
         unet.requires_grad_(True)
-    #### Prepare reference model
-    ref = copy.deepcopy(unet)
-    ref.to(accelerator.device)
-    ref.requires_grad_(False)
     
     if config.use_lora:
         unet_lora_config = LoraConfig(
@@ -389,8 +388,17 @@ def main(_):
         global_step = 0
     
     save_and_evaluation(accelerator, unet, pipeline, config, first_epoch, global_step)
-    exced_early_stop_threshold_step = 0
-    TERMINATE = False
+    
+    #### copy from dancegrpo/fastvideo/train_grpo_sd.py ####
+    def gather_tensor(tensor):
+        if not dist.is_initialized():
+            return tensor
+        world_size = dist.get_world_size()
+        gathered_tensors = [torch.zeros_like(tensor) for _ in range(world_size)]
+        dist.all_gather(gathered_tensors, tensor)
+        return torch.cat(gathered_tensors, dim=0)
+    #### copy from dancegrpo/fastvideo/train_grpo_sd.py ####
+    
     for epoch in tqdm(
         range(first_epoch, config.num_epochs),
         total=config.num_epochs,
@@ -399,9 +407,6 @@ def main(_):
         desc="Epoch",
         position=0,
     ):
-        train_loss = 0.0
-        train_ratio_win = 0.0
-        train_ratio_lose = 0.0
         data_loader_process_bar = tqdm(
             enumerate(data_loader),
             total=len(data_loader),
@@ -410,127 +415,99 @@ def main(_):
             position=1,
         )
         for dataset_batch_idx, batch in data_loader_process_bar:
-            if (
-                dataset_batch_idx == len(data_loader) - 1 and 
-                accelerator.gradient_state.in_dataloader
-            ):
-                # After sampling, we need to iterate through training batches.
-                # If 'end_of_dataloader' is True, accelerator.accumulate will skip gradient accumulation.
-                # Hence, we set it to False to ensure proper gradient accumulation.
-                accelerator.gradient_state.active_dataloader.end_of_dataloader = False
+            samples = []
+            expanded_prompts = []
+            for p in batch["extra_info"]["prompts"]:
+                expanded_prompts.extend([p] * config.num_generations)
 
+            all_latents = []
+            all_log_probs = []
+            all_rewards = []
+            all_prompts_embed = []
             #################### SAMPLING ####################
-            unet.eval()
             pipeline.unet.eval()
-            batch_size = batch['input_ids'].shape[0]
-            prompt_ids = batch['input_ids']
-            # encode prompts
-            prompt_embeds = pipeline.text_encoder(prompt_ids)[0]
-            sample_neg_prompt_embeds = neg_prompt_embed.repeat(batch_size, 1, 1)
-            
-            # prepare extra_info for the preference model
-            extra_info = batch['extra_info']
-            for k, v in extra_info.items():
-                if isinstance(v, torch.Tensor):
-                    other_dim = [1 for _ in range(v.dim() - 1)]
-                    extra_info[k] = v.repeat(config.sample.num_sample_each_step, *other_dim) # [B, L] -> [B + B (num_sample_each_step), L]
-                elif isinstance(v, list):
-                    extra_info[k] = v * config.sample.num_sample_each_step
-                else:
-                    raise ValueError(f"Unknown type {type(v)} for extra_info[{k}]")
-            
-            with autocast():
-                (
-                    timesteps, 
-                    current_latents,  # x_t
-                    next_latents, # x_{t-1}
-                    prompt_embeds,
-                    preference_score_logs,
-                ) = multi_sample_pipeline(
-                    pipeline,
-                    prompt_embeds=prompt_embeds,
-                    negative_prompt_embeds=sample_neg_prompt_embeds,
-                    num_inference_steps=config.sample.num_steps,
-                    guidance_scale=config.sample.guidance_scale,
-                    eta=config.sample.eta,
-                    
-                    divert_start_step=divert_start_step,
-                    num_samples_each_step=config.sample.num_sample_each_step,
-                    preference_model_fn=preference_model_fn,
-                    bool_spo_reward_aigi_detector_func=bool_spo_reward_aigi_detector_func,
-                    compare_fn=compare_func,
-                    extra_info=extra_info,
-                )
-            
-            if bool_spo_reward_aigi_detector_func == True:
-                reward_model_score_logs, aigi_detector_score_logs = preference_score_logs
-                reward_model_score_logs = accelerator.gather(reward_model_score_logs).detach()
-                aigi_detector_score_logs = accelerator.gather(aigi_detector_score_logs).detach()
-                accelerator.log(
-                    {
-                        "reward_model_scores_mean": reward_model_score_logs.float().mean().item(),
-                        "reward_model_scores_std": reward_model_score_logs.float().std().item(),
-                        "aigi_detector_scores_mean": aigi_detector_score_logs.float().mean().item(),
-                        "aigi_detector_score_std": aigi_detector_score_logs.float().std().item(),
-                    },
-                    step=global_step,
-                )
-                # apply early stop.
-                if epoch > 0 and config.train.early_stop_threshold is not None and aigi_detector_score_logs.mean().item() > config.train.early_stop_threshold:
-                    if global_step - exced_early_stop_threshold_step < 200:
-                        TERMINATE = True
-                    exced_early_stop_threshold_step = global_step
-                    
-                del reward_model_score_logs, aigi_detector_score_logs
-            else:
-                preference_score_logs = accelerator.gather(preference_score_logs).detach()
-                accelerator.log(
-                    {
-                        "preference_scores_mean": preference_score_logs.float().mean().item(), 
-                        "preference_scores_std": preference_score_logs.float().std().item(),
-                    },
-                    step=global_step,
-                )
-                # apply early stop.
-                if epoch > 0 and config.train.early_stop_threshold is not None and preference_score_logs.mean().item() > config.train.early_stop_threshold:
-                    if global_step - exced_early_stop_threshold_step < 200:
-                        TERMINATE = True
-                    exced_early_stop_threshold_step = global_step
-                del preference_score_logs
-            
-            if TERMINATE:
-                break
-            
-            if accelerator.num_processes > 1:
-                accelerator.wait_for_everyone()
-                local_valid_samples_num_list = [
-                    torch.tensor([next_latents.shape[0]], dtype=torch.long, device=accelerator.device) 
-                    for _ in range(accelerator.num_processes)
-                ]
-                for process_idx in range(accelerator.num_processes):
-                    broadcast(local_valid_samples_num_list[process_idx], from_process=process_idx)
+            batch_size = config.train.batch_size
+            ###for the sake of convenience, we use the same latents for all prompts in a batch.
+            global_input_latents = torch.randn(
+                        (1, 4, 64, 64),
+                        device=accelerator.device,
+                        dtype=accelerator.dtype,
+                    )
+            for i in range(0, len(expanded_prompts), batch_size):
+                current_batch = expanded_prompts[i:i+batch_size]
                 
-                local_valid_samples_num_list = [sample_num.item() for sample_num in local_valid_samples_num_list]
+                prompt_ids = pipeline.tokenizer(
+                    current_batch,
+                    return_tensors="pt",
+                    padding="max_length",
+                    truncation=True,
+                    max_length=pipeline.tokenizer.model_max_length
+                ).input_ids.to(accelerator.device)
+                prompt_embeds = pipeline.text_encoder(prompt_ids)[0]
+                if i%config.num_generations == 0:
+                    input_latents = global_input_latents.repeat(batch_size,1,1,1).clone()
 
-                # total_valid_samples_num, 1
-                timesteps = gather_tensor_with_diff_shape(timesteps, local_valid_samples_num_list)
-                # total_valid_samples_num, 1, c, h, w
-                current_latents = gather_tensor_with_diff_shape(current_latents, local_valid_samples_num_list)
-                # total_valid_samples_num, 2, c, h, w
-                next_latents = gather_tensor_with_diff_shape(next_latents, local_valid_samples_num_list)
-                # total_valid_samples_num,1,l,c
-                prompt_embeds = gather_tensor_with_diff_shape(prompt_embeds, local_valid_samples_num_list)
-            
-            total_valid_samples_num = timesteps.shape[0]
-            
-            data_loader_process_bar.set_postfix({
-                "total_valid_samples_num": total_valid_samples_num
-            })
-            
-            if total_valid_samples_num < accelerator.num_processes:
-                if (dataset_batch_idx + 1) % config.train.save_and_eval_batch_interval == 0:
-                    save_and_evaluation(accelerator, unet, pipeline, config, epoch, global_step)
-                continue
+                with torch.no_grad():
+                    with autocast():
+                        images, _, latents, log_probs = pipeline_with_logprob(
+                            pipeline,
+                            prompt_embeds=prompt_embeds,
+                            negative_prompt_embeds=sample_neg_prompt_embeds,
+                            num_inference_steps=config.sample.num_steps,
+                            guidance_scale=config.sample.guidance_scale,
+                            eta=config.sample.eta,
+                            output_type="pt",
+                            latents=input_latents
+                        )
+                rewards = []
+                tuwen_rewards = []
+                for j, image in enumerate(images):
+                    pil = Image.fromarray(
+                        (image.to(torch.float32).cpu().numpy().transpose(1, 2, 0) * 255).astype(np.uint8)
+                    )
+                    pil = pil.resize((512, 512))
+                    image_path = os.path.join("./images_same", f"image-{i}-{j}-rank-{dist.get_rank()}.jpg")
+                    pil.save(image_path)
+                    if config.reward_fn == "hpsv2":
+                        image = preprocess_val(Image.open(image_path).convert("RGB")).unsqueeze(0).to(device=device, non_blocking=True)
+                        # Process the prompt
+                        text = processor([current_batch[j]]).to(device=device, non_blocking=True)
+                    # Calculate the HPS
+                    with torch.no_grad():
+                        with torch.amp.autocast('cuda'):
+                            if config.reward_fn == "hpsv2":
+                                outputs = reward_model(image, text)
+                                image_features, text_features = outputs["image_features"], outputs["text_features"]
+                                logits_per_image = image_features @ text_features.T
+                                hps_score = torch.diagonal(logits_per_image)
+                                rewards.append(hps_score)
+                            elif config.reward_fn == "hpsv3":
+                                hps_score = reward_model.reward([image_path], [current_batch[j]])
+                                if hps_score.ndim == 2:
+                                    hps_score = hps_score[:,0]
+                                rewards.append(hps_score)
+
+                latents = torch.stack(latents, dim=1).detach()     # (4, num_steps+1, ...)
+                log_probs = torch.stack(log_probs, dim=1).detach()   # (4, num_steps, ...)
+                rewards = torch.cat(rewards, dim=0)  
+                
+
+                all_latents.append(latents)
+                all_log_probs.append(log_probs)
+                all_rewards.append(rewards)
+                all_prompts_embed.append(prompt_embeds)
+
+                torch.cuda.empty_cache()
+
+
+            all_latents = torch.cat(all_latents, dim=0)
+            all_log_probs = torch.cat(all_log_probs, dim=0)
+            all_rewards = torch.cat(all_rewards, dim=0).to(torch.float32)
+            all_prompts_embed = torch.cat(all_prompts_embed, dim=0)
+            timesteps = pipeline.scheduler.timesteps.repeat(
+                config.sample.batch_size*config.num_generations, 1
+            ) 
+
             
             sample = {
                 "prompt_embeds": prompt_embeds,
