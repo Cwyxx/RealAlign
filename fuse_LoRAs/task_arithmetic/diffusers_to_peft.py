@@ -47,13 +47,13 @@ if __name__ == "__main__":
     
     unet = UNet2DConditionModel.from_pretrained(
         args.pretrained_model_name_or_path,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float32,
         subfolder="unet",
     ).to("cuda")
     
     pipeline = StableDiffusionPipeline.from_pretrained(
         args.pretrained_model_name_or_path,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float32,
         unet=unet
     ).to("cuda")
     pipeline.load_lora_weights(args.lora_dir, weight_name="pytorch_lora_weights.safetensors", adapter_name=args.adapter_name)

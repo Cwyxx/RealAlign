@@ -4,9 +4,9 @@ conda activate internvl
 
 model_type="stable_diffusion"
 train_caption_dataset="spo_4k"
-val_json_data_path="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/pick_a_pic_v1/pick_a_pic_validation_prompt_500.json" # "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/pick_a_pic_v1/pick_a_pic_validation_prompt_500.json" # val_json_data_path="../dataset/mscoco_val2014.json" "/data_center/data2/dataset/chenwy/21164-data/ffhq/ffhq-10k-captions.json"
-image_column="evalset_idx" # evalset_idx # image
-caption_column="caption" # text
+val_json_data_path="/data3/chenweiyan/notebook/fine-tune-diffusion/code/refine-generator/dataset/mscoco_val2014.json" # "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/pick_a_pic_v1/pick_a_pic_validation_prompt_500.json" # val_json_data_path="../dataset/mscoco_val2014.json" "/data_center/data2/dataset/chenwy/21164-data/ffhq/ffhq-10k-captions.json"
+image_column="image" # evalset_idx # image
+caption_column="text" # caption # text
 combination_type="cat"
 
 lora_dirs=(
@@ -25,7 +25,7 @@ generated_image_output_dir="/data_center/data2/dataset/chenwy/21164-data/generat
 
 
 # runwayml/stable-diffusion-v1-5 CompVis/stable-diffusion-v1-4
-HF_ENDPOINT=https://hf-mirror.com CUDA_VISIBLE_DEVICES=5 python main_add_adapter_weights.py --pretrained_model_name_or_path "runwayml/stable-diffusion-v1-5" \
+HF_ENDPOINT=https://hf-mirror.com CUDA_VISIBLE_DEVICES=6 python main_add_adapter_weights.py --pretrained_model_name_or_path "runwayml/stable-diffusion-v1-5" \
     --output_dir "${generated_image_output_dir}" \
     --val_json_data_path "${val_json_data_path}" \
     --batch_size 8 \
