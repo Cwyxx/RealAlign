@@ -150,6 +150,11 @@ if __name__ == "__main__":
         batch_size=args.batch_size
     )
     
+    pipeline.set_progress_bar_config(
+        leave=False,
+        desc="Sampling Timestep",
+        dynamic_ncols=True,
+    )
     with torch.inference_mode():
         for batch in tqdm(val_dataloader):
             image_uids = batch[args.image_column]
