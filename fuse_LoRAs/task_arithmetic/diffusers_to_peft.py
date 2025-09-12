@@ -36,6 +36,12 @@ def get_args():
         type=str,
         default=None,
     )
+    parser.add_argument(
+        "--negative_lora",
+        action="store_true",
+        help="If set, multiply all LoRA weights by -1."
+    )
+    parser
     
     args = parser.parse_args()
 
@@ -67,6 +73,13 @@ if __name__ == "__main__":
     )
     
     original_state_dict = {f"base_model.model.{k}": v for k, v in pipeline.unet.state_dict().items()}
+    if args.negative_lora:
+        with torch.no_grad():
+            for k, v in original_state_dict.items():
+                if ("lora" in k or "lora_up" in k or "lora_down" in k) and torch.is_floating_point(v):
+                    original_state_dict[k] = -v
+                    print(f"Negated {k}")
+                    
     adapter_peft_model.load_state_dict(original_state_dict, strict=True)
     adapter_peft_model.save_pretrained(args.peft_dir)
     print(f"Loaded LoRA from {args.lora_dir} with adapter {args.adapter_name}")

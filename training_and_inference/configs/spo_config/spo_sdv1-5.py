@@ -21,12 +21,13 @@ def exp_config():
     config.train.gradient_accumulation_steps = 1
     config.train.max_grad_norm = 1.0 # custom: 0.1 # 1.0
     config.sample.num_sample_each_step = 4
+    config.train.divert_start_step = 15
     
     ###### Preference Model ######
     # config.preference_model_func_cfg = dict(
     #     type="hpsv2_preference_model_func"
     # )
-    aigi_detector = "dinov2"
+    aigi_detector = "code"
     return_label = False
     config.preference_model_func_cfg = dict(
         type="aigi_detector_preference_model_func",
@@ -35,7 +36,7 @@ def exp_config():
         return_label = return_label
     )
     ###### Compare Function ######
-    compare_func_threshold=0.1
+    compare_func_threshold=0.0
     config.compare_func_cfg = dict(
         type="preference_score_compare",
         threshold=compare_func_threshold,
@@ -53,7 +54,7 @@ def exp_config():
     config.train.save_and_eval_batch_interval = 25
     config.wandb_project_name = "spo-sdv1-5"
     config.logdir = f"/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_5/spo_4k/{config.wandb_project_name}"
-    config.run_name = f"{aigi_detector}-lr_{config.train.learning_rate}-max_gn_{config.train.max_grad_norm}-comp_{compare_func_threshold}"
+    config.run_name = f"{aigi_detector}-lr_{config.train.learning_rate}-max_gn_{config.train.max_grad_norm}-comp_{compare_func_threshold}-divert_start_step_{config.train.divert_start_step}"
     config.validation_prompts = [ 'a cat.', 'a dog', 'a horse.', 'A bus stopped on the side of the road while people board it.', 'A woman holding a plate of cake in her hand.']
     config.num_validation_images = 1
 
