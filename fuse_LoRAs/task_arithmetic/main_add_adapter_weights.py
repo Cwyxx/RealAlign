@@ -111,14 +111,38 @@ if __name__ == "__main__":
             )
             print(f"Loaded LoRA from {args.lora_dirs[i]} with adapter {args.adapter_names[i]}")
             
-        model.add_weighted_adapter(
-            adapters=args.adapter_names,
-            weights=args.lora_weights,
-            combination_type=args.combination_type,
-            adapter_name="GGBond"
-        )
-        print(f"adapter_names: {args.adapter_names} withs weights: {args.lora_weights}")
-        print(f"Added weighted adapter GGBond with combination type {args.combination_type}")
+        if args.combination_type in ["linear"]:
+            model.add_weighted_adapter(
+                adapters=args.adapter_names,
+                weights=args.lora_weights,
+                combination_type=args.combination_type,
+                adapter_name="GGBond"
+            )
+            print(f"adapter_names: {args.adapter_names} withs weights: {args.lora_weights}")
+            print(f"Added weighted adapter GGBond with combination type {args.combination_type}")
+        
+        elif args.combination_type in [ "magnitude_prune", "dare_linear" ]:
+            model.add_weighted_adapter(
+                adapters=args.adapter_names,
+                weights=args.lora_weights,
+                combination_type=args.combination_type,
+                adapter_name="GGBond",
+                density=0.7
+            )
+            print(f"adapter_names: {args.adapter_names} withs weights: {args.lora_weights}")
+            print(f"Added weighted adapter GGBond with combination type {args.combination_type}")
+            
+        elif args.combination_type in [ "ties_svd" ]:
+            model.add_weighted_adapter(
+                adapters=args.adapter_names,
+                weights=args.lora_weights,
+                combination_type=args.combination_type,
+                adapter_name="GGBond",
+                density=0.5
+            )
+            print(f"adapter_names: {args.adapter_names} withs weights: {args.lora_weights}")
+            print(f"Added weighted adapter GGBond with combination type {args.combination_type}")
+        
         model.set_adapters("GGBond")
         model = model.to(dtype=torch.float16, device="cuda")
         

@@ -7,20 +7,21 @@ train_caption_dataset="spo_4k"
 val_json_data_path="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/pick_a_pic_v1/pick_a_pic_validation_prompt_500.json" # "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/pick_a_pic_v1/pick_a_pic_validation_prompt_500.json" # val_json_data_path="../dataset/mscoco_val2014.json" "/data_center/data2/dataset/chenwy/21164-data/ffhq/ffhq-10k-captions.json"
 image_column="evalset_idx" # evalset_idx # image
 caption_column="caption" # text
-combination_type="linear"
+combination_type="ties_svd"
 
 lora_dirs=(
     "/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_5/spo_4k/spo-sdv1-5/peft/step_aware/checkpoint_1_754"
-    "/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_5/spo_4k/spo-sdv1-5/peft/dinov2/checkpoint_0_800"
+    "/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_5/spo_4k/spo-sdv1-5/peft/code-lr_6e-05-max_gn_1.0-comp_0.0-divert_start_step_15/checkpoint_0_750"
+    # "/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_5/spo_4k/spo-sdv1-5/peft/dinov2/checkpoint_0_800"
     # "/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_5/spo_4k/spo-sdv1-5/peft/code-lr_6e-05-max_gn_1.0-comp_0.0/checkpoint_0_800"
     )
-lora_weights=(0.5 1.0)
-adapter_names=("step_aware" "dinov2")
+lora_weights=(1.0 1.0)
+adapter_names=("step_aware" "code-divert_start_step_15")
 
 seed=42
 checkpoint=0
 global_step=0
-finetune_method="spo-sdv1-5/fuse_lora/${combination_type}/step_aware_0.5-dinov2_1.0" # DRaFT_LV-adv-5-imagereward-JPEG_1.0_80_100-grad_scale_0.1 DRaFT_LV-hpsv2
+finetune_method="spo-sdv1-5/fuse_lora/${combination_type}/step_aware_1.0-code-divert_start_step_1.0" # DRaFT_LV-adv-5-imagereward-JPEG_1.0_80_100-grad_scale_0.1 DRaFT_LV-hpsv2
 generated_image_output_dir="/data_center/data2/dataset/chenwy/21164-data/generated_image-seed_${seed}/stable_diffusion_v1_5/${train_caption_dataset}/pick_a_pic_validation_500/${finetune_method}/checkpoint_${checkpoint}_${global_step}"
 
 
