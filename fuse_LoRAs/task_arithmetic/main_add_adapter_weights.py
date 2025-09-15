@@ -153,6 +153,8 @@ if __name__ == "__main__":
             safety_checker=None
         ).to('cuda')
         
+        print(f"Activate Lora: {pipeline.get_active_adapters()}")
+        
     else:
         print("Please provide at least two LoRA directories for fusion.")
         exit(0)

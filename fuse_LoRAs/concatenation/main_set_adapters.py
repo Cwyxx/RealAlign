@@ -89,6 +89,7 @@ if __name__ == "__main__":
     if len(args.lora_dirs) > 1:
         pipeline.set_adapters(args.adapter_names, adapter_weights=args.lora_weights)
         print(f"Set adapters {args.adapter_names} with weights {args.lora_weights}")
+        print(f"Activate Lora: {pipeline.get_active_adapters()}")
     
     data_files = {}
     data_files["val"] = args.val_json_data_path
