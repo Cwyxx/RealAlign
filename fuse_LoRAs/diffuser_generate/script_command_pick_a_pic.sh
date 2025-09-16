@@ -14,30 +14,19 @@ val_json_data_path="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/pic
 image_column="evalset_idx" # evalset_idx # image
 caption_column="caption" # text
 
-lora_dirs=(
-    "/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_5/spo_4k/spo-sdv1-5/step_aware/checkpoint_1_754"
-    "/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_5/spo_4k/spo-sdv1-5/code-lr_6e-05-max_gn_1.0-comp_0.0-divert_start_step_15/checkpoint_0_750"
-    )
-lora_weights=(1.0 1.0)
-adapter_names=("step_aware" "code-divert_start_step_15")
-
 seed=42
 checkpoint=0
 global_step=0
-method="composite"
-finetune_method="spo-sdv1-5/fuse_lora/${method}/step_aware_1.0-code-divert_start_step_15_1.0" # DRaFT_LV-adv-5-imagereward-JPEG_1.0_80_100-grad_scale_0.1 DRaFT_LV-hpsv2
+finetune_method="spo-sdv1-5/spo_official" # DRaFT_LV-adv-5-imagereward-JPEG_1.0_80_100-grad_scale_0.1 DRaFT_LV-hpsv2
+lora_weight_dir="/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_5/${train_caption_dataset}/${finetune_method}/checkpoint_${checkpoint}_${global_step}"
 generated_image_output_dir="/data_center/data2/dataset/chenwy/21164-data/generated_image-seed_${seed}/stable_diffusion_v1_5/${train_caption_dataset}/pick_a_pic_validation_500/${finetune_method}/checkpoint_${checkpoint}_${global_step}"
 
-
-# runwayml/stable-diffusion-v1-5
-HF_ENDPOINT=https://hf-mirror.com CUDA_VISIBLE_DEVICES=6 python lora_composition.py --pretrained_model_name_or_path "runwayml/stable-diffusion-v1-5" \
+# runwayml/stable-diffusion-v1-5 CompVis/stable-diffusion-v1-4
+HF_ENDPOINT=https://hf-mirror.com CUDA_VISIBLE_DEVICES=7 python sd_generate_image.py --pretrained_model_name_or_path "runwayml/stable-diffusion-v1-5" \
+    --lora_weight_dir "${lora_weight_dir}" \
     --output_dir "${generated_image_output_dir}" \
     --val_json_data_path "${val_json_data_path}" \
     --batch_size 8 \
     --seed ${seed} \
     --image_column "${image_column}" \
-    --caption_column "${caption_column}" \
-    --lora_dirs "${lora_dirs[@]}" \
-    --lora_weights "${lora_weights[@]}" \
-    --adapter_names "${adapter_names[@]}" \
-    --method "${method}"
+    --caption_column "${caption_column}"

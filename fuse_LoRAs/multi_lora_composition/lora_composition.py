@@ -99,16 +99,20 @@ if __name__ == "__main__":
     cur_loras = args.adapter_names
     # select the method for the composition
     if args.method == "merge":
-        pipeline.set_adapters(cur_loras, adapter_weights=args.lora_weights)
+        pipeline.set_adapters(cur_loras)
         switch_callback = None
+        
     elif args.method == "switch":
+        print(f"Switch")
         pipeline.set_adapters([cur_loras[0]])
         switch_callback = make_callback(switch_step=args.switch_step, loras=cur_loras)
+        
     else:
-        pipeline.set_adapters(cur_loras, adapter_weights=args.lora_weights)
+        print(f"Lora_composite: {True if args.method == 'composite' else False}")
+        pipeline.set_adapters(cur_loras)
         switch_callback = None
-    print(f"Set adapters {args.adapter_names} with weights {args.lora_weights}")
-    print(f"Multi LoRA {args.method}")
+    
+    print(f"activate adapters: {pipeline.get_active_adapters()}")
     data_files = {}
     data_files["val"] = args.val_json_data_path
     dataset = load_dataset(
