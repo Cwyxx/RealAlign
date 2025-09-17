@@ -16,10 +16,13 @@ elif [[ "$reward_model" == "aesthetic_v2_5" ]]; then
 
 elif [[ "$reward_model" == "imagereward" ]]; then
     conda activate imagereward
+
+elif [[ "$reward_model" == "vqascore" ]]; then
+    conda activate t2v
 fi
 
 
-HF_ENDPOINT=https://hf-mirror.com CUDA_VISIBLE_DEVICES=5 python calculate_metric.py \
+HF_ENDPOINT=https://hf-mirror.com CUDA_VISIBLE_DEVICES=3 python calculate_metric.py \
     --reward_model $reward_model \
     --generated_image_dir $generated_image_dir \
     --val_json_data_path $val_json_data_path \

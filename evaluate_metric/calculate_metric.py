@@ -143,6 +143,16 @@ elif args.reward_model == "clipscore":
     
     reward_fn = calculate_clip_score
     
+elif args.reward_model == "vqascore":
+    import t2v_metrics
+    clip_flant5_score = t2v_metrics.VQAScore(model='clip-flant5-xl')
+    
+    def calculate_vqasocre(prompt, image_path, device):
+        score = clip_flant5_score(images=[image_path], texts=[prompt])[0][0]
+        return score
+    
+    reward_fn = calculate_vqasocre
+    
 elif args.reward_model == "clip_iqa":
     import pyiqa
     reward_model = pyiqa.create_metric("clipiqa", device=device)
@@ -210,7 +220,6 @@ val_dataloader = torch.utils.data.DataLoader(
     batch_size=1
 )
 
-print_once = True
 score_list = []
 with torch.inference_mode():
     for batch in tqdm(val_dataloader, dynamic_ncols=True, desc=f"{args.reward_model}:{args.generated_image_dir}"):
