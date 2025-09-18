@@ -53,10 +53,10 @@ echo "val json data path: ${val_json_data_path}"
 # echo "Running CLIPScore metric..."
 # ./reward_model_metric_param.sh "clipscore" "${generated_image_dir}" "${val_json_data_path}" "${image_column}" "${caption_column}"
 
-# VQAScore metric
-echo "********************{VQAScore}********************"
-echo "Running VQAScore metric..."
-./reward_model_metric_param.sh "vqascore" "${generated_image_dir}" "${val_json_data_path}" "${image_column}" "${caption_column}"
+# # VQAScore metric
+# echo "********************{VQAScore}********************"
+# echo "Running VQAScore metric..."
+# ./reward_model_metric_param.sh "vqascore" "${generated_image_dir}" "${val_json_data_path}" "${image_column}" "${caption_column}"
 
 # # CLIP-IQA metric
 # echo "********************{CLIP-IQA}********************"
@@ -73,15 +73,17 @@ echo "Running VQAScore metric..."
 # echo "Running Aesthetic metric..."
 # ./reward_model_metric_param.sh "aesthetic" "${generated_image_dir}" "${val_json_data_path}" "${image_column}" "${caption_column}"
 
-# Aesthetic-V2-5 metric
-echo "********************{Aesthetic_V2_5}********************"
-echo "Running Aesthetic_V2_5 metric..."
-./reward_model_metric_param.sh "aesthetic_v2_5" "${generated_image_dir}" "${val_json_data_path}" "${image_column}" "${caption_column}"
+# # Aesthetic-V2-5 metric
+# echo "********************{Aesthetic_V2_5}********************"
+# echo "Running Aesthetic_V2_5 metric..."
+# ./reward_model_metric_param.sh "aesthetic_v2_5" "${generated_image_dir}" "${val_json_data_path}" "${image_column}" "${caption_column}"
 
-# VILA metric
-source /data3/chenweiyan/miniconda3/etc/profile.d/conda.sh
-conda activate vila
-echo "********************{VILA}********************"
-echo "Running VILA metric..."
-HF_ENDPOINT=https://hf-mirror.com CUDA_VISIBLE_DEVICES=6 python -m vila.run_vilda_predict.py \
-    -ckpt_dir /data_center/data2/dataset/chenwy/21164-data/model-ckpt/vila/checkpoints
+# # VILA metric
+# source /data3/chenweiyan/miniconda3/etc/profile.d/conda.sh
+# conda activate vila
+# echo "********************{VILA}********************"
+# echo "Running VILA metric..."
+# HF_ENDPOINT=https://hf-mirror.com CUDA_VISIBLE_DEVICES=6 python -m vila.run_vilda_predict.py \
+#     -ckpt_dir /data_center/data2/dataset/chenwy/21164-data/model-ckpt/vila/checkpoints \
+#     --image_dir ${generated_image_dir} \
+#     --spm_model_path /data_center/data2/dataset/chenwy/21164-data/model-ckpt/vila/spm_model/spm.model

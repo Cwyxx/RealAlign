@@ -72,6 +72,12 @@ def get_args():
         default=[],
     )
     
+    parser.add_argument(
+        "--num_inference_steps",
+        type=int,
+        default=50
+    )
+    
     args = parser.parse_args()
 
     return args
@@ -119,9 +125,9 @@ if __name__ == "__main__":
             prompts = batch[args.caption_column]
             if args.seed is not None:
                 generator = torch.Generator(device="cuda").manual_seed(args.seed)
-                generate_images = pipeline(prompts, generator=[ generator ] * len(prompts)).images
+                generate_images = pipeline(prompts, generator=[ generator ] * len(prompts), num_inference_steps=args.num_inference_steps).images
             else:
-                generate_images = pipeline(prompts).images
+                generate_images = pipeline(prompts, num_inference_steps=args.num_inference_steps).images
                 
             for image_uid, generate_image in zip(image_uids, generate_images):
                 generate_image.save(os.path.join(args.output_dir, f"{image_uid}.png"))

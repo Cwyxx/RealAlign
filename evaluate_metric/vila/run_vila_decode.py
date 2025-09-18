@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example script for running VILA model."""
+"""Example script for running VILA model for captioning."""
+from typing import Sequence
 
 from absl import app
 from absl import flags
@@ -30,10 +31,8 @@ from praxis import base_layer
 from praxis import optimizers
 from praxis import pax_fiddle
 from praxis import py_utils
+from praxis import pytypes
 from praxis import schedules
-
-import os
-from tqdm import tqdm
 
 from vila import coca_vila
 from vila import coca_vila_configs
@@ -42,43 +41,46 @@ from vila import coca_vila_configs
 NestedMap = py_utils.NestedMap
 
 _CKPT_DIR = flags.DEFINE_string('ckpt_dir', '', 'Path to checkpoint.')
+_IS_PRETRAIN = flags.DEFINE_boolean(
+    'is_pretrain',
+    False,
+    'Whether the checkpoint is pretrain or rank-based finetuned.',
+)
 _SPM_MODEL_PATH = flags.DEFINE_string(
     'spm_model_path', '', 'Path to sentence piece tokenizer model.'
 )
-_IMAGE_DIR = flags.DEFINE_string('image_dir', '', 'Path to input image dir.')
+_IMAGE_PATH = flags.DEFINE_string('image_path', '', 'Path to input image.')
 
 _PRE_CROP_SIZE = 272
 _IMAGE_SIZE = 224
 _MAX_TEXT_LEN = 64
 _TEXT_VOCAB_SIZE = 64000
 
-_ZSL_QUALITY_PROMPTS = [
-    ['good image', 'bad image'],
-    ['good lighting', 'bad lighting'],
-    ['good content', 'bad content'],
-    ['good background', 'bad background'],
-    ['good foreground', 'bad foreground'],
-    ['good composition', 'bad composition'],
-]
-
 
 def load_vila_model(
-    ckpt_dir,
+    ckpt_dir, is_pretrain = False
 ):
   """Loads the VILA model from checkpoint directory.
 
   Args:
     ckpt_dir: The path to checkpoint directory
+    is_pretrain: True for `CoCaVilaPretrain`, False for
+      `CoCaVilaRankBasedFinetune`
 
   Returns:
     VILA model, VILA model states
   """
   coca_config = coca_vila_configs.CocaVilaConfig()
-  coca_config.model_type = coca_vila.CoCaVilaRankBasedFinetune
+  if is_pretrain:
+    coca_config.model_type = coca_vila.CoCaVilaPretrain
+  else:
+    coca_config.model_type = coca_vila.CoCaVilaRankBasedFinetune
   coca_config.decoding_max_len = _MAX_TEXT_LEN
   coca_config.text_vocab_size = _TEXT_VOCAB_SIZE
   model_p = coca_vila_configs.build_coca_vila_model(coca_config)
-  model_p.model_dims = coca_config.model_dims
+  if not is_pretrain:
+    model_p.model_dims = coca_config.model_dims
+  model_p.generation_decode = True
   model = model_p.Instantiate()
 
   dummy_batch_size = 4  # For initialization only
@@ -134,31 +136,63 @@ def preprocess_image(
   return image.numpy()
 
 
+class InputObject:
+  """The function `ids_to_strings` is called in model.process_decode_out."""
+
+  def __init__(self, tokenizer):
+    self.tokenizer = tokenizer
+
+  def ids_to_strings(
+      self, ids, lengths
+  ):
+    decoded = self.tokenizer.IdsToStrings(ids, lengths).numpy()
+    return [d.decode() for d in decoded]
+
+
 def main(_):
-    logging.set_verbosity(logging.ERROR)
-    model, model_states = load_vila_model(_CKPT_DIR.value)
-    
-    score_list = []
-    for image_name in tqdm(os.listdir(_IMAGE_DIR.value), dynamic_ncols=True):
-        image = preprocess_image(os.path.join(_IMAGE_DIR.value, image_name), _PRE_CROP_SIZE, _IMAGE_SIZE)
-        input_batch = NestedMap(
-            image=image,
-            ids=jnp.zeros((1, 1, _MAX_TEXT_LEN), dtype=jnp.int32),
-            paddings=jnp.zeros((1, 1, _MAX_TEXT_LEN), dtype=jnp.int32),
-        )
+  # Suppresses verbose INFO/DEBUG log.
+  logging.set_verbosity(logging.ERROR)
+  model, model_states = load_vila_model(
+      _CKPT_DIR.value, _IS_PRETRAIN.value
+  )
+  tokenizer_p = lingvo_tokenizers.SentencePieceTokenizer.Params().Set(
+      spm_model=_SPM_MODEL_PATH.value,
+      vocab_size=_TEXT_VOCAB_SIZE,
+  )
+  tokenizer = tokenizer_p.Instantiate()
+  input_obj = InputObject(tokenizer)
 
-        context_p = base_layer.JaxContext.HParams(do_eval=True)
-        with base_layer.JaxContext(context_p):
-            predictions = model.apply(
-                {'params': model_states.mdl_vars['params']},
-                input_batch,
-                method=model.compute_predictions,
-            )
-        quality_scores = predictions['quality_scores'][0][0]
-        score_list.append(quality_scores)
+  # Dummy text input, not actually used.
+  ids, _, paddings = tokenizer.StringsToIds(
+      ['dummy text'], max_length=_MAX_TEXT_LEN
+  )
 
-    print(f"image num: {len(score_list)}")
-    print(f"average score: {sum(score_list) / len(score_list)}")
+  image = preprocess_image(_IMAGE_PATH.value, _PRE_CROP_SIZE, _IMAGE_SIZE)
+  input_batch = NestedMap(
+      ids=ids[tf.newaxis].numpy(),
+      image=image,
+      paddings=paddings[tf.newaxis].numpy(),
+  )
+  context_p = base_layer.JaxContext.HParams(do_eval=True)
+  with base_layer.JaxContext(context_p):
+    prng_key = jax.random.PRNGKey(0)
+    prng_key, compute_key = jax.random.split(prng_key)
+    (_, decode_out, _), _ = model.apply(
+        {'params': model_states.mdl_vars['params']},
+        input_batch,
+        method=model.decode,
+        rngs={base_layer.RANDOM: compute_key},
+        mutable=[base_layer.DECODE_CACHE],
+    )
+    (process_metric, _, _), _ = model.apply(
+        {'params': model_states.mdl_vars['params']},
+        input_obj,
+        decode_out,
+        method=model.process_decode_out,
+        mutable=[base_layer.DECODE_CACHE],
+    )
+    decoded_str_list = process_metric['decoded_str']
+  print('===== VILA generated comment: ', decoded_str_list)
 
 
 if __name__ == '__main__':
