@@ -17,13 +17,13 @@ lora_weights=(1.0 1.0)
 adapter_names=("step_aware" "code-divert_start_step_15")
 
 seed=42
-num_inference_steps=20
+num_inference_steps=30
 checkpoint=0
 global_step=0
 finetune_method="spo-sdv1-5/fuse_lora/concatenation/step_aware_1.0-code-divert_start_step_15_1.0"
 generated_image_output_dir="/data_center/data2/dataset/chenwy/21164-data/generated_image-seed_${seed}-num_inference_steps_${num_inference_steps}/stable_diffusion_v1_5/spo_4k/geneval/${finetune_method}/checkpoint_${checkpoint}_${global_step}"
 
-HF_ENDPOINT=https://hf-mirror.com CUDA_VISIBLE_DEVICES=3 python generation/diffusers_generate_concatenation.py \
+HF_ENDPOINT=https://hf-mirror.com CUDA_VISIBLE_DEVICES=2 python generation/diffusers_generate_concatenation.py \
     ${metadata_file} \
     --model "runwayml/stable-diffusion-v1-5" \
     --outdir "${generated_image_output_dir}" \

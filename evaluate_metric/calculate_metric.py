@@ -233,3 +233,6 @@ with torch.inference_mode():
 
 print(f"image num: {len(score_list)}")
 print(f"average score: {sum(score_list) / len(score_list)}")
+
+with open("/data3/chenweiyan/notebook/fine-tune-diffusion/spo_gitee/evaluate_metric/evaluate_result.txt", encoding='utf-8', mode='a') as f:
+    f.write(f"{args.reward_model}; score: {sum(score_list) / len(score_list)}\n")

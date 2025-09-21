@@ -6,7 +6,7 @@ metadata_file="prompts/evaluation_metadata.jsonl"
 
 #### runwayml-stable-diffusion-v1-5 ####
 seed=42
-num_inference_steps=20
+num_inference_steps=30
 checkpoint=0
 global_step=0
 finetune_method="runwayml-stable-diffusion-v1-5"
@@ -24,7 +24,7 @@ HF_ENDPOINT=https://hf-mirror.com CUDA_VISIBLE_DEVICES=4 python generation/diffu
 
 #### spo_official ####
 seed=42
-num_inference_steps=20
+num_inference_steps=30
 checkpoint=0
 global_step=0
 finetune_method="spo-sdv1-5/spo_official"
@@ -42,7 +42,7 @@ HF_ENDPOINT=https://hf-mirror.com CUDA_VISIBLE_DEVICES=4 python generation/diffu
 
 #### step_aware ####
 seed=42
-num_inference_steps=20
+num_inference_steps=30
 checkpoint=1
 global_step=754
 finetune_method="spo-sdv1-5/step_aware"
@@ -60,7 +60,7 @@ HF_ENDPOINT=https://hf-mirror.com CUDA_VISIBLE_DEVICES=4 python generation/diffu
 
 #### code-lr_6e-05-max_gn_1.0-comp_0.0-divert_start_step_15 ####
 seed=42
-num_inference_steps=20
+num_inference_steps=30
 checkpoint=0
 global_step=750
 finetune_method="spo-sdv1-5/code-lr_6e-05-max_gn_1.0-comp_0.0-divert_start_step_15"

@@ -2,7 +2,7 @@ import os
 import argparse
 from tqdm import tqdm
 import torch
-from diffusers import StableDiffusionPipeline
+from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler
 from datasets import load_dataset, Dataset
 
 def get_args():
@@ -77,7 +77,11 @@ def get_args():
         type=int,
         default=50
     )
-    
+    parser.add_argument(
+        "--scheduler",
+        type=str,
+        default="pndm"
+    )
     args = parser.parse_args()
 
     return args
@@ -85,9 +89,15 @@ def get_args():
 if __name__ == "__main__":
     args = get_args()
     os.makedirs(args.output_dir, exist_ok=True)
+    print(f"**************************************************")
+    if args.scheduler == "dpmsolver":
+        dpm_solver = DPMSolverMultistepScheduler.from_pretrained(args.pretrained_model_name_or_path, subfolder="scheduler")
+        pipeline = StableDiffusionPipeline.from_pretrained(args.pretrained_model_name_or_path, torch_dtype=torch.float16, safety_checker=None, scheduler=dpm_solver).to('cuda')
+    else:
+        pipeline = StableDiffusionPipeline.from_pretrained(args.pretrained_model_name_or_path, torch_dtype=torch.float16, safety_checker=None).to('cuda')
     print(f"Output image dir: {args.output_dir}")
-    pipeline = StableDiffusionPipeline.from_pretrained(args.pretrained_model_name_or_path, torch_dtype=torch.float16, safety_checker=None).to('cuda')
-    
+    print(f"Using scheduler: {pipeline.scheduler.__class__.__name__}")
+
     for lora_dir, lora_weight, adapter_name in zip(args.lora_dirs, args.lora_weights, args.adapter_names):
         pipeline.load_lora_weights(lora_dir, weight_name="pytorch_lora_weights.safetensors", adapter_name=adapter_name)
         print(f"Loaded LoRA from {lora_dir} with weight {lora_weight} for adapter {adapter_name}")

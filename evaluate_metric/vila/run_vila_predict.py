@@ -18,6 +18,7 @@
 from absl import app
 from absl import flags
 from absl import logging
+import torch
 import jax
 import jax.numpy as jnp
 from lingvo import compat as tf
@@ -137,7 +138,7 @@ def preprocess_image(
 def main(_):
     logging.set_verbosity(logging.ERROR)
     model, model_states = load_vila_model(_CKPT_DIR.value)
-    
+    print("JAX detected devices:", jax.devices())
     score_list = []
     for image_name in tqdm(os.listdir(_IMAGE_DIR.value), dynamic_ncols=True):
         image = preprocess_image(os.path.join(_IMAGE_DIR.value, image_name), _PRE_CROP_SIZE, _IMAGE_SIZE)

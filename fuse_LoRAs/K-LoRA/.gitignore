@@ -1,0 +1,8 @@
+**/__pycache__/
+output  
+loras
+*.safetensors
+loraDataset
+visual.py
+test.py
+weights
