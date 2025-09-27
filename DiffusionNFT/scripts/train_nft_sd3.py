@@ -15,6 +15,8 @@
 
 from collections import defaultdict
 import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import datetime
 from concurrent import futures
 import time
@@ -31,7 +33,7 @@ import torch
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data.distributed import DistributedSampler
-import wandb
+import swanlab
 from functools import partial
 import tqdm
 import tempfile
@@ -81,6 +83,8 @@ class TextPromptDataset(Dataset):
         self.file_path = os.path.join(dataset, f"{split}.txt")
         with open(self.file_path, "r") as f:
             self.prompts = [line.strip() for line in f.readlines()]
+        if split == "test":
+            self.prompts = self.prompts[0:20]
 
     def __len__(self):
         return len(self.prompts)
@@ -160,7 +164,7 @@ def gather_tensor_to_all(tensor, world_size):
 
 def compute_text_embeddings(prompt, text_encoders, tokenizers, max_sequence_length, device):
     with torch.no_grad():
-        prompt_embeds, pooled_prompt_embeds = encode_prompt(text_encoders, tokenizers, prompt, max_sequence_length)
+        prompt_embeds, pooled_prompt_embeds = encode_prompt(text_encoders, tokenizers, prompt, max_sequence_length, device)
         prompt_embeds = prompt_embeds.to(device)
         pooled_prompt_embeds = pooled_prompt_embeds.to(device)
     return prompt_embeds, pooled_prompt_embeds
@@ -212,10 +216,9 @@ def eval_fn(
     world_size,
     global_step,
     reward_fn,
-    executor,
     mixed_precision_dtype,
     ema,
-    transformer_trainable_parameters,
+    transformer_trainable_parameters
 ):
     if config.train.ema and ema is not None:
         ema.copy_ema_to(transformer_trainable_parameters, store_temp=True)
@@ -281,14 +284,13 @@ def eval_fn(
                     model_type="sd3",
                 )
 
-        rewards_future = executor.submit(reward_fn, images, prompts, prompt_metadata, only_strict=False)
-        time.sleep(0)
-        rewards, reward_metadata = rewards_future.result()
+        rewards, reward_metadata = reward_fn(images, prompts, prompt_metadata, only_strict=False)
 
         for key, value in rewards.items():
             rewards_tensor = torch.as_tensor(value, device=device).float()
             gathered_value = gather_tensor_to_all(rewards_tensor, world_size)
             all_rewards[key].append(gathered_value.numpy())
+        
 
     if is_main_process(rank):
         final_rewards = {key: np.concatenate(value_list) for key, value_list in all_rewards.items()}
@@ -307,10 +309,10 @@ def eval_fn(
             sampled_prompts_log = [prompts_to_log[i] for i in range(num_samples_to_log)]
             sampled_rewards_log = [{k: final_rewards[k][i] for k in final_rewards} for i in range(num_samples_to_log)]
 
-            wandb.log(
+            swanlab.log(
                 {
                     "eval_images": [
-                        wandb.Image(
+                        swanlab.Image(
                             os.path.join(tmpdir, f"{idx}.jpg"),
                             caption=f"{prompt:.1000} | "
                             + " | ".join(f"{k}: {v:.2f}" for k, v in reward.items() if v != -10),
@@ -370,11 +372,11 @@ def main(_):
     else:
         config.run_name += "_" + unique_id
 
-    # --- WandB Init (only on main process) ---
+    # --- swanlab Init (only on main process) ---
     if is_main_process(rank):
         log_dir = os.path.join(config.logdir, config.run_name)
         os.makedirs(log_dir, exist_ok=True)
-        wandb.init(project="flow-grpo", name=config.run_name, config=config.to_dict(), dir=log_dir)
+        swanlab.init(project="flow-grpo", name=config.run_name, config=config.to_dict(), dir=log_dir)
     logger.info(f"\n{config}")
 
     set_seed(config.seed, rank)  # Pass rank for different seeds per process
@@ -390,14 +392,18 @@ def main(_):
     scaler = GradScaler(enabled=enable_amp)
 
     # --- Load pipeline and models ---
-    pipeline = StableDiffusion3Pipeline.from_pretrained(config.pretrained.model)
+    pipeline = StableDiffusion3Pipeline.from_pretrained(config.pretrained.model, text_encoder_3=None, tokenizer_3=None)
+    # pipeline.enable_model_cpu_offload()
     pipeline.vae.requires_grad_(False)
     pipeline.text_encoder.requires_grad_(False)
     pipeline.text_encoder_2.requires_grad_(False)
-    pipeline.text_encoder_3.requires_grad_(False)
+    # !!! Drop  pipeline.text_encoder_3.requires_grad_(False)
     pipeline.transformer.requires_grad_(not config.use_lora)
-    text_encoders = [pipeline.text_encoder, pipeline.text_encoder_2, pipeline.text_encoder_3]
-    tokenizers = [pipeline.tokenizer, pipeline.tokenizer_2, pipeline.tokenizer_3]
+    text_encoders = [pipeline.text_encoder, pipeline.text_encoder_2, None] # Drop text_encoder_3
+    tokenizers = [pipeline.tokenizer, pipeline.tokenizer_2, None] # Drop tokenizer_3
+    
+    # transformer_config_joint_attention_dim = pipeline.transformer.config.joint_attention_dim # 4096
+    
     pipeline.safety_checker = None
     pipeline.set_progress_bar_config(
         position=1,
@@ -412,7 +418,7 @@ def main(_):
     pipeline.vae.to(device, dtype=torch.float32)  # VAE usually fp32
     pipeline.text_encoder.to(device, dtype=text_encoder_dtype)
     pipeline.text_encoder_2.to(device, dtype=text_encoder_dtype)
-    pipeline.text_encoder_3.to(device, dtype=text_encoder_dtype)
+    # pipeline.text_encoder_3.to(device, dtype=text_encoder_dtype)
 
     transformer = pipeline.transformer.to(device)
 
@@ -509,25 +515,27 @@ def main(_):
     else:
         assert False
 
-    executor = futures.ThreadPoolExecutor(max_workers=8)  # Async reward computation
-
     # Train!
     samples_per_epoch = config.sample.train_batch_size * world_size * config.sample.num_batches_per_epoch
     total_train_batch_size = config.train.batch_size * world_size * config.train.gradient_accumulation_steps
 
-    logger.info("***** Running training *****")
-    logger.info(f"  Num Epochs = {config.num_epochs}")
-    logger.info(f"  Sample batch size per device = {config.sample.train_batch_size}")
-    logger.info(f"  Train batch size per device = {config.train.batch_size}")
-    logger.info(f"  Gradient Accumulation steps = {config.train.gradient_accumulation_steps}")
-    logger.info("")
-    logger.info(f"  Total number of samples per epoch = {samples_per_epoch}")
-    logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size}")
-    logger.info(f"  Number of gradient updates per inner epoch = {samples_per_epoch // total_train_batch_size}")
-    logger.info(f"  Number of inner epochs = {config.train.num_inner_epochs}")
+    if is_main_process(rank):
+        logger.info("***** Running training *****")
+        logger.info(f"  Num Epochs = {config.num_epochs}")
+        logger.info(f"  Sample batch size per device = {config.sample.train_batch_size}")
+        logger.info(f"  Train batch size per device = {config.train.batch_size}")
+        logger.info(f"  Gradient Accumulation steps = {config.train.gradient_accumulation_steps}")
+        logger.info("")
+        logger.info(f"  Num batches per epoch: {config.sample.num_batches_per_epoch}")
+        logger.info(f"  Num images per prompt: {config.sample.num_image_per_prompt}")
+        logger.info("")
+        logger.info(f"  Total number of samples per epoch = {samples_per_epoch}")
+        logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size}")
+        logger.info(f"  Number of gradient updates per inner epoch = {samples_per_epoch // total_train_batch_size}")
+        logger.info(f"  Number of inner epochs = {config.train.num_inner_epochs}")
 
-    reward_fn = getattr(flow_grpo.rewards, "multi_score")(device, config.reward_fn)  # Pass device
-    eval_reward_fn = getattr(flow_grpo.rewards, "multi_score")(device, config.reward_fn)  # Pass device
+    reward_fn, reward_models = getattr(flow_grpo.rewards, "multi_score")(device, config.reward_fn)  # Pass device
+    eval_reward_fn = reward_fn
 
     # --- Resume from checkpoint ---
     first_epoch = 0
@@ -584,15 +592,13 @@ def main(_):
             train_sampler.set_epoch(epoch)
 
         # SAMPLING
+        transformer_ddp.eval()  # Sets DDP model and its submodules to eval mode.
         pipeline.transformer.eval()
         samples_data_list = []
+        for reward_model in reward_models.values(): reward_model.to(device)
+        torch.cuda.empty_cache()
 
-        for i in tqdm(
-            range(config.sample.num_batches_per_epoch),
-            desc=f"Epoch {epoch}: sampling",
-            disable=not is_main_process(rank),
-            position=0,
-        ):
+        for i in tqdm(range(config.sample.num_batches_per_epoch), desc=f"Epoch {epoch}: sampling", disable=not is_main_process(rank), position=0):
             transformer_ddp.module.set_adapter("default")
             if hasattr(train_sampler, "set_epoch") and isinstance(train_sampler, DistributedKRepeatSampler):
                 train_sampler.set_epoch(epoch * config.sample.num_batches_per_epoch + i)
@@ -618,7 +624,6 @@ def main(_):
                     world_size,
                     global_step,
                     eval_reward_fn,
-                    executor,
                     mixed_precision_dtype,
                     ema,
                     transformer_trainable_parameters,
@@ -661,8 +666,7 @@ def main(_):
             latents = torch.stack(latents, dim=1)
             timesteps = pipeline.scheduler.timesteps.repeat(len(prompts), 1).to(device)
 
-            rewards_future = executor.submit(reward_fn, images, prompts, prompt_metadata, only_strict=True)
-            time.sleep(0)
+            rewards, reward_metadata = reward_fn(images, prompts, prompt_metadata, only_strict=True)
 
             samples_data_list.append(
                 {
@@ -672,16 +676,16 @@ def main(_):
                     "timesteps": timesteps,
                     "next_timesteps": torch.concatenate([timesteps[:, 1:], torch.zeros_like(timesteps[:, :1])], dim=1),
                     "latents_clean": latents[:, -1],
-                    "rewards_future": rewards_future,  # Store future
+                    "rewards": {k: torch.as_tensor(v, device=device).float() for k, v in rewards.items()}
                 }
             )
+            del latents, _, prompt_metadata
+            if i != config.sample.num_batches_per_epoch - 1:
+                del prompts, images
 
-        for sample_item in tqdm(
-            samples_data_list, desc="Waiting for rewards", disable=not is_main_process(rank), position=0
-        ):
-            rewards, reward_metadata = sample_item["rewards_future"].result()
-            sample_item["rewards"] = {k: torch.as_tensor(v, device=device).float() for k, v in rewards.items()}
-            del sample_item["rewards_future"]
+        for reward_model in reward_models.values(): reward_model.to("cpu")
+        torch.cuda.empty_cache()
+    
 
         # Collate samples
         collated_samples = {
@@ -707,10 +711,10 @@ def main(_):
                     pil = pil.resize((config.resolution, config.resolution))
                     pil.save(os.path.join(tmpdir, f"{idx}.jpg"))
 
-                wandb.log(
+                swanlab.log(
                     {
                         "images": [
-                            wandb.Image(
+                            swanlab.Image(
                                 os.path.join(tmpdir, f"{idx}.jpg"),
                                 caption=f"{prompts_to_log[idx]:.100} | avg: {rewards_to_log[idx]:.2f}",
                             )
@@ -729,7 +733,7 @@ def main(_):
             gathered_rewards_dict[key] = gather_tensor_to_all(value_tensor, world_size).numpy()
 
         if is_main_process(rank):  # logging
-            wandb.log(
+            swanlab.log(
                 {
                     "epoch": epoch,
                     **{
@@ -752,7 +756,7 @@ def main(_):
             if is_main_process(rank):
                 group_size, trained_prompt_num = stat_tracker.get_stats()
                 zero_std_ratio, reward_std_mean = calculate_zero_std_ratio(prompts_all_decoded, gathered_rewards_dict)
-                wandb.log(
+                swanlab.log(
                     {
                         "group_size": group_size,
                         "trained_prompt_num": trained_prompt_num,
@@ -767,9 +771,12 @@ def main(_):
                     step=global_step,
                 )
             stat_tracker.clear()
+            del prompt_ids_all, prompts_all_decoded
+            torch.cuda.empty_cache()
         else:
             avg_rewards_all = gathered_rewards_dict["avg"]
             advantages = (avg_rewards_all - avg_rewards_all.mean()) / (avg_rewards_all.std() + 1e-4)
+        
         # Distribute advantages back to processes
         samples_per_gpu = collated_samples["timesteps"].shape[0]
         if advantages.ndim == 1:
@@ -787,13 +794,14 @@ def main(_):
 
         del collated_samples["rewards"]
         del collated_samples["prompt_ids"]
-
+        del gathered_rewards_dict
+        torch.cuda.empty_cache()
+        
         num_batches = config.sample.num_batches_per_epoch * config.sample.train_batch_size // config.train.batch_size
 
         filtered_samples = collated_samples
 
         total_batch_size_filtered, num_timesteps_filtered = filtered_samples["timesteps"].shape
-
         # TRAINING
         transformer_ddp.train()  # Sets DDP model and its submodules to train mode.
 
@@ -828,12 +836,7 @@ def main(_):
 
             info_accumulated = defaultdict(list)  # For accumulating stats over one grad acc cycle
 
-            for i, train_sample_batch in tqdm(
-                list(enumerate(samples_batched_list)),
-                desc=f"Epoch {epoch}.{inner_epoch}: training",
-                position=0,
-                disable=not is_main_process(rank),
-            ):
+            for i, train_sample_batch in tqdm(list(enumerate(samples_batched_list)), desc=f"Epoch {epoch}.{inner_epoch}: training", position=0, disable=not is_main_process(rank),):
                 current_micro_batch_size = len(train_sample_batch["prompt_embeds"])
 
                 if config.sample.guidance_scale > 1.0:
@@ -851,13 +854,7 @@ def main(_):
                     pooled_embeds = train_sample_batch["pooled_prompt_embeds"]
 
                 # Loop over timesteps for this micro-batch
-                for j_idx, j_timestep_orig_idx in tqdm(
-                    enumerate(range(num_train_timesteps)),
-                    desc="Timestep",
-                    position=1,
-                    leave=False,
-                    disable=not is_main_process(rank),
-                ):
+                for j_idx, j_timestep_orig_idx in tqdm(enumerate(range(num_train_timesteps)), desc="Timestep", position=1, leave=False, disable=not is_main_process(rank),):
                     assert j_idx == j_timestep_orig_idx
                     x0 = train_sample_batch["latents_clean"]
 
@@ -1008,7 +1005,7 @@ def main(_):
                         dist.all_reduce(info_tensor, op=dist.ReduceOp.AVG)
                         reduced_log_info = {k: info_tensor[ki].item() for ki, k in enumerate(sorted(log_info.keys()))}
                         if is_main_process(rank):
-                            wandb.log(
+                            swanlab.log(
                                 {
                                     "step": global_step,
                                     "gradient_update_times": gradient_update_times,
@@ -1018,6 +1015,8 @@ def main(_):
                                 }
                             )
 
+                        del log_info, info_tensor, reduced_log_info, info_accumulated
+                        torch.cuda.empty_cache()
                         global_step += 1  # gradient step
                         info_accumulated = defaultdict(list)  # Reset for next accumulation cycle
 
@@ -1027,7 +1026,11 @@ def main(_):
                     and (current_accumulated_steps % effective_grad_accum_steps == 0)
                 ):
                     ema.step(transformer_trainable_parameters, global_step)
-
+                
+        
+        del images, prompts, prompt_ids, prompt_embeds, pooled_prompt_embeds
+        del samples_data_list, collated_samples, filtered_samples, advantages
+        torch.cuda.empty_cache()
         if world_size > 1:
             dist.barrier()
 
@@ -1037,9 +1040,11 @@ def main(_):
                 transformer_trainable_parameters, old_transformer_trainable_parameters, strict=True
             ):
                 tgt_param.data.copy_(tgt_param.detach().data * decay + src_param.detach().clone().data * (1.0 - decay))
+        torch.cuda.empty_cache()       
+        
 
     if is_main_process(rank):
-        wandb.finish()
+        swanlab.finish()
     cleanup_distributed()
 
 

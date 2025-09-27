@@ -13,7 +13,7 @@ class PerPromptStatTracker:
         prompts = np.array(prompts)
         rewards = np.array(rewards, dtype=np.float64)
         unique = np.unique(prompts)
-        advantages = np.empty_like(rewards) * 0.0
+        advantages = np.zeros_like(rewards) # np.empty_like(rewards) * 0.0
         for prompt in unique:
             prompt_rewards = rewards[prompts == prompt]
             if prompt not in self.stats:
@@ -37,6 +37,7 @@ class PerPromptStatTracker:
         return avg_group_size, history_prompts
 
     def clear(self):
+        del self.stats
         self.stats = {}
 
     def get_mean_of_top_rewards(self, top_percentage):

@@ -74,7 +74,7 @@ def hpsv2_score(device):
         scores = scorer(images, prompts)
         return scores, {}
 
-    return _fn
+    return _fn, scorer
 
 
 def pickscore_score(device):
@@ -265,13 +265,17 @@ def multi_score(device, score_dict):
         "clipscore": clip_score,
         "hpsv2": hpsv2_score,
     }
-    score_fns = {}
+    score_fns, score_models = {}, {}
     for score_name, weight in score_dict.items():
-        score_fns[score_name] = (
-            score_functions[score_name](device)
-            if "device" in score_functions[score_name].__code__.co_varnames
-            else score_functions[score_name]()
-        )
+        # score_fns[score_name] = (
+        #     score_functions[score_name](device)
+        #     if "device" in score_functions[score_name].__code__.co_varnames
+        #     else score_functions[score_name]()
+        # )
+        score_fn, score_model = score_functions[score_name](device) if "device" in score_functions[score_name].__code__.co_varnames else score_functions[score_name]()
+        score_fns[score_name] = score_fn
+        score_models[score_name] = score_model
+        
 
     # only_strict is only for geneval. During training, only the strict reward is needed, and non-strict rewards don't need to be computed, reducing reward calculation time.
     def _fn(images, prompts, metadata, only_strict=True):
@@ -302,7 +306,7 @@ def multi_score(device, score_dict):
         score_details["avg"] = total_scores
         return score_details, {}
 
-    return _fn
+    return _fn, score_models
 
 
 def main():

@@ -31,6 +31,7 @@ def run_sampling(
         range(len(sigma_schedule) - 1),
         desc="Sampling Progress",
         disable=not dist.is_initialized() or dist.get_rank() != 0,
+        leave=False
     ):
         sigma = sigma_schedule[i]
 

@@ -25,8 +25,8 @@ def _get_config(base_model="sd3", n_gpus=1, gradient_step_per_epoch=1, dataset="
         config.sample.noise_level = 0.7
         bsz = 9
 
-    config.sample.num_image_per_prompt = 24
-    num_groups = 48
+    config.sample.num_image_per_prompt = 24 # 24
+    num_groups = 48 # 48
 
     while True:
         if bsz < 1:
@@ -39,22 +39,22 @@ def _get_config(base_model="sd3", n_gpus=1, gradient_step_per_epoch=1, dataset="
             if n_batch_per_epoch % gradient_step_per_epoch == 0:
                 config.sample.train_batch_size = bsz
                 config.sample.num_batches_per_epoch = n_batch_per_epoch
-                config.train.batch_size = config.sample.train_batch_size
+                config.train.batch_size = 2
                 config.train.gradient_accumulation_steps = (
-                    config.sample.num_batches_per_epoch // gradient_step_per_epoch
+                    config.sample.num_batches_per_epoch * (config.sample.train_batch_size // config.train.batch_size) // gradient_step_per_epoch
                 )
                 break
         bsz -= 1
 
     # special design, the test set has a total of 1018/2212/2048 for ocr/geneval/pickscore, to make gpu_num*bs*n as close as possible to it, because when the number of samples cannot be divided evenly by the number of cards, multi-card will fill the last batch to ensure each card has the same number of samples, affecting gradient synchronization.
-    config.sample.test_batch_size = 14 if dataset == "geneval" else 16
+    config.sample.test_batch_size = 8 if dataset == "geneval" else 8
     if n_gpus > 32:
         config.sample.test_batch_size = config.sample.test_batch_size // 2
 
     config.prompt_fn = "geneval" if dataset == "geneval" else "general_ocr"
 
-    config.run_name = f"nft_{base_model}_{name}"
-    config.save_dir = f"logs/nft/{base_model}/{name}"
+    config.run_name = f"/data_center/data2/dataset/chenwy/21164-data/diffusionnft/logs/nft_{base_model}_{name}"
+    config.save_dir = f"/data_center/data2/dataset/chenwy/21164-data/diffusionnft/model-ckpt/{base_model}/{name}"
     config.reward_fn = reward_fn
 
     config.decay_type = 1
@@ -134,5 +134,22 @@ def sd3_multi_reward():
         name="multi_reward",
     )
     config.sample.num_steps = 25
+    config.beta = 0.1
+    return config
+
+
+def sd3_multi_reward_hpsv2_1():
+    reward_fn = {
+        "hpsv2": 1.0
+    }
+    config = _get_config(
+        base_model="sd3",
+        n_gpus=4,
+        gradient_step_per_epoch=1,
+        dataset="pickscore",
+        reward_fn=reward_fn,
+        name="hpsv2_1",
+    )
+    config.sample.num_steps = 10
     config.beta = 0.1
     return config

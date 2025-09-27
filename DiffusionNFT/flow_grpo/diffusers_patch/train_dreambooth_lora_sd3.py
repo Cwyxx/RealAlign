@@ -103,6 +103,7 @@ def encode_prompt(
     device=None,
     num_images_per_prompt: int = 1,
     text_input_ids_list=None,
+    transformer_config_joint_attention_dim=4096
 ):
     prompt = [prompt] if isinstance(prompt, str) else prompt
 
@@ -126,19 +127,34 @@ def encode_prompt(
     clip_prompt_embeds = torch.cat(clip_prompt_embeds_list, dim=-1)
     pooled_prompt_embeds = torch.cat(clip_pooled_prompt_embeds_list, dim=-1)
 
-    t5_prompt_embed = _encode_prompt_with_t5(
-        text_encoders[-1],
-        tokenizers[-1],
-        max_sequence_length,
-        prompt=prompt,
-        num_images_per_prompt=num_images_per_prompt,
-        text_input_ids=text_input_ids_list[-1] if text_input_ids_list else None,
-        device=device if device is not None else text_encoders[-1].device,
-    )
+    if text_encoders[-1] is not None:
+        t5_prompt_embed = _encode_prompt_with_t5(
+            text_encoders[-1],
+            tokenizers[-1],
+            max_sequence_length,
+            prompt=prompt,
+            num_images_per_prompt=num_images_per_prompt,
+            text_input_ids=text_input_ids_list[-1] if text_input_ids_list else None,
+            device=device if device is not None else text_encoders[-1].device,
+        )
+    else:
+        ### Copy from diffusers/stablediffusionpipeline
+        batch_size = len(prompt)
+        batch_size *= num_images_per_prompt
+        t5_prompt_embed = torch.zeros(
+            (
+                batch_size,
+                tokenizers[0].model_max_length,
+                transformer_config_joint_attention_dim
+            ),
+            device=device if device is not None else text_encoders[0].device,
+            dtype=text_encoders[0].dtype,
+        )
 
     clip_prompt_embeds = torch.nn.functional.pad(
         clip_prompt_embeds, (0, t5_prompt_embed.shape[-1] - clip_prompt_embeds.shape[-1])
     )
+
     prompt_embeds = torch.cat([clip_prompt_embeds, t5_prompt_embed], dim=-2)
 
     return prompt_embeds, pooled_prompt_embeds

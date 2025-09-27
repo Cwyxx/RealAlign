@@ -89,7 +89,7 @@ class HPSv2Scorer(nn.Module):
         self.device = device
         model = create_model(
             "ViT-H-14",
-            os.path.join(CKPT_PATH, "open_clip_pytorch_model.bin"),
+            None,
             precision="amp",
             device=device,
             jit=False,
@@ -114,7 +114,7 @@ class HPSv2Scorer(nn.Module):
 
         self.model = model.to(device)
         self.preprocess_val = preprocess_val
-        checkpoint = torch.load(os.path.join(CKPT_PATH, "HPS_v2.1_compressed.pt"), map_location="cpu")
+        checkpoint = torch.load("/data_center/data2/dataset/chenwy/21164-data/model-ckpt/hpsv2/HPS_v2.1_compressed.pt", map_location="cpu")
         self.model.load_state_dict(checkpoint["state_dict"])
         self.processor = get_tokenizer("ViT-H-14")
         self.eval()
