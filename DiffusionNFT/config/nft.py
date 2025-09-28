@@ -23,7 +23,7 @@ def _get_config(base_model="sd3", n_gpus=1, gradient_step_per_epoch=1, dataset="
         config.resolution = 512
         config.train.beta = 0.0001
         config.sample.noise_level = 0.7
-        bsz = 9
+        bsz = 7
 
     config.sample.num_image_per_prompt = 24 # 24
     num_groups = 48 # 48
@@ -100,12 +100,14 @@ def sd3_pickscore():
     }
     config = _get_config(
         base_model="sd3",
-        n_gpus=8,
+        n_gpus=6,
         gradient_step_per_epoch=1,
         dataset="pickscore",
         reward_fn=reward_fn,
         name="pickscore",
     )
+    config.sample.num_steps=10
+    config.beta = 1.0
     return config
 
 
@@ -114,8 +116,10 @@ def sd3_hpsv2():
         "hpsv2": 1.0,
     }
     config = _get_config(
-        base_model="sd3", n_gpus=8, gradient_step_per_epoch=1, dataset="pickscore", reward_fn=reward_fn, name="hpsv2"
+        base_model="sd3", n_gpus=6, gradient_step_per_epoch=1, dataset="pickscore", reward_fn=reward_fn, name="hpsv2"
     )
+    config.sample.num_steps=10
+    config.beta = 1.0
     return config
 
 
@@ -127,7 +131,7 @@ def sd3_multi_reward():
     }
     config = _get_config(
         base_model="sd3",
-        n_gpus=8,
+        n_gpus=6,
         gradient_step_per_epoch=1,
         dataset="pickscore",
         reward_fn=reward_fn,
@@ -137,19 +141,3 @@ def sd3_multi_reward():
     config.beta = 0.1
     return config
 
-
-def sd3_multi_reward_hpsv2_1():
-    reward_fn = {
-        "hpsv2": 1.0
-    }
-    config = _get_config(
-        base_model="sd3",
-        n_gpus=4,
-        gradient_step_per_epoch=1,
-        dataset="pickscore",
-        reward_fn=reward_fn,
-        name="hpsv2_1",
-    )
-    config.sample.num_steps = 10
-    config.beta = 0.1
-    return config

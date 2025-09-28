@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from huggingface_hub import login
+login(token="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")
 from collections import defaultdict
 import os
 import sys
@@ -284,7 +286,7 @@ def eval_fn(
                     model_type="sd3",
                 )
 
-        rewards, reward_metadata = reward_fn(images, prompts, prompt_metadata, only_strict=False)
+        rewards, reward_metadata = reward_fn(images, prompts, prompt_metadata, only_strict=False, offload_to_cpu=True)
 
         for key, value in rewards.items():
             rewards_tensor = torch.as_tensor(value, device=device).float()
@@ -536,6 +538,10 @@ def main(_):
 
     reward_fn, reward_models = getattr(flow_grpo.rewards, "multi_score")(device, config.reward_fn)  # Pass device
     eval_reward_fn = reward_fn
+    ### Offload to cpu ###
+    for _, reward_model in reward_models.items():
+        reward_model.to(torch.device("cpu"))
+    ### Offload to cpu ###
 
     # --- Resume from checkpoint ---
     first_epoch = 0
@@ -595,7 +601,7 @@ def main(_):
         transformer_ddp.eval()  # Sets DDP model and its submodules to eval mode.
         pipeline.transformer.eval()
         samples_data_list = []
-        for reward_model in reward_models.values(): reward_model.to(device)
+        # for reward_model in reward_models.values(): reward_model.to(device)
         torch.cuda.empty_cache()
 
         for i in tqdm(range(config.sample.num_batches_per_epoch), desc=f"Epoch {epoch}: sampling", disable=not is_main_process(rank), position=0):
@@ -628,6 +634,7 @@ def main(_):
                     ema,
                     transformer_trainable_parameters,
                 )
+                torch.cuda.empty_cache()
 
             if i == 0 and epoch % config.save_freq == 0 and is_main_process(rank) and not config.debug:
                 save_ckpt(
@@ -666,7 +673,8 @@ def main(_):
             latents = torch.stack(latents, dim=1)
             timesteps = pipeline.scheduler.timesteps.repeat(len(prompts), 1).to(device)
 
-            rewards, reward_metadata = reward_fn(images, prompts, prompt_metadata, only_strict=True)
+            torch.cuda.empty_cache()
+            rewards, reward_metadata = reward_fn(images, prompts, prompt_metadata, only_strict=True, offload_to_cpu=True)
 
             samples_data_list.append(
                 {
@@ -683,7 +691,6 @@ def main(_):
             if i != config.sample.num_batches_per_epoch - 1:
                 del prompts, images
 
-        for reward_model in reward_models.values(): reward_model.to("cpu")
         torch.cuda.empty_cache()
     
 
@@ -1014,6 +1021,10 @@ def main(_):
                                     **reduced_log_info,
                                 }
                             )
+                            
+                            logger.info(f"  global_step: {global_step}")
+                            logger.info(f"  gradient_update_times: {gradient_update_times}")
+                            logger.info(f"  epoch: {epoch}")
 
                         del log_info, info_tensor, reduced_log_info, info_accumulated
                         torch.cuda.empty_cache()

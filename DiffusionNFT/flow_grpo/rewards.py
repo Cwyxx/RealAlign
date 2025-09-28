@@ -59,7 +59,7 @@ def clip_score(device):
         scores = scorer(images, prompts)
         return scores, {}
 
-    return _fn
+    return _fn, scorer
 
 
 def hpsv2_score(device):
@@ -90,7 +90,7 @@ def pickscore_score(device):
         scores = scorer(prompts, images)
         return scores, {}
 
-    return _fn
+    return _fn, scorer
 
 
 def imagereward_score(device):
@@ -107,7 +107,7 @@ def imagereward_score(device):
         scores = scorer(prompts, images)
         return scores, {}
 
-    return _fn
+    return _fn, scorer
 
 
 def geneval_score(device):
@@ -278,11 +278,14 @@ def multi_score(device, score_dict):
         
 
     # only_strict is only for geneval. During training, only the strict reward is needed, and non-strict rewards don't need to be computed, reducing reward calculation time.
-    def _fn(images, prompts, metadata, only_strict=True):
+    def _fn(images, prompts, metadata, only_strict=True, offload_to_cpu=False):
         total_scores = []
         score_details = {}
-
+                
         for score_name, weight in score_dict.items():
+            if score_name in ["pickscore", "clipscore", "hpsv2"] and offload_to_cpu:
+                score_models[score_name].to(device)
+                
             if score_name == "geneval":
                 scores, rewards, strict_rewards, group_rewards, group_strict_rewards = score_fns[score_name](
                     images, prompts, metadata, only_strict
@@ -302,6 +305,10 @@ def multi_score(device, score_dict):
                 total_scores = weighted_scores
             else:
                 total_scores = [total + weighted for total, weighted in zip(total_scores, weighted_scores)]
+                
+            ### offLoad_to_cpu ###
+            if score_name in ["pickscore", "clipscore", "hpsv2"] and offload_to_cpu:
+                score_models[score_name].to(torch.device("cpu"))
 
         score_details["avg"] = total_scores
         return score_details, {}

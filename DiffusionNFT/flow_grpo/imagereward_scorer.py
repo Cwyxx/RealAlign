@@ -13,7 +13,7 @@ class ImageRewardScorer(torch.nn.Module):
             RM.load(
                 "ImageReward-v1.0",
                 device=device,
-                download_root=os.path.join(os.environ.get("HF_HOME", "~/.cache/"), "ImageReward"),
+                # download_root=os.path.join(os.environ.get("HF_HOME", "~/.cache/"), "ImageReward"),
             )
             .eval()
             .to(dtype=dtype)
