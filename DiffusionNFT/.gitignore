@@ -306,6 +306,7 @@ tags
 wandb/
 logs/
 notebooks/
+swanlog/
 
 *.pth
 
