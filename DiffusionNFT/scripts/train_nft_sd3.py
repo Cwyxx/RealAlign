@@ -84,7 +84,7 @@ class TextPromptDataset(Dataset):
         with open(self.file_path, "r") as f:
             self.prompts = [line.strip() for line in f.readlines()]
         if split == "test":
-            self.prompts = self.prompts[0:20]
+            self.prompts = self.prompts[0:50]
 
     def __len__(self):
         return len(self.prompts)

@@ -15,9 +15,9 @@ def get_config():
     config.logdir = "logs"
     # number of epochs to train for. each epoch is one round of sampling from the model followed by training on those
     # samples.
-    config.num_epochs = 100000
+    config.num_epochs = 152 # 100000
     # number of epochs between saving model checkpoints.
-    config.save_freq = 30
+    config.save_freq = 10 # 30
     config.eval_freq = 10
     # mixed precision training. options are "fp16", "bf16", and "no". half-precision speeds up training significantly.
     config.mixed_precision = "fp16"

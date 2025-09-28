@@ -41,7 +41,7 @@ logging.getLogger("httpx").setLevel(logging.ERROR)
 def setup_distributed(rank, world_size):
     """Initializes the distributed process group."""
     os.environ["MASTER_ADDR"] = os.getenv("MASTER_ADDR", "localhost")
-    os.environ["MASTER_PORT"] = os.getenv("MASTER_PORT", "12355")
+    os.environ["MASTER_PORT"] = os.getenv("MASTER_PORT", "13355")
     dist.init_process_group("nccl", rank=rank, world_size=world_size)
 
 

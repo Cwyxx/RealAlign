@@ -47,7 +47,7 @@ def _get_config(base_model="sd3", n_gpus=1, gradient_step_per_epoch=1, dataset="
         bsz -= 1
 
     # special design, the test set has a total of 1018/2212/2048 for ocr/geneval/pickscore, to make gpu_num*bs*n as close as possible to it, because when the number of samples cannot be divided evenly by the number of cards, multi-card will fill the last batch to ensure each card has the same number of samples, affecting gradient synchronization.
-    config.sample.test_batch_size = 8 if dataset == "geneval" else 8
+    config.sample.test_batch_size = 5 if dataset == "geneval" else 5
     if n_gpus > 32:
         config.sample.test_batch_size = config.sample.test_batch_size // 2
 
