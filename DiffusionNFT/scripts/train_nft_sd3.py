@@ -13,8 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from huggingface_hub import login
-login(token="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")
+# from huggingface_hub import login
+# login(token="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")
+import warnings
+warnings.simplefilter("once")
+
 from collections import defaultdict
 import os
 import sys

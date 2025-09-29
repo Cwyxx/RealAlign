@@ -122,6 +122,26 @@ def sd3_hpsv2():
     config.beta = 1.0
     return config
 
+def sd3_code():
+    reward_fn = {
+        "code": 1.0,
+    }
+    config = _get_config(
+        base_model="sd3",
+        n_gpus=6,
+        gradient_step_per_epoch=1,
+        dataset="pickscore",
+        reward_fn=reward_fn,
+        name="code",
+    )
+    config.sample.num_steps=10
+    #### for faster reward increase ####
+    config.beta = 0.1
+    config.decay_type = 2
+    config.save_freq = 1 # 30
+    config.eval_freq = 1
+    #### for faster reward increase ####
+    return config
 
 def sd3_multi_reward():
     reward_fn = {

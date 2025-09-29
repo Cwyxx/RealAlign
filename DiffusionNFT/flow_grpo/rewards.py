@@ -2,6 +2,7 @@ from PIL import Image
 import io
 import numpy as np
 import torch
+import torchvision
 from collections import defaultdict
 
 
@@ -252,6 +253,77 @@ def unifiedreward_score_sglang(device):
 
     return _fn
 
+def code(device):
+    from flow_grpo.code_models.models import VITContrastiveHF as CoDE_Model
+    classification_type = "linear"
+    aigi_detector_path = "/data_center/data2/dataset/chenwy/21164-data/detection-method-ckpt/CoDE"
+    aigi_detector = CoDE_Model(classification_type, aigi_detector_path)
+    aigi_detector = aigi_detector.to(dtype=torch.float32, device=device)
+    aigi_detector.eval()
+    
+    _transform = torchvision.transforms.Compose([
+        torchvision.transforms.CenterCrop(224),               # Center crop to 224x224
+        torchvision.transforms.ToTensor(),                     # Convert PIL image to tensor
+        torchvision.transforms.Normalize(                      # Normalize with mean and std
+            mean=[0.485, 0.456, 0.406],            # ImageNet mean values
+            std=[0.229, 0.224, 0.225]              # ImageNet std values
+        )
+    ])
+    def _fn(images, prompts, metadata):
+        if isinstance(images, torch.Tensor):
+            images = (images * 255).round().clamp(0, 255).to(torch.uint8).cpu().numpy()
+            images = images.transpose(0, 2, 3, 1)  # NCHW -> NHWC
+            images = [Image.fromarray(image) for image in images]
+        
+        transformed_images = [_transform(image) for image in images]
+        image_tensor = torch.stack(transformed_images)
+        logits = aigi_detector(image_tensor)
+        outputs = logits[:, 1].reshape(-1, 1)
+        scores = 1 - outputs
+        scores = scores.squeeze()
+        return scores, {}
+    
+    return _fn, aigi_detector
+
+def b_free(device):
+    import os, yaml
+    from flow_grpo.b_free_models.networks import get_network, load_weights
+
+    def get_config(model_name, weights_dir='/data_center/data2/dataset/chenwy/21164-data/model-ckpt/B-Free'):
+        with open(os.path.join(weights_dir, model_name, 'config.yaml')) as fid:
+            data = yaml.load(fid, Loader=yaml.FullLoader)
+        model_path = os.path.join(weights_dir, model_name, data['weights_file'])
+        return data['model_name'], model_path, data['arch'], data['norm_type']
+    
+    # defining model and transforms
+    _, model_path, arch, norm_type = get_config("BFREE_dino2reg4")
+    model = load_weights(get_network(arch), model_path)
+    model = model.to(device).eval()
+    
+    if norm_type == "resnet":
+        _transform = torchvision.transforms.Compose([
+                torchvision.transforms.ToTensor(),                     # Convert PIL image to tensor
+                torchvision.transforms.Normalize(                      # Normalize with mean and std
+                    mean=[0.485, 0.456, 0.406],            # ImageNet mean values
+                    std=[0.229, 0.224, 0.225]              # ImageNet std values
+                )
+        ])
+    
+    def _fn(images, prompts, metadata):
+        if isinstance(images, torch.Tensor):
+            images = (images * 255).round().clamp(0, 255).to(torch.uint8).cpu().numpy()
+            images = images.transpose(0, 2, 3, 1)  # NCHW -> NHWC
+            images = [Image.fromarray(image) for image in images]
+        
+        transformed_images = [_transform(image) for image in images]
+        image_tensor = torch.stack(transformed_images)
+        outputs = torch.sigmoid(model(image_tensor))
+        outputs = outputs.reshape(-1, 1)
+        scores = 1 - outputs
+        scores = scores.squeeze()
+        return scores, {}
+    return _fn, model
+
 
 def multi_score(device, score_dict):
     score_functions = {
@@ -264,6 +336,7 @@ def multi_score(device, score_dict):
         "geneval": geneval_score,
         "clipscore": clip_score,
         "hpsv2": hpsv2_score,
+        "code": code
     }
     score_fns, score_models = {}, {}
     for score_name, weight in score_dict.items():
