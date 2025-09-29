@@ -227,7 +227,7 @@ def main(_):
     # ### MODIFIED: Logic ported from calculate_score.py ###
     # --- 2. Setup Dataset and DataLoader ---
     print(f"Loading dataset: {args.dataset}")
-    dataset_path = f"dataset/{args.dataset}"
+    dataset_path = f"/data3/chenweiyan/notebook/fine-tune-diffusion/spo_gitee/DiffusionNFT/dataset/{args.dataset}"
     if args.dataset == "geneval":
         dataset = GenevalPromptDataset(dataset_path, split="test")
     else: # Handles ocr, pickscore, drawbench

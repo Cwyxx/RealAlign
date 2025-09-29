@@ -45,7 +45,7 @@ def aesthetic_score(device):
         scores = scorer(images)
         return scores, {}
 
-    return _fn
+    return _fn, scorer
 
 
 def clip_score(device):

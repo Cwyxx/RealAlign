@@ -145,7 +145,7 @@ def main(args):
         def scoring_fn(images, prompts, metadata, only_strict=False):
             ### images is image_paths #### 
             images = [ Image.open(image_path) for image_path in images ]
-            score_list = reward_model(images).tolist()
+            score_list = reward_model.score(images).tolist()
             
             score_details = { args.reward_model: score_list}
             return score_details, {}
@@ -167,7 +167,7 @@ def main(args):
                     preprocessor(images=pil_image, return_tensors="pt")
                     .pixel_values.to(device)
                 )
-                score = reward_model(pixel_values).logits.squeeze().float().cpu().numpy()
+                score = reward_model(pixel_values).logits.squeeze().float().detach().cpu().numpy()
                 score_list.append(score.item())
                 
             score_details = { args.reward_model: score_list}
@@ -189,7 +189,7 @@ def main(args):
             pil_images = [ Image.open(image_path) for image_path in image_paths ] # imagereward, pickscore get pil image input
             
             if args.reward_model == "aesthetic":
-                pil_images = np.stack([np.array(Image.open(img)) for img in pil_images])
+                pil_images = np.stack([np.array(img) for img in pil_images])
                 images = pil_images.transpose(0, 3, 1, 2)
                 images = torch.tensor(images, dtype=torch.uint8)
                 

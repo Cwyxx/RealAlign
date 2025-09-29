@@ -36,24 +36,6 @@ import logging
 logging.getLogger("openai").setLevel(logging.ERROR)
 logging.getLogger("httpx").setLevel(logging.ERROR)
 
-
-def setup_distributed(rank, world_size):
-    """Initializes the distributed process group."""
-    os.environ["MASTER_ADDR"] = os.getenv("MASTER_ADDR", "localhost")
-    os.environ["MASTER_PORT"] = os.getenv("MASTER_PORT", "13355")
-    dist.init_process_group("nccl", rank=rank, world_size=world_size)
-
-
-def cleanup_distributed():
-    """Destroys the distributed process group."""
-    dist.destroy_process_group()
-
-
-def is_main_process(rank):
-    """Checks if the current process is the main one (rank 0)."""
-    return rank == 0
-
-
 class TextPromptDataset(Dataset):
     def __init__(self, dataset_path, split="test"):
         self.file_path = os.path.join(dataset_path, f"{split}.txt")
