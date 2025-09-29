@@ -276,7 +276,7 @@ def code(device):
             images = [Image.fromarray(image) for image in images]
         
         transformed_images = [_transform(image) for image in images]
-        image_tensor = torch.stack(transformed_images)
+        image_tensor = torch.stack(transformed_images).to(device)
         with torch.no_grad():
             logits = aigi_detector(image_tensor)
             outputs = logits[:, 1].reshape(-1, 1)
@@ -318,7 +318,7 @@ def b_free(device):
             images = [Image.fromarray(image) for image in images]
         
         transformed_images = [_transform(image) for image in images]
-        image_tensor = torch.stack(transformed_images)
+        image_tensor = torch.stack(transformed_images).to(device)
         with torch.no_grad():
             outputs = torch.sigmoid(model(image_tensor))
             outputs = outputs.reshape(-1, 1)
@@ -340,7 +340,8 @@ def multi_score(device, score_dict):
         "geneval": geneval_score,
         "clipscore": clip_score,
         "hpsv2": hpsv2_score,
-        "code": code
+        "code": code,
+        "b_free": b_free
     }
     score_fns, score_models = {}, {}
     for score_name, weight in score_dict.items():
@@ -353,14 +354,14 @@ def multi_score(device, score_dict):
         score_fns[score_name] = score_fn
         score_models[score_name] = score_model
         
-
+    offload_reward_model_list = ["pickscore", "clipscore", "hpsv2", "code", "b_free"]
     # only_strict is only for geneval. During training, only the strict reward is needed, and non-strict rewards don't need to be computed, reducing reward calculation time.
     def _fn(images, prompts, metadata, only_strict=True, offload_to_cpu=False):
         total_scores = []
         score_details = {}
                 
         for score_name, weight in score_dict.items():
-            if score_name in ["pickscore", "clipscore", "hpsv2"] and offload_to_cpu:
+            if score_name in offload_reward_model_list and offload_to_cpu:
                 score_models[score_name].to(device)
                 
             if score_name == "geneval":
@@ -384,7 +385,7 @@ def multi_score(device, score_dict):
                 total_scores = [total + weighted for total, weighted in zip(total_scores, weighted_scores)]
                 
             ### offLoad_to_cpu ###
-            if score_name in ["pickscore", "clipscore", "hpsv2"] and offload_to_cpu:
+            if score_name in offload_reward_model_list and offload_to_cpu:
                 score_models[score_name].to(torch.device("cpu"))
 
         score_details["avg"] = total_scores
