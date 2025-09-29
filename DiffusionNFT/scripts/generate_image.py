@@ -15,6 +15,8 @@
 
 import argparse
 import os
+# import sys
+# sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '../')))
 import json
 import torch
 import numpy as np
@@ -25,11 +27,8 @@ from diffusers import StableDiffusion3Pipeline
 from torch.utils.data import DataLoader, Dataset
 from peft import LoraConfig, get_peft_model
 
-from flow_grpo.rewards import multi_score
 
 import torch.distributed as dist
-from torch.utils.data.distributed import DistributedSampler
-from collections import defaultdict
 from peft import PeftModel
 
 import logging
@@ -94,13 +93,7 @@ def collate_fn(examples):
 
 
 def main(args):
-    # --- Distributed Setup ---
-    rank = int(os.environ.get("RANK", "0"))
-    world_size = int(os.environ.get("WORLD_SIZE", "1"))
-    local_rank = int(os.environ.get("LOCAL_RANK", "0"))
-
-    setup_distributed(rank, world_size)
-    device = torch.device(f"cuda:{local_rank}")
+    device = torch.device("cuda:0")
     torch.cuda.set_device(device)
 
     # --- Mixed Precision Setup ---
@@ -112,19 +105,15 @@ def main(args):
 
     enable_amp = mixed_precision_dtype is not None
 
-    if is_main_process(rank):
-        print(f"Running distributed evaluation with {world_size} GPUs.")
-        if enable_amp:
-            print(f"Using mixed precision: {args.mixed_precision}")
-        os.makedirs(args.output_dir, exist_ok=True)
-        if args.save_images:
-            os.makedirs(os.path.join(args.output_dir, "images"), exist_ok=True)
+    print(f"Running evaluation with 1 GPUs.")
+    if enable_amp: print(f"Using mixed precision: {args.mixed_precision}")
+    os.makedirs(args.output_dir, exist_ok=True)
+    if args.save_images: os.makedirs(os.path.join(args.output_dir, "images"), exist_ok=True)
 
     results_filepath = os.path.join(args.output_dir, "evaluation_results.jsonl")
 
     # --- Load Model and Pipeline ---
-    if is_main_process(rank):
-        print("Loading model and pipeline...")
+    print("Loading model and pipeline (stabilityai/stable-diffusion-3.5-medium)...")
 
     if args.model_type == "sd3":
         pipeline = StableDiffusion3Pipeline.from_pretrained("stabilityai/stable-diffusion-3.5-medium")
@@ -147,15 +136,14 @@ def main(args):
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
 
-    if args.lora_hf_path:
+    if args.lora_hf_path is not None and args.lora_hf_path:
         pipeline.transformer = PeftModel.from_pretrained(pipeline.transformer, args.lora_hf_path)
         pipeline.transformer = pipeline.transformer.merge_and_unload()
-        if is_main_process(rank): print(f"Loading LoRA weights from HuggingFace: {args.lora_hf_path}.")
+        print(f"Loading LoRA weights from HuggingFace: {args.lora_hf_path}.")
         
-    elif args.checkpoint_path:
+    elif args.checkpoint_path is not None and args.checkpoint_path and os.path.exists(os.path.join(args.checkpoint_path, "lora")):
         lora_path = os.path.join(args.checkpoint_path, "lora")
-        if is_main_process(rank):
-            print(f"Loading LoRA weights from: {lora_path}")
+        print(f"Loading LoRA weights from: {lora_path}")
         if not os.path.exists(lora_path):
             raise FileNotFoundError(
                 f"LoRA directory not found at {lora_path}. Ensure your checkpoint has a 'lora' subdirectory."
@@ -176,55 +164,37 @@ def main(args):
     pipeline.safety_checker = None
     pipeline.set_progress_bar_config(
         position=1,
-        disable=not is_main_process(rank),
         leave=False,
         desc="Timestep",
         dynamic_ncols=True,
     )
 
     # --- Load Dataset with Distributed Sampler ---
-    dataset_path = f"dataset/{args.dataset}"
-    if is_main_process(rank):
-        print(f"Loading dataset from: {dataset_path}")
+    dataset_path = f"../dataset/{args.dataset}"
+    print(f"Loading dataset from: {dataset_path}")
 
     if args.dataset == "geneval":
         dataset = GenevalPromptDataset(dataset_path, split="test")
-        all_reward_scorers = {"geneval": 1.0}
+
     elif args.dataset == "ocr":
         dataset = TextPromptDataset(dataset_path, split="test")
-        all_reward_scorers = {"ocr": 1.0}
+
     elif args.dataset == "pickscore":
         dataset = TextPromptDataset(dataset_path, split="test")
-        all_reward_scorers = {
-            "imagereward": 1.0,
-            "pickscore": 1.0,
-            "aesthetic": 1.0,
-            "unifiedreward": 1.0,
-            "clipscore": 1.0,
-            "hpsv2": 1.0,
-        }
+
     elif args.dataset == "drawbench":
         dataset = TextPromptDataset(dataset_path, split="test")
-        all_reward_scorers = {
-            "imagereward": 1.0,
-            "pickscore": 1.0,
-            "aesthetic": 1.0,
-            "unifiedreward": 1.0,
-            "clipscore": 1.0,
-            "hpsv2": 1.0,
-        }
-    eval_batch_size = 1
+    eval_batch_size = 2
 
-    sampler = DistributedSampler(dataset, num_replicas=world_size, rank=rank, shuffle=False)
     dataloader = DataLoader(
         dataset,
         batch_size=eval_batch_size,
-        sampler=sampler,
         collate_fn=collate_fn,
         shuffle=False,
     )
     
-    for batch in tqdm(dataloader, desc=f"Evaluating (Rank {rank})", disable=not is_main_process(rank)):
+    result_this_rank = []
+    for batch in tqdm(dataloader, desc=f"Evaluating"):
         prompts, metadata, indices = batch
         current_batch_size = len(prompts)
         generator = torch.Generator(device).manual_seed(args.seed)
@@ -251,66 +221,25 @@ def main(args):
             }
 
             if args.save_images:
-                image_path = os.path.join(args.output_dir, "images", f"{sample_idx:05d}.jpg")
+                image_path = os.path.join(args.output_dir, "images", f"{sample_idx:05d}.png")
                 pil_image = Image.fromarray((images[i].cpu().numpy().transpose(1, 2, 0) * 255).astype(np.uint8))
                 pil_image.save(image_path)
                 result_item["image_path"] = image_path
 
-        #     for score_name, score_values in all_scores.items():
-        #         if isinstance(score_values, torch.Tensor):
-        #             result_item["scores"][score_name] = score_values[i].detach().cpu().item()
-        #         else:
-        #             result_item["scores"][score_name] = float(score_values[i])
-
-        #     results_this_rank.append(result_item)
-
+        result_this_rank.append(result_item)
         # del images, all_scores
         del images
         torch.cuda.empty_cache()
+        
+    result_this_rank.sort(key=lambda x: x["sample_id"])
 
-    # # --- Gather and Save Results ---
-    # dist.barrier()
-
-    # all_gathered_results = [None] * world_size
-    # dist.all_gather_object(all_gathered_results, results_this_rank)
-
-    # if is_main_process(rank):
-    #     flat_results = [item for sublist in all_gathered_results for item in sublist]
-
-    #     flat_results.sort(key=lambda x: x["sample_id"])
-
-    #     with open(results_filepath, "w") as f_out:
-    #         for result_item in flat_results:
-    #             f_out.write(json.dumps(result_item) + "\n")
-
-    #     print(f"\nEvaluation finished. All {len(flat_results)} results saved to {results_filepath}")
-
-    #     all_scores_agg = defaultdict(list)
-
-    #     for result in flat_results:
-    #         for score_name, score_value in result["scores"].items():
-    #             if isinstance(score_value, (int, float)):
-    #                 all_scores_agg[score_name].append(score_value)
-
-    #     average_scores = {
-    #         name: np.mean(list(filter(lambda score: score != -10.0, scores))) for name, scores in all_scores_agg.items()
-    #     }
-
-    #     print("\n--- Average Scores ---")
-    #     if not average_scores:
-    #         print("No scores were found to average.")
-    #     else:
-    #         for name, avg_score in sorted(average_scores.items()):
-    #             print(f"{name:<20}: {avg_score:.4f}")
-    #     print("----------------------")
-
-    #     avg_scores_filepath = os.path.join(args.output_dir, "average_scores.json")
-    #     with open(avg_scores_filepath, "w") as f_avg:
-    #         json.dump(average_scores, f_avg, indent=4)
-    #     print(f"Average scores also saved to {avg_scores_filepath}")
-
-    cleanup_distributed()
-
+    with open(results_filepath, "w") as f_out:
+        for result_item in result_this_rank:
+            f_out.write(json.dumps(result_item) + "\n")
+    
+    with open(results_filepath.replace(".jsonl", "_backup.jsonl"), "w") as f_out:
+        for result_item in result_this_rank:
+            f_out.write(json.dumps(result_item) + "\n")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate a trained diffusion model in a distributed manner.")
@@ -323,13 +252,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--lora_hf_path",
         type=str,
-        default="",
+        default=None,
         help="Huggingface path for LoRA.",
     )
     parser.add_argument(
         "--checkpoint_path",
         type=str,
-        default="",
+        default=None,
         help="Local path to the LoRA checkpoint directory (e.g., './save/run_name/checkpoints/checkpoint-5000').",
     )
     parser.add_argument(
@@ -359,7 +288,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--mixed_precision",
         type=str,
-        default="no",
+        default="fp16",
         choices=["no", "fp16", "bf16"],
         help="Whether to use mixed precision. Choose between 'no', 'fp16', or 'bf16'.",
     )

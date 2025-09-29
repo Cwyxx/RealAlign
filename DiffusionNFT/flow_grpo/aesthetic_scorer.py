@@ -34,7 +34,7 @@ class AestheticScorer(torch.nn.Module):
         self.clip = CLIPModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
         self.processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
         self.mlp = MLP().to(device)
-        state_dict = torch.load(os.path.join(CKPT_PATH, "sac+logos+ava1-l14-linearMSE.pth"), map_location="cpu")
+        state_dict = torch.load("/data_center/data2/dataset/chenwy/21164-data/model-ckpt/aesthetic_predictor_v2/sac+logos+ava1-l14-linearMSE.pth", map_location="cpu")
         self.mlp.load_state_dict(state_dict)
         self.dtype = dtype
         self.device = device

@@ -277,10 +277,12 @@ def code(device):
         
         transformed_images = [_transform(image) for image in images]
         image_tensor = torch.stack(transformed_images)
-        logits = aigi_detector(image_tensor)
-        outputs = logits[:, 1].reshape(-1, 1)
-        scores = 1 - outputs
-        scores = scores.squeeze()
+        with torch.no_grad():
+            logits = aigi_detector(image_tensor)
+            outputs = logits[:, 1].reshape(-1, 1)
+            scores = 1 - outputs
+            scores = scores.squeeze()
+            
         return scores, {}
     
     return _fn, aigi_detector
@@ -317,11 +319,13 @@ def b_free(device):
         
         transformed_images = [_transform(image) for image in images]
         image_tensor = torch.stack(transformed_images)
-        outputs = torch.sigmoid(model(image_tensor))
-        outputs = outputs.reshape(-1, 1)
-        scores = 1 - outputs
-        scores = scores.squeeze()
+        with torch.no_grad():
+            outputs = torch.sigmoid(model(image_tensor))
+            outputs = outputs.reshape(-1, 1)
+            scores = 1 - outputs
+            scores = scores.squeeze()
         return scores, {}
+    
     return _fn, model
 
 

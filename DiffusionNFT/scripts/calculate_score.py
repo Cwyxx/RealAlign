@@ -15,22 +15,18 @@
 
 import argparse
 import os
+import sys
+sys.path.append(os.path.join(os.getcwd(), "../"))
 import json
 import torch
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
-from diffusers import StableDiffusion3Pipeline
 from torch.utils.data import DataLoader, Dataset
-from peft import LoraConfig, get_peft_model
-
 from flow_grpo.rewards import multi_score
-
 from collections import defaultdict
-from peft import PeftModel
 
-import logging
 
 
 class TextPromptDataset(Dataset):
@@ -77,7 +73,8 @@ def main(args):
     results_filepath = os.path.join(args.output_dir, "evaluation_results.jsonl")
 
     # --- Load Dataset with Distributed Sampler ---
-    dataset_path = f"dataset/{args.dataset}"
+    dataset_path = f"../dataset/{args.dataset}"
+    print(f"Loading dataset from: {dataset_path}")
 
     if args.dataset == "geneval":
         dataset = GenevalPromptDataset(dataset_path, split="test")
@@ -87,7 +84,7 @@ def main(args):
         dataset = TextPromptDataset(dataset_path, split="test")
     elif args.dataset == "drawbench":
         dataset = TextPromptDataset(dataset_path, split="test")
-    eval_batch_size = 1
+    eval_batch_size = 2
     
     dataloader = DataLoader(
         dataset,
@@ -104,9 +101,11 @@ def main(args):
         }
         scoring_fn, _ = multi_score(device, all_reward_scorers)
         print(f"Initializing reward models {args.reward_model} from DiffusionNFT...")
+        
     elif args.reward_model == "vqascore":
         import t2v_metrics
         clip_flant5_score = t2v_metrics.VQAScore(model='clip-flant5-xl')
+        print(f"Initializing reward models {args.reward_model}...")
         
         def scoring_fn(images, prompts, metadata, only_strict=False):
             ### images is image_paths #### 
@@ -114,107 +113,174 @@ def main(args):
             diagonal_scores = [scores[i][i] for i in range(len(scores))]
             score_details = { args.reward_model: diagonal_scores}
             return score_details, {}
+        
+    elif args.reward_model == "clip_iqa":
+        import pyiqa
+        reward_model = pyiqa.create_metric("clipiqa", device=device)
+        print(f"Initializing reward models {args.reward_model}...")
+        
+        def scoring_fn(images, prompts, metadata, only_strict=False):
+            ### images is image_paths #### 
+            score_list = []
+            for image in images:
+                score = reward_model(image)
+                if isinstance(score, torch.Tensor):
+                    score = score.item()
+                score_list.append(score)
+                
+            score_details = { args.reward_model: score_list}
+            return score_details, {}
+        
+    elif args.reward_model == "deqa":
+        from transformers import AutoModelForCausalLM
+        reward_model = AutoModelForCausalLM.from_pretrained(
+            "zhiyuanyou/DeQA-Score-Mix3",
+            trust_remote_code=True,
+            attn_implementation="eager",
+            torch_dtype=torch.float16,
+            device_map="auto",
+        )
+        print(f"Initializing reward models {args.reward_model}...")
+        
+        def scoring_fn(images, prompts, metadata, only_strict=False):
+            ### images is image_paths #### 
+            images = [ Image.open(image_path) for image_path in images ]
+            score_list = reward_model(images).tolist()
+            
+            score_details = { args.reward_model: score_list}
+            return score_details, {}
+        
+    elif args.reward_model == "aesthetic_v2_5":
+        from aesthetic_predictor_v2_5 import convert_v2_5_from_siglip
+        reward_model, preprocessor = convert_v2_5_from_siglip(
+            low_cpu_mem_usage=True,
+            trust_remote_code=True,
+        )
+        reward_model = reward_model.to(device)
+        
+        def scoring_fn(images, prompts, metadata, only_strict=False):
+            ### images is image_paths #### 
+            score_list = []
+            for image_path in images:
+                pil_image = Image.open(image_path).convert("RGB")
+                pixel_values = (
+                    preprocessor(images=pil_image, return_tensors="pt")
+                    .pixel_values.to(device)
+                )
+                score = reward_model(pixel_values).logits.squeeze().float().cpu().numpy()
+                score_list.append(score.item())
+                
+            score_details = { args.reward_model: score_list}
+            return score_details, {}
 
     # --- Evaluation Loop ---
-    results_this_rank = []
+    result_this_rank = []
+    with open(results_filepath, 'r') as f:
+        for line in f:
+            if line.strip(): result_this_rank.append(json.loads(line)) # Skip any empty lines
+    result_this_rank.sort(key=lambda x: x["sample_id"])
 
     for batch in tqdm(dataloader, desc=f"Evaluating"):
         prompts, metadata, indices = batch
         current_batch_size = len(prompts)
-
-        all_scores, _ = scoring_fn(images, prompts, metadata, only_strict=False)
-
+        image_paths = [ os.path.join(args.output_dir, "images", f"{sample_idx:05d}.png") for sample_idx in indices ]
+        
+        if args.reward_model in [ "imagereward",  "pickscore",  "aesthetic", "clipscore", "hpsv2"]:
+            pil_images = [ Image.open(image_path) for image_path in image_paths ] # imagereward, pickscore get pil image input
+            
+            if args.reward_model == "aesthetic":
+                pil_images = np.stack([np.array(Image.open(img)) for img in pil_images])
+                images = pil_images.transpose(0, 3, 1, 2)
+                images = torch.tensor(images, dtype=torch.uint8)
+                
+            elif args.reward_model in [ "clipscore", "hpsv2"]:
+                images = [ np.array(img) for img in pil_images ]
+                images = np.array(images)
+                images = images.transpose(0, 3, 1, 2)  # NHWC -> NCHW
+                images = torch.tensor(images, dtype=torch.uint8) / 255.0
+            
+            elif args.reward_model in [ "imagereward", "pickscore"]:
+                images = pil_images
+        
+        elif args.reward_model in [ "vqascore", "clip_iqa", "deqa", "aesthetic_v2_5" ]:
+            images = image_paths # path
+                
+        all_scores, _ = scoring_fn(images, prompts, metadata, only_strict=False) # calculate_score
+        
         for i in range(current_batch_size):
             sample_idx = indices[i]
-            result_item = {
-                "sample_id": sample_idx,
-                "prompt": prompts[i],
-                "metadata": metadata[i] if metadata else {},
-                "scores": {},
-            }
-
-            if args.save_images:
-                image_path = os.path.join(args.output_dir, "images", f"{sample_idx:05d}.jpg")
-                pil_image = Image.fromarray((images[i].cpu().numpy().transpose(1, 2, 0) * 255).astype(np.uint8))
-                pil_image.save(image_path)
-                result_item["image_path"] = image_path
-
+            result_item = result_this_rank[sample_idx]
+            assert result_item["sample_id"] == sample_idx, f'result_item[sample_id]: {result_item["sample_id"]} / sample_idx: {sample_idx}'
+            
             for score_name, score_values in all_scores.items():
                 if isinstance(score_values, torch.Tensor):
                     result_item["scores"][score_name] = score_values[i].detach().cpu().item()
                 else:
                     result_item["scores"][score_name] = float(score_values[i])
 
-            results_this_rank.append(result_item)
-
         del images, all_scores
         torch.cuda.empty_cache()
 
-    # --- Gather and Save Results ---
-    dist.barrier()
 
-    all_gathered_results = [None] * world_size
-    dist.all_gather_object(all_gathered_results, results_this_rank)
+    result_this_rank.sort(key=lambda x: x["sample_id"])
 
-    if is_main_process(rank):
-        flat_results = [item for sublist in all_gathered_results for item in sublist]
+    with open(results_filepath, "w") as f_out:
+        for result_item in result_this_rank:
+            f_out.write(json.dumps(result_item) + "\n")
 
-        flat_results.sort(key=lambda x: x["sample_id"])
+    print(f"\nEvaluation finished. All {len(result_this_rank)} results saved to {results_filepath}")
 
-        with open(results_filepath, "w") as f_out:
-            for result_item in flat_results:
-                f_out.write(json.dumps(result_item) + "\n")
+    all_scores_agg = defaultdict(list)
 
-        print(f"\nEvaluation finished. All {len(flat_results)} results saved to {results_filepath}")
+    for result in result_this_rank:
+        for score_name, score_value in result["scores"].items():
+            if isinstance(score_value, (int, float)):
+                all_scores_agg[score_name].append(score_value)
 
-        all_scores_agg = defaultdict(list)
+    average_scores = {
+        name: np.mean(list(filter(lambda score: score != -10.0, scores))) for name, scores in all_scores_agg.items()
+    }
 
-        for result in flat_results:
-            for score_name, score_value in result["scores"].items():
-                if isinstance(score_value, (int, float)):
-                    all_scores_agg[score_name].append(score_value)
+    print("\n--- Average Scores ---")
+    if not average_scores:
+        print("No scores were found to average.")
+    else:
+        for name, avg_score in sorted(average_scores.items()):
+            print(f"{name:<20}: {avg_score:.10f}")
+    print("----------------------")
 
-        average_scores = {
-            name: np.mean(list(filter(lambda score: score != -10.0, scores))) for name, scores in all_scores_agg.items()
-        }
-
-        print("\n--- Average Scores ---")
-        if not average_scores:
-            print("No scores were found to average.")
-        else:
-            for name, avg_score in sorted(average_scores.items()):
-                print(f"{name:<20}: {avg_score:.4f}")
-        print("----------------------")
-
-        avg_scores_filepath = os.path.join(args.output_dir, "average_scores.json")
-        with open(avg_scores_filepath, "w") as f_avg:
-            json.dump(average_scores, f_avg, indent=4)
-        print(f"Average scores also saved to {avg_scores_filepath}")
-
-    cleanup_distributed()
-
+    avg_scores_filepath = os.path.join(args.output_dir, "average_scores.json")
+    with open(avg_scores_filepath, "w") as f_avg:
+        json.dump(average_scores, f_avg, indent=4)
+    print(f"Average scores also saved to {avg_scores_filepath}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate a trained diffusion model in a distributed manner.")
     parser.add_argument(
+        "--reward_model",
+        type=str,
+        default=None,
+        help="Reward Model.",
+    )
+    parser.add_argument(
         "--lora_hf_path",
         type=str,
-        default="",
+        default=None,
         help="Huggingface path for LoRA.",
     )
     parser.add_argument(
         "--checkpoint_path",
         type=str,
-        default="",
+        default=None,
         help="Local path to the LoRA checkpoint directory (e.g., './save/run_name/checkpoints/checkpoint-5000').",
     )
-    parser.add_argument(
-        "--model_type",
-        type=str,
-        required=True,
-        choices=["sd3"],
-        help="Type of the base model ('sd3').",
-    )
+    # parser.add_argument(
+    #     "--model_type",
+    #     type=str,
+    #     required=True,
+    #     choices=["sd3"],
+    #     help="Type of the base model ('sd3').",
+    # )
     parser.add_argument(
         "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench"], help="Dataset type."
     )
