@@ -353,6 +353,7 @@ def multi_score(device, score_dict):
         score_fn, score_model = score_functions[score_name](device) if "device" in score_functions[score_name].__code__.co_varnames else score_functions[score_name]()
         score_fns[score_name] = score_fn
         score_models[score_name] = score_model
+        score_model.to(torch.device("cpu"))
         
     offload_reward_model_list = ["pickscore", "clipscore", "hpsv2", "code", "b_free"]
     # only_strict is only for geneval. During training, only the strict reward is needed, and non-strict rewards don't need to be computed, reducing reward calculation time.

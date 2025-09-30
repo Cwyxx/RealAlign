@@ -11,7 +11,7 @@ ckpt=$3 # 0
 cfg_guidance=$4
 dataset="drawbench"
 
-export CUDA_VISIBLE_DEVICES=cuda_device
+export CUDA_VISIBLE_DEVICES=${cuda_device}
 
 base_ckpt_dir="/data_center/data2/dataset/chenwy/21164-data/diffusionnft/model-ckpt/sd3"
 base_image_dir="/data_center/data2/dataset/chenwy/21164-data/diffusionnft/generate_images/sd3_cfg_${cfg_guidance}/${dataset}"
