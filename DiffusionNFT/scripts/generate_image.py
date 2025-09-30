@@ -166,7 +166,7 @@ def main(args):
 
     elif args.dataset == "drawbench":
         dataset = TextPromptDataset(dataset_path, split="test")
-    eval_batch_size = 2
+    eval_batch_size = 1
 
     dataloader = DataLoader(
         dataset,

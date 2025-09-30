@@ -182,3 +182,25 @@ def sd3_multi_reward():
     config.beta = 0.1
     return config
 
+def sd3_pickscore_b_free():
+    reward_fn = {
+        "pickscore": 1.0,
+        "b_free": 1.0,
+    }
+    config = _get_config(
+        base_model="sd3",
+        n_gpus=6,
+        gradient_step_per_epoch=1,
+        dataset="pickscore",
+        reward_fn=reward_fn,
+        name="pickscore_b_free",
+    )
+    config.sample.num_steps=10
+    #### for faster reward increase ####
+    config.beta = 0.1
+    config.decay_type = 2
+    config.save_freq = 1 # 30
+    config.eval_freq = 1
+    #### for faster reward increase ####
+    return config
+
