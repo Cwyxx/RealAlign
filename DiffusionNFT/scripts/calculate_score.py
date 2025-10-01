@@ -84,6 +84,8 @@ def main(args):
         dataset = TextPromptDataset(dataset_path, split="test")
     elif args.dataset == "drawbench":
         dataset = TextPromptDataset(dataset_path, split="test")
+    elif args.dataset == "pick_a_pic_spo":
+        dataset = TextPromptDataset(dataset_path, split="test")
     eval_batch_size = 2
     
     dataloader = DataLoader(
@@ -99,7 +101,8 @@ def main(args):
         all_reward_scorers = {
             args.reward_model: 1.0
         }
-        scoring_fn, _ = multi_score(device, all_reward_scorers)
+        scoring_fn, reward_models = multi_score(device, all_reward_scorers)
+        for reward_model in reward_models.values(): reward_model.to(device)
         print(f"Initializing reward models {args.reward_model} from DiffusionNFT...")
         
     elif args.reward_model == "vqascore":
@@ -282,7 +285,7 @@ if __name__ == "__main__":
     #     help="Type of the base model ('sd3').",
     # )
     parser.add_argument(
-        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench"], help="Dataset type."
+        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo"], help="Dataset type."
     )
     parser.add_argument(
         "--output_dir",

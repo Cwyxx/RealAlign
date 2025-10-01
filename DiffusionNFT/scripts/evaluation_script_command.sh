@@ -9,12 +9,12 @@ cuda_device=$1 # 0
 method=$2 # "sd-3-5-medium"
 ckpt=$3 # 0
 cfg_guidance=$4
-dataset="drawbench"
+dataset="pickscore_train"
 
 export CUDA_VISIBLE_DEVICES=${cuda_device}
 
 base_ckpt_dir="/data_center/data2/dataset/chenwy/21164-data/diffusionnft/model-ckpt/sd3"
-base_image_dir="/data_center/data2/dataset/chenwy/21164-data/diffusionnft/generate_images/sd3_cfg_${cfg_guidance}/${dataset}"
+base_image_dir="/data_center/data2/dataset/chenwy/21164-data/diffusionnft/generate_images/sd3_textencoder_3_none_cfg_${cfg_guidance}/${dataset}"
 
 ckpt_dir="${base_ckpt_dir}/${method}/checkpoints/checkpoint-${ckpt}"
 image_dir="${base_image_dir}/${method}/ckpt-${ckpt}"
@@ -27,24 +27,24 @@ python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --model_type sd
     --output_dir ${image_dir} \
     --guidance_scale ${cfg_guidance} \
     --save_images
-chmod 777 "${image_dir}/evaluation_results.jsonl"
+# chmod 777 "${image_dir}/evaluation_results.jsonl"
 
-# # reward_model_list=("pickscore" "hpsv2" "imagereward" "clipscore" "vqascore" "clip_iqa" "deqa" "aesthetic" "aesthetic_v2_5")
-# # for reward_model in "${reward_model_list[@]}"; do
-# #     echo "********************************************"
-# #     echo "reward_model: ${reward_model}"
-# #     conda activate alignprop
+# reward_model_list=("pickscore" "hpsv2" "imagereward" "clipscore" "vqascore" "clip_iqa" "deqa" "aesthetic" "aesthetic_v2_5")
+# for reward_model in "${reward_model_list[@]}"; do
+#     echo "********************************************"
+#     echo "reward_model: ${reward_model}"
+#     conda activate alignprop
     
-# #     if [[ "$reward_model" == "deqa" ]] || [[ "$reward_model" == "clip_iqa" ]] ; then
-# #         conda activate internvl
-# #     elif [[ "$reward_model" == "aesthetic_v2_5" ]]; then
-# #         conda activate utils
-# #     elif [[ "$reward_model" == "vqascore" ]]; then
-# #         conda activate t2v
-# #     fi
+#     if [[ "$reward_model" == "deqa" ]] || [[ "$reward_model" == "clip_iqa" ]] ; then
+#         conda activate internvl
+#     elif [[ "$reward_model" == "aesthetic_v2_5" ]]; then
+#         conda activate utils
+#     elif [[ "$reward_model" == "vqascore" ]]; then
+#         conda activate t2v
+#     fi
     
-# #     python calculate_score.py --reward_model ${reward_model} --dataset ${dataset} --output_dir ${image_dir} 
-# # done
+#     python calculate_score.py --reward_model ${reward_model} --dataset ${dataset} --output_dir ${image_dir} 
+# done
 
 # conda activate vila
 # echo "********************************************"
