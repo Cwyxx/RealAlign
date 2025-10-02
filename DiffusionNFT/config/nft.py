@@ -39,7 +39,7 @@ def _get_config(base_model="sd3", n_gpus=1, gradient_step_per_epoch=1, dataset="
             if n_batch_per_epoch % gradient_step_per_epoch == 0:
                 config.sample.train_batch_size = bsz
                 config.sample.num_batches_per_epoch = n_batch_per_epoch
-                config.train.batch_size = 2
+                config.train.batch_size = 1
                 config.train.gradient_accumulation_steps = (
                     config.sample.num_batches_per_epoch * (config.sample.train_batch_size // config.train.batch_size) // gradient_step_per_epoch
                 )
@@ -132,9 +132,11 @@ def sd3_code():
         gradient_step_per_epoch=1,
         dataset="pickscore",
         reward_fn=reward_fn,
-        name="code",
+        name="code-beta_0.1-cfg_4.5",
     )
     config.sample.num_steps=10
+    config.sample.guidance_scale = 4.5
+    config.sample.mini_sample_size = 2
     #### for faster reward increase ####
     config.beta = 0.1
     config.decay_type = 2
@@ -153,12 +155,15 @@ def sd3_b_free():
         gradient_step_per_epoch=1,
         dataset="pickscore",
         reward_fn=reward_fn,
-        name="b_free",
+        name="b_free-beta_1.0-cfg_4.5",
     )
     config.sample.num_steps=10
+    config.sample.guidance_scale = 4.5
+    config.sample.mini_sample_size = 2
     #### for faster reward increase ####
-    config.beta = 0.1
-    config.decay_type = 2
+    # config.beta = 0.1
+    # config.decay_type = 2
+    config.beta = 1.0
     config.save_freq = 1 # 30
     config.eval_freq = 1
     #### for faster reward increase ####

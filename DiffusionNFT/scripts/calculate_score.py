@@ -176,6 +176,7 @@ def main(args):
             score_details = { args.reward_model: score_list}
             return score_details, {}
 
+    score_list = []
     # --- Evaluation Loop ---
     result_this_rank = []
     with open(results_filepath, 'r') as f:
@@ -220,11 +221,12 @@ def main(args):
                     result_item["scores"][score_name] = score_values[i].detach().cpu().item()
                 else:
                     result_item["scores"][score_name] = float(score_values[i])
+                    score_list.append(float(score_values[i]))
 
         del images, all_scores
         torch.cuda.empty_cache()
 
-
+    print(f"score_list / {args.reward_model}: {sum(score_list)/len(score_list):.4f} / len: {len(score_list)}")
     result_this_rank.sort(key=lambda x: x["sample_id"])
 
     with open(results_filepath, "w") as f_out:

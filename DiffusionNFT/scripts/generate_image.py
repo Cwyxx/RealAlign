@@ -42,7 +42,7 @@ class TextPromptDataset(Dataset):
         if not os.path.exists(self.file_path):
             raise FileNotFoundError(f"Dataset file not found at {self.file_path}")
         with open(self.file_path, "r") as f:
-            self.prompts = [line.strip() for line in f.readlines()][0:100]
+            self.prompts = [line.strip() for line in f.readlines()]
 
     def __len__(self):
         return len(self.prompts)
@@ -98,8 +98,8 @@ def main(args):
     print("Loading model and pipeline (stabilityai/stable-diffusion-3.5-medium)...")
 
     if args.model_type == "sd3":
-        pipeline = StableDiffusion3Pipeline.from_pretrained("stabilityai/stable-diffusion-3.5-medium", text_encoder_3=None, tokenizer_3=None)
-        # pipeline = StableDiffusion3Pipeline.from_pretrained("stabilityai/stable-diffusion-3.5-medium")
+        # pipeline = StableDiffusion3Pipeline.from_pretrained("stabilityai/stable-diffusion-3.5-medium", text_encoder_3=None, tokenizer_3=None)
+        pipeline = StableDiffusion3Pipeline.from_pretrained("stabilityai/stable-diffusion-3.5-medium")
         target_modules = [
             "attn.add_k_proj",
             "attn.add_q_proj",
@@ -142,7 +142,7 @@ def main(args):
     pipeline.vae.to(device, dtype=torch.float32)  # VAE usually fp32
     pipeline.text_encoder.to(device, dtype=text_encoder_dtype)
     pipeline.text_encoder_2.to(device, dtype=text_encoder_dtype)
-    # pipeline.text_encoder_3.to(device, dtype=text_encoder_dtype)
+    pipeline.text_encoder_3.to(device, dtype=text_encoder_dtype)
 
     pipeline.safety_checker = None
     pipeline.set_progress_bar_config(
@@ -267,7 +267,7 @@ if __name__ == "__main__":
         help="Directory to save evaluation results and generated images.",
     )
     parser.add_argument(
-        "--num_inference_steps", type=int, default=10, help="Number of inference steps for the diffusion pipeline."
+        "--num_inference_steps", type=int, default=40, help="Number of inference steps for the diffusion pipeline."
     )
     parser.add_argument("--guidance_scale", type=float, default=1.0, help="Classifier-free guidance scale.")
     parser.add_argument("--resolution", type=int, default=512, help="Resolution of the generated images.")

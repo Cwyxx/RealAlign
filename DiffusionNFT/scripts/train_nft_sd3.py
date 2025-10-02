@@ -15,8 +15,8 @@
 
 # from huggingface_hub import login
 # login(token="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")
-import warnings
-warnings.simplefilter("once")
+# import warnings
+# warnings.simplefilter("once")
 
 from collections import defaultdict
 import os
@@ -287,6 +287,7 @@ def eval_fn(
                     deterministic=True,
                     solver="flow",
                     model_type="sd3",
+                    generator=torch.Generator(device=device).manual_seed(42),
                 )
 
         rewards, reward_metadata = reward_fn(images, prompts, prompt_metadata, only_strict=False, offload_to_cpu=True)
@@ -612,14 +613,8 @@ def main(_):
             if hasattr(train_sampler, "set_epoch") and isinstance(train_sampler, DistributedKRepeatSampler):
                 train_sampler.set_epoch(epoch * config.sample.num_batches_per_epoch + i)
 
-            prompts, prompt_metadata = next(train_iter)
+            train_prompts, train_prompt_metadata = next(train_iter)
 
-            prompt_embeds, pooled_prompt_embeds = compute_text_embeddings(
-                prompts, text_encoders, tokenizers, max_sequence_length=128, device=device
-            )
-            prompt_ids = tokenizers[0](
-                prompts, padding="max_length", max_length=256, truncation=True, return_tensors="pt"
-            ).input_ids.to(device)
 
             if i == 0 and epoch % config.eval_freq == 0 and not config.debug:
                 eval_fn(
@@ -653,46 +648,56 @@ def main(_):
                 )
 
             transformer_ddp.module.set_adapter("old")
-            with torch_autocast(enabled=enable_amp, dtype=mixed_precision_dtype):
-                with torch.no_grad():
-                    images, latents, _ = pipeline_with_logprob(
-                        pipeline,
-                        prompt_embeds=prompt_embeds,
-                        pooled_prompt_embeds=pooled_prompt_embeds,
-                        negative_prompt_embeds=sample_neg_prompt_embeds[: len(prompts)],
-                        negative_pooled_prompt_embeds=sample_neg_pooled_prompt_embeds[: len(prompts)],
-                        num_inference_steps=config.sample.num_steps,
-                        guidance_scale=config.sample.guidance_scale,
-                        output_type="pt",
-                        height=config.resolution,
-                        width=config.resolution,
-                        noise_level=config.sample.noise_level,
-                        deterministic=config.sample.deterministic,
-                        solver=config.sample.solver,
-                        model_type="sd3",
-                    )
-            transformer_ddp.module.set_adapter("default")
+            for mini_sample_idx in range(config.sample.train_batch_size // config.sample.mini_sample_size):
+                start = mini_sample_idx * config.sample.mini_sample_size
+                end = start + config.sample.mini_sample_size
+                prompts, prompt_metadata = train_prompts[:2], train_prompt_metadata[0:2]  # For debug, comment out for full run
+                prompt_embeds, pooled_prompt_embeds = compute_text_embeddings(
+                    prompts, text_encoders, tokenizers, max_sequence_length=128, device=device
+                )
+                prompt_ids = tokenizers[0](
+                    prompts, padding="max_length", max_length=256, truncation=True, return_tensors="pt"
+                ).input_ids.to(device)
+                with torch_autocast(enabled=enable_amp, dtype=mixed_precision_dtype):
+                    with torch.no_grad():
+                        images, latents, _ = pipeline_with_logprob(
+                            pipeline,
+                            prompt_embeds=prompt_embeds,
+                            pooled_prompt_embeds=pooled_prompt_embeds,
+                            negative_prompt_embeds=sample_neg_prompt_embeds[: len(prompts)],
+                            negative_pooled_prompt_embeds=sample_neg_pooled_prompt_embeds[: len(prompts)],
+                            num_inference_steps=config.sample.num_steps,
+                            guidance_scale=config.sample.guidance_scale,
+                            output_type="pt",
+                            height=config.resolution,
+                            width=config.resolution,
+                            noise_level=config.sample.noise_level,
+                            deterministic=config.sample.deterministic,
+                            solver=config.sample.solver,
+                            model_type="sd3",
+                        )
+                transformer_ddp.module.set_adapter("default")
 
-            latents = torch.stack(latents, dim=1)
-            timesteps = pipeline.scheduler.timesteps.repeat(len(prompts), 1).to(device)
+                latents = torch.stack(latents, dim=1)
+                timesteps = pipeline.scheduler.timesteps.repeat(len(prompts), 1).to(device)
 
-            torch.cuda.empty_cache()
-            rewards, reward_metadata = reward_fn(images, prompts, prompt_metadata, only_strict=True, offload_to_cpu=True)
+                torch.cuda.empty_cache()
+                rewards, reward_metadata = reward_fn(images, prompts, prompt_metadata, only_strict=True, offload_to_cpu=True)
 
-            samples_data_list.append(
-                {
-                    "prompt_ids": prompt_ids,
-                    "prompt_embeds": prompt_embeds,
-                    "pooled_prompt_embeds": pooled_prompt_embeds,
-                    "timesteps": timesteps,
-                    "next_timesteps": torch.concatenate([timesteps[:, 1:], torch.zeros_like(timesteps[:, :1])], dim=1),
-                    "latents_clean": latents[:, -1],
-                    "rewards": {k: torch.as_tensor(v, device=device).float() for k, v in rewards.items()}
-                }
-            )
-            del latents, _, prompt_metadata
-            if i != config.sample.num_batches_per_epoch - 1:
-                del prompts, images
+                samples_data_list.append(
+                    {
+                        "prompt_ids": prompt_ids,
+                        "prompt_embeds": prompt_embeds,
+                        "pooled_prompt_embeds": pooled_prompt_embeds,
+                        "timesteps": timesteps,
+                        "next_timesteps": torch.concatenate([timesteps[:, 1:], torch.zeros_like(timesteps[:, :1])], dim=1),
+                        "latents_clean": latents[:, -1],
+                        "rewards": {k: torch.as_tensor(v, device=device).float() for k, v in rewards.items()}
+                    }
+                )
+                del latents, _, prompt_metadata
+                if i != config.sample.num_batches_per_epoch - 1 or mini_sample_idx != config.sample.train_batch_size // config.sample.mini_sample_size - 1:
+                    del prompts, images
 
         torch.cuda.empty_cache()
     
