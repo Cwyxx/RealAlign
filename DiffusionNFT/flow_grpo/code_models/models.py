@@ -6,7 +6,8 @@ import torch
 import torch.nn as nn
 import joblib
 from torchvision import transforms
-
+import pandas as pd
+from tqdm import tqdm
 """
 linear - knn --> 0 Real - 1 Fake
 svm --> -1 Real - 1 Fake
@@ -76,6 +77,54 @@ class VITContrastiveHF(nn.Module):
     
 
 
+# if __name__ == "__main__":
+#     if torch.cuda.is_available():
+#         device = torch.device("cuda")
+#     else:
+#         device = torch.device("cpu")
+#     # HF inference code
+#     classificator_type = "linear"
+#     model = VITContrastiveHF(
+#         pretraiend_model="/data_center/data2/dataset/chenwy/21164-data/detection-method-ckpt/CoDE", classificator_type=classificator_type
+#     )
+
+#     transform = transforms.Compose(
+#         [
+#             transforms.CenterCrop(224),
+#             transforms.ToTensor(),
+#             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+#         ]
+#     )
+
+#     model.eval()
+#     model.model.to(device)
+#     y_pred = []
+#     img_1 = Image.open("deepfake_model.jpg").convert("RGB")
+#     img_2 = Image.open("deepfake_model.jpg").convert("RGB")
+
+#     with torch.no_grad():
+#         # in_tens = model.processor(img, return_tensors='pt')['pixel_values']
+#         in_tens_1 = transform(img_1)
+#         in_tens_2 = transform(img_2)
+#         in_tens = torch.stack([in_tens_1, in_tens_2], dim=0)
+        
+#         in_tens = in_tens.to(device)
+#         output = model(in_tens)
+#         print(f"output:\n{output}")
+#         print(f"output.shape:\n{output.shape}")
+#         # y_pred.extend(model(in_tens).flatten().tolist())
+
+#     # check the correct label of the predict image
+#     for el in y_pred:
+#         if el == 1:
+#             print("Fake")
+#         elif el == 0:
+#             print("Real")
+#         elif el == -1:
+#             print("Real")
+#         else:
+#             print("Error")
+
 if __name__ == "__main__":
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -95,31 +144,32 @@ if __name__ == "__main__":
         ]
     )
 
-    model.eval()
-    model.model.to(device)
+    model.eval().to(device)
     y_pred = []
-    img_1 = Image.open("deepfake_model.jpg").convert("RGB")
-    img_2 = Image.open("deepfake_model.jpg").convert("RGB")
+    y_true = []
+    predictions_log = []
+    base_image_dir = "/data3/chenweiyan/notebook/fine-tune-diffusion/spo_gitee/tmp/SD_3_5_medium"
+    image_type_list = [ "fake", "real" ]
+    
+    for image_type in image_type_list:
+        source_image_dir = os.path.join(base_image_dir, image_type)
+        image_name_list = os.listdir(source_image_dir)
+        for image_name in tqdm(image_name_list, desc=image_type):
+            image_path = os.path.join(source_image_dir, image_name)
+            y_true.append(1 if image_type=="fake" else 0)
+            image = Image.open(image_path).convert("RGB")
+            
+            with torch.no_grad():
+                in_tens = transform(image)
+                in_tens = in_tens.unsqueeze(0).to(device)  # add batch dimension
+                output = model(in_tens)
+                output = output[:, 1].reshape(-1, 1)
+                y_pred.append(output.flatten().tolist()[0])
+                
+                predictions_log.append({
+                    'image_name': image_name,
+                    'image_type': 1 if image_type=="fake" else 0,
+                    'model_output': output.flatten().tolist()[0]
+                })
 
-    with torch.no_grad():
-        # in_tens = model.processor(img, return_tensors='pt')['pixel_values']
-        in_tens_1 = transform(img_1)
-        in_tens_2 = transform(img_2)
-        in_tens = torch.stack([in_tens_1, in_tens_2], dim=0)
-        
-        in_tens = in_tens.to(device)
-        output = model(in_tens)
-        print(f"output:\n{output}")
-        print(f"output.shape:\n{output.shape}")
-        # y_pred.extend(model(in_tens).flatten().tolist())
-
-    # check the correct label of the predict image
-    for el in y_pred:
-        if el == 1:
-            print("Fake")
-        elif el == 0:
-            print("Real")
-        elif el == -1:
-            print("Real")
-        else:
-            print("Error")
+    pd.DataFrame(predictions_log).to_csv(os.path.join(base_image_dir, "detect_score", "code.csv"), index=False)

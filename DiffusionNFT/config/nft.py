@@ -39,7 +39,7 @@ def _get_config(base_model="sd3", n_gpus=1, gradient_step_per_epoch=1, dataset="
             if n_batch_per_epoch % gradient_step_per_epoch == 0:
                 config.sample.train_batch_size = bsz
                 config.sample.num_batches_per_epoch = n_batch_per_epoch
-                config.train.batch_size = 1
+                config.train.batch_size = 2
                 config.train.gradient_accumulation_steps = (
                     config.sample.num_batches_per_epoch * (config.sample.train_batch_size // config.train.batch_size) // gradient_step_per_epoch
                 )
@@ -132,17 +132,18 @@ def sd3_code():
         gradient_step_per_epoch=1,
         dataset="pickscore",
         reward_fn=reward_fn,
-        name="code-beta_0.1-cfg_4.5",
+        name="sd3.5m-diffusionnft-multireward-next-code-beta_1.0-cfg_1.0",
     )
     config.sample.num_steps=10
-    config.sample.guidance_scale = 4.5
     config.sample.mini_sample_size = 2
+    
     #### for faster reward increase ####
-    config.beta = 0.1
-    config.decay_type = 2
     config.save_freq = 1 # 30
     config.eval_freq = 1
     #### for faster reward increase ####
+    
+    #### config.resume_lora_path ####
+    config.resume_lora = "/data_center/data2/dataset/chenwy/21164-data/diffusionnft/model-ckpt/sd3/SD3.5M-DiffusionNFT-MultiReward"
     return config
 
 def sd3_b_free():

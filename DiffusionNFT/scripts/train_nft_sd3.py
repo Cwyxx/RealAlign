@@ -579,6 +579,13 @@ def main(_):
                 f"Could not parse global_step from checkpoint name: {config.resume_from}. Starting global_step from 0."
             )
             global_step = 0
+            
+    #### resume_lora ####
+    if config.resume_lora:
+        resume_lora_path = os.path.join(config.resume_lora, "lora")
+        logger.info(f"Loading LoRA weights from {resume_lora_path}")
+        transformer_ddp.module.load_adapter(resume_lora_path, adapter_name="default", is_trainable=True)
+        transformer_ddp.module.load_adapter(resume_lora_path, adapter_name="old", is_trainable=False)
 
     ema = None
     if config.train.ema:

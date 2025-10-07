@@ -26,7 +26,7 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader, Dataset
 from flow_grpo.rewards import multi_score
 from collections import defaultdict
-
+import random
 
 
 class TextPromptDataset(Dataset):
@@ -36,6 +36,10 @@ class TextPromptDataset(Dataset):
             raise FileNotFoundError(f"Dataset file not found at {self.file_path}")
         with open(self.file_path, "r") as f:
             self.prompts = [line.strip() for line in f.readlines()]
+            
+        random.seed(42)
+        self.prompts = random.sample(self.prompts, 5)
+        print(f"Sampled 5 prompts for quick testing:\n{self.prompts}")
 
     def __len__(self):
         return len(self.prompts)
@@ -287,7 +291,7 @@ if __name__ == "__main__":
     #     help="Type of the base model ('sd3').",
     # )
     parser.add_argument(
-        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo"], help="Dataset type."
+        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "drawbench-analysis"], help="Dataset type."
     )
     parser.add_argument(
         "--output_dir",

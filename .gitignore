@@ -1,2 +1,3 @@
 evaluate_metric/hf_cache
 evaluate_metric/t2v_metrics_github
+tmp/

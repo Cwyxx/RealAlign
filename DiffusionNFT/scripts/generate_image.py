@@ -98,8 +98,8 @@ def main(args):
     print("Loading model and pipeline (stabilityai/stable-diffusion-3.5-medium)...")
 
     if args.model_type == "sd3":
-        # pipeline = StableDiffusion3Pipeline.from_pretrained("stabilityai/stable-diffusion-3.5-medium", text_encoder_3=None, tokenizer_3=None)
-        pipeline = StableDiffusion3Pipeline.from_pretrained("stabilityai/stable-diffusion-3.5-medium")
+        pipeline = StableDiffusion3Pipeline.from_pretrained("stabilityai/stable-diffusion-3.5-medium", text_encoder_3=None, tokenizer_3=None)
+        # pipeline = StableDiffusion3Pipeline.from_pretrained("stabilityai/stable-diffusion-3.5-medium")
         target_modules = [
             "attn.add_k_proj",
             "attn.add_q_proj",
@@ -142,7 +142,7 @@ def main(args):
     pipeline.vae.to(device, dtype=torch.float32)  # VAE usually fp32
     pipeline.text_encoder.to(device, dtype=text_encoder_dtype)
     pipeline.text_encoder_2.to(device, dtype=text_encoder_dtype)
-    pipeline.text_encoder_3.to(device, dtype=text_encoder_dtype)
+    # pipeline.text_encoder_3.to(device, dtype=text_encoder_dtype)
 
     pipeline.safety_checker = None
     pipeline.set_progress_bar_config(
