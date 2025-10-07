@@ -78,3 +78,5 @@ wandb
 *.html
 debug
 .png
+
+swanlog/
