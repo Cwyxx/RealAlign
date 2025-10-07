@@ -1,3 +1,8 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
 evaluate_metric/hf_cache
 evaluate_metric/t2v_metrics_github
 tmp/
