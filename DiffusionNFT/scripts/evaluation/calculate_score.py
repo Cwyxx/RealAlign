@@ -16,7 +16,7 @@
 import argparse
 import os
 import sys
-sys.path.append(os.path.join(os.getcwd(), "../"))
+sys.path.append(os.path.join(os.getcwd(), "../.."))
 import json
 import torch
 import numpy as np
@@ -36,10 +36,6 @@ class TextPromptDataset(Dataset):
             raise FileNotFoundError(f"Dataset file not found at {self.file_path}")
         with open(self.file_path, "r") as f:
             self.prompts = [line.strip() for line in f.readlines()]
-            
-        random.seed(42)
-        self.prompts = random.sample(self.prompts, 5)
-        print(f"Sampled 5 prompts for quick testing:\n{self.prompts}")
 
     def __len__(self):
         return len(self.prompts)
@@ -77,7 +73,7 @@ def main(args):
     results_filepath = os.path.join(args.output_dir, "evaluation_results.jsonl")
 
     # --- Load Dataset with Distributed Sampler ---
-    dataset_path = f"../dataset/{args.dataset}"
+    dataset_path = f"../../dataset/{args.dataset}"
     print(f"Loading dataset from: {dataset_path}")
 
     if args.dataset == "geneval":
@@ -225,12 +221,10 @@ def main(args):
                     result_item["scores"][score_name] = score_values[i].detach().cpu().item()
                 else:
                     result_item["scores"][score_name] = float(score_values[i])
-                    score_list.append(float(score_values[i]))
 
         del images, all_scores
         torch.cuda.empty_cache()
 
-    print(f"score_list / {args.reward_model}: {sum(score_list)/len(score_list):.4f} / len: {len(score_list)}")
     result_this_rank.sort(key=lambda x: x["sample_id"])
 
     with open(results_filepath, "w") as f_out:

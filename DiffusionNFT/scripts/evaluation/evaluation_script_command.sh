@@ -9,7 +9,7 @@ cuda_device=$1 # 0
 method=$2 # "sd-3-5-medium"
 ckpt=$3 # 0
 cfg_guidance=$4
-dataset="pickscore-analysis"
+dataset="pick_a_pic_spo"
 
 export CUDA_VISIBLE_DEVICES=${cuda_device}
 
@@ -23,14 +23,14 @@ echo "dataset: ${dataset}"
 echo "ckpt_dir: ${ckpt_dir}"
 echo "image_dir: ${image_dir}"
 
-# python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --model_type sd3 --dataset ${dataset} \
-#     --output_dir ${image_dir} \
-#     --guidance_scale ${cfg_guidance} \
-#     --save_images
-# chmod 777 "${image_dir}/evaluation_results.jsonl"
+python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --model_type sd3 --dataset ${dataset} \
+    --output_dir ${image_dir} \
+    --guidance_scale ${cfg_guidance} \
+    --save_images
+chmod 777 "${image_dir}/evaluation_results.jsonl"
 
 # reward_model_list=("pickscore" "hpsv2" "imagereward" "clipscore" "vqascore" "clip_iqa" "deqa" "aesthetic" "aesthetic_v2_5")
-reward_model_list=("pickscore" "hpsv2" "imagereward" "clipscore" "vqascore" "clip_iqa" "deqa" "aesthetic" "aesthetic_v2_5" "code" "b_free")
+reward_model_list=("pickscore" "hpsv2" "imagereward" "clipscore" "vqascore" "clip_iqa" "deqa" "aesthetic" "aesthetic_v2_5")
 for reward_model in "${reward_model_list[@]}"; do
     echo "********************************************"
     echo "reward_model: ${reward_model}"
@@ -44,17 +44,17 @@ for reward_model in "${reward_model_list[@]}"; do
         conda activate t2v
     fi
     
-    python calculate_score_group.py --reward_model ${reward_model} --dataset ${dataset} --output_dir ${image_dir} 
+    python calculate_score.py --reward_model ${reward_model} --dataset ${dataset} --output_dir ${image_dir} 
 done
 
 conda activate vila
 echo "********************************************"
 echo "reward_model: vila_score"
-cd ../../evaluate_metric
-python3 -m vila.run_vila_predict_analysis \
+cd ../../../evaluate_metric
+python3 -m vila.run_vila_predict_by_gemini_diffusionnft \
     --output_dir ${image_dir} \
     --ckpt_dir "/data_center/data2/dataset/chenwy/21164-data/model-ckpt/vila/checkpoints/vila_rank_tuned/" \
     --spm_model_path "/data_center/data2/dataset/chenwy/21164-data/model-ckpt/vila/spm_model/spm.model" \
     --dataset "${dataset}"
 
-cd ../DiffusionNFT/scripts
+cd ../DiffusionNFT/scripts/evaluation

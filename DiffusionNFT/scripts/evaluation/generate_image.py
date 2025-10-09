@@ -153,7 +153,7 @@ def main(args):
     )
 
     # --- Load Dataset with Distributed Sampler ---
-    dataset_path = f"../dataset/{args.dataset}"
+    dataset_path = f"../../dataset/{args.dataset}"
     print(f"Loading dataset from: {dataset_path}")
 
     if args.dataset == "geneval":

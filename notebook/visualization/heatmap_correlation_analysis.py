@@ -1,5 +1,5 @@
-code_block_type = "single_image_correlation"
-target_prompt = "photo of Ford Focus RS, night time, city, city roads, Miami streets"
+code_block_type = "lpips"
+target_prompt = "A hi res photo of a beautiful young woman named curvy Jo, wearing a tight sweater"
 reward_model_list = ["pickscore", "imagereward", "clipscore", "clip_iqa", "deqa", "aesthetic", "aesthetic_v2_5", "vila_score", "code" ]
 
 if code_block_type == "show_image":
@@ -113,3 +113,99 @@ elif code_block_type == "single_image_correlation":
     plt.tight_layout()
     plt.savefig(f"{code_block_type}.png")
     plt.show()
+
+elif code_block_type in ["lpips", "ssim"]:
+    ### hard example analysis - (lpips, SSIM) ###
+    import os
+    import pandas as pd
+    from scipy.stats import spearmanr
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import lpips
+    import torch
+    from PIL import Image
+    from itertools import combinations
+    import numpy as np
+    from skimage.metrics import structural_similarity as ssim
+    from tqdm import tqdm
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    loss_fn = lpips.LPIPS(net='vgg').to(device) # VGG: Correct; Alex: Fast
+
+    analysis_reward_model = "code"
+    base_reward_score_dir = "/data_center/data2/dataset/chenwy/21164-data/diffusionnft/generate_images/sd3_textencoder_3_none_cfg_1.0/pickscore-analysis/SD3.5M-DiffusionNFT-MultiReward/ckpt-0/reward_score"
+    reward_model_list = ["pickscore", "hpsv2", "imagereward", "clipscore", "vqascore", "clip_iqa", "deqa", "aesthetic", "aesthetic_v2_5", "vila_score", "code", "b_free"]
+
+    reward_model_df_dict = {}
+    first_image_names = None
+    all_data = []
+
+    for reward_model in reward_model_list:
+        reward_model_path = os.path.join(base_reward_score_dir, f"{reward_model}.csv")
+        reward_model_df = pd.read_csv(reward_model_path)
+        reward_model_df = reward_model_df.sort_values(by="image_name", ascending=True, ignore_index=True)
+        all_data.append(reward_model_df[['prompt', 'image_name', reward_model]])
+        
+    total_df = all_data[0]
+    for reward_model_idx, reward_model in enumerate(reward_model_list):
+        if reward_model_idx == 0: continue
+        total_df = pd.merge(total_df, all_data[reward_model_idx][['prompt', 'image_name', reward_model]], on=['prompt', 'image_name'], how='outer')
+
+    image_dir = "/data_center/data2/dataset/chenwy/21164-data/diffusionnft/generate_images/sd3_textencoder_3_none_cfg_1.0/pickscore-analysis/SD3.5M-DiffusionNFT-MultiReward/ckpt-0/images"
+
+    def load_image(image_path):
+        img = lpips.im2tensor(lpips.load_image(image_path))
+        return img.to(device)
+
+    def compute_group_lpips(image_paths):
+        images = []
+        for path in image_paths:
+            try:
+                images.append(load_image(path))
+            except Exception as e:
+                print(f"Error loading {path}: {e}")
+                return None  
+        
+        if len(images) != 24:
+            print(f"Warning: Group has {len(images)} images, not 24.")
+            return None
+        
+        lpips_scores = []
+        for img1, img2 in combinations(images, 2):
+            with torch.no_grad():
+                lpips_scores.append(loss_fn(img1, img2).item())
+        
+        avg_lpips = np.mean(lpips_scores)
+        return avg_lpips
+
+    def compute_group_ssim(image_paths):
+        images_np = []
+        for path in image_paths:
+            img = np.array(Image.open(path).convert('RGB'))
+            images_np.append(img)
+        
+        ssim_scores = []
+        for img1, img2 in combinations(images_np, 2):
+            ssim_scores.append(ssim(img1, img2, channel_axis=-1, data_range=255))
+        
+        avg_ssim = np.mean(ssim_scores)
+        return 1 - avg_ssim
+
+    metric_list = []
+    hard_prompts = []
+    lpips_threshold = 0.3
+    target_models = ["clip_iqa", "deqa", "aesthetic", "aesthetic_v2_5", "vila_score"]
+    grouped_by_prompt = total_df.groupby('prompt')
+
+    for idx, (prompt, group) in enumerate(tqdm(grouped_by_prompt, total=len(grouped_by_prompt))):
+        image_names = group['image_name'].tolist()
+        image_paths = [os.path.join(image_dir, f"{img_name}.png") for img_name in image_names]
+        
+        avg_metric = compute_group_lpips(image_paths) if code_block_type == "lpips" else compute_group_ssim(image_paths)
+        print(f"Prompt {idx}: {prompt[:50]}... | Avg {code_block_type} diff: {avg_metric:.4f}")
+
+        metric_list.append((prompt, avg_metric))   
+    
+    pd.DataFrame(metric_list, columns=['prompt', f'{code_block_type}']).to_csv(os.path.join(base_reward_score_dir, f"{code_block_type}.csv"), index=False)
+    
+
