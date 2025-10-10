@@ -104,5 +104,8 @@ def get_config():
 
     ###### Per-Prompt Stat Tracking ######
     config.per_prompt_stat_tracking = True
+    
+    ###### Filter sampling config ######
+    config.filter_sample = ml_collections.ConfigDict()
 
     return config

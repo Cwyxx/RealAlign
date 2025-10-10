@@ -15,8 +15,8 @@
 
 # from huggingface_hub import login
 # login(token="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")
-# import warnings
-# warnings.simplefilter("once")
+import warnings
+warnings.simplefilter("once", category=FutureWarning)
 
 from collections import defaultdict
 import os
@@ -270,7 +270,7 @@ def eval_fn(
             current_sample_neg_prompt_embeds = sample_neg_prompt_embeds
             current_sample_neg_pooled_prompt_embeds = sample_neg_pooled_prompt_embeds
 
-        with torch_autocast(enabled=(config.mixed_precision in ["fp16", "bf16"]), dtype=mixed_precision_dtype):
+        with torch.amp.autocast("cuda", enabled=(config.mixed_precision in ["fp16", "bf16"]), dtype=mixed_precision_dtype):
             with torch.no_grad():
                 images, _, _ = pipeline_with_logprob(
                     pipeline,
@@ -291,7 +291,6 @@ def eval_fn(
                 )
 
         rewards, reward_metadata = reward_fn(images, prompts, prompt_metadata, only_strict=False, offload_to_cpu=True)
-
         for key, value in rewards.items():
             rewards_tensor = torch.as_tensor(value, device=device).float()
             gathered_value = gather_tensor_to_all(rewards_tensor, world_size)
@@ -371,7 +370,6 @@ def main(_):
 
     setup_distributed(rank, local_rank, world_size)
     device = torch.device(f"cuda:{local_rank}")
-
     unique_id = datetime.datetime.now().strftime("%Y.%m.%d_%H.%M.%S")
     if not config.run_name:
         config.run_name = unique_id
@@ -539,22 +537,21 @@ def main(_):
         logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size}")
         logger.info(f"  Number of gradient updates per inner epoch = {samples_per_epoch // total_train_batch_size}")
         logger.info(f"  Number of inner epochs = {config.train.num_inner_epochs}")
-
+        
         os.makedirs(config.save_dir, exist_ok=True)
-        with open(os.path.join(config.save_dir, "exp_config.py"), "w") as f:
-            f.write(config.pretty_text)
-        logger.info(f"\n{config.pretty_text}")
-    
+        with open(os.path.join(config.save_dir, "exp_config.txt"), "w") as f:
+            json.dump(config.to_dict(), f, indent=4)            
+
     reward_fn, reward_models = getattr(flow_grpo.rewards, "multi_score")(device, config.reward_fn)  # Pass device
     eval_reward_fn = reward_fn
-    ### Offload to cpu ###
-    for _, reward_model in reward_models.items():
-        reward_model.to(torch.device("cpu"))
-    ### Offload to cpu ###
+    # ### Offload to cpu ###
+    # for _, reward_model in reward_models.items(): reward_model.to(torch.device("cpu"))
+    # ### Offload to cpu ###
 
     # --- Resume from checkpoint ---
     first_epoch = 0
     global_step = 0
+    
     if config.resume_from:
         logger.info(f"Resuming from {config.resume_from}")
         # Assuming checkpoint dir contains lora, optimizer.pt, scaler.pt
@@ -584,14 +581,7 @@ def main(_):
                 f"Could not parse global_step from checkpoint name: {config.resume_from}. Starting global_step from 0."
             )
             global_step = 0
-            
-    #### resume_lora ####
-    if config.resume_lora:
-        resume_lora_path = os.path.join(config.resume_lora, "lora")
-        logger.info(f"Loading LoRA weights from {resume_lora_path}")
-        transformer_ddp.module.load_adapter(resume_lora_path, adapter_name="default", is_trainable=True)
-        transformer_ddp.module.load_adapter(resume_lora_path, adapter_name="old", is_trainable=False)
-
+    
     ema = None
     if config.train.ema:
         ema = EMAModuleWrapper(transformer_trainable_parameters, decay=0.9, update_step_interval=1, device=device)
@@ -609,93 +599,98 @@ def main(_):
         tgt_param.data.copy_(src_param.detach().data)
         assert src_param is not tgt_param
 
+    log_images_to_swanlab = False
+    consume_prompt_num = 0
     for epoch in range(first_epoch, config.num_epochs):
+        if is_main_process(rank): log_images_to_swanlab = True
+            
         if hasattr(train_sampler, "set_epoch"):
             train_sampler.set_epoch(epoch)
-
+            
         # SAMPLING
         transformer_ddp.eval()  # Sets DDP model and its submodules to eval mode.
         pipeline.transformer.eval()
+        transformer_ddp.module.set_adapter("default")
+        
+        if epoch % config.eval_freq == 0 and not config.debug:
+            eval_fn(
+                pipeline,
+                test_dataloader,
+                text_encoders,
+                tokenizers,
+                config,
+                device,
+                rank,
+                world_size,
+                global_step,
+                eval_reward_fn,
+                mixed_precision_dtype,
+                ema,
+                transformer_trainable_parameters,
+            )
+            torch.cuda.empty_cache()
+
+        if epoch % config.save_freq == 0 and is_main_process(rank) and not config.debug:
+            save_ckpt(
+                config.save_dir,
+                transformer_ddp,
+                global_step,
+                rank,
+                ema,
+                transformer_trainable_parameters,
+                config,
+                optimizer,
+                scaler,
+            )
+
+        current_group_num = 0
+        current_group_bar = tqdm(total=config.num_groups, desc="Processing Groups", disable=not is_main_process(rank), dynamic_ncols=True, position=0)
         samples_data_list = []
-        # for reward_model in reward_models.values(): reward_model.to(device)
         torch.cuda.empty_cache()
 
-        for i in tqdm(range(config.sample.num_batches_per_epoch), desc=f"Epoch {epoch}: sampling", disable=not is_main_process(rank), position=0):
-            transformer_ddp.module.set_adapter("default")
+        while current_group_num < config.num_groups:
             if hasattr(train_sampler, "set_epoch") and isinstance(train_sampler, DistributedKRepeatSampler):
-                train_sampler.set_epoch(epoch * config.sample.num_batches_per_epoch + i)
+                train_sampler.set_epoch(consume_prompt_num)
 
-            train_prompts, train_prompt_metadata = next(train_iter)
-
-
-            if i == 0 and epoch % config.eval_freq == 0 and not config.debug:
-                eval_fn(
-                    pipeline,
-                    test_dataloader,
-                    text_encoders,
-                    tokenizers,
-                    config,
-                    device,
-                    rank,
-                    world_size,
-                    global_step,
-                    eval_reward_fn,
-                    mixed_precision_dtype,
-                    ema,
-                    transformer_trainable_parameters,
-                )
-                torch.cuda.empty_cache()
-
-            if i == 0 and epoch % config.save_freq == 0 and is_main_process(rank) and not config.debug:
-                save_ckpt(
-                    config.save_dir,
-                    transformer_ddp,
-                    global_step,
-                    rank,
-                    ema,
-                    transformer_trainable_parameters,
-                    config,
-                    optimizer,
-                    scaler,
-                )
-
+            consume_prompt_num += 1
+            prompts, prompt_metadata = next(train_iter)
             transformer_ddp.module.set_adapter("old")
-            for mini_sample_idx in range(config.sample.train_batch_size // config.sample.mini_sample_size):
-                start = mini_sample_idx * config.sample.mini_sample_size
-                end = start + config.sample.mini_sample_size
-                prompts, prompt_metadata = train_prompts[:2], train_prompt_metadata[0:2]  # For debug, comment out for full run
-                prompt_embeds, pooled_prompt_embeds = compute_text_embeddings(
-                    prompts, text_encoders, tokenizers, max_sequence_length=128, device=device
-                )
-                prompt_ids = tokenizers[0](
-                    prompts, padding="max_length", max_length=256, truncation=True, return_tensors="pt"
-                ).input_ids.to(device)
-                with torch_autocast(enabled=enable_amp, dtype=mixed_precision_dtype):
-                    with torch.no_grad():
-                        images, latents, _ = pipeline_with_logprob(
-                            pipeline,
-                            prompt_embeds=prompt_embeds,
-                            pooled_prompt_embeds=pooled_prompt_embeds,
-                            negative_prompt_embeds=sample_neg_prompt_embeds[: len(prompts)],
-                            negative_pooled_prompt_embeds=sample_neg_pooled_prompt_embeds[: len(prompts)],
-                            num_inference_steps=config.sample.num_steps,
-                            guidance_scale=config.sample.guidance_scale,
-                            output_type="pt",
-                            height=config.resolution,
-                            width=config.resolution,
-                            noise_level=config.sample.noise_level,
-                            deterministic=config.sample.deterministic,
-                            solver=config.sample.solver,
-                            model_type="sd3",
-                        )
-                transformer_ddp.module.set_adapter("default")
+            prompt_embeds, pooled_prompt_embeds = compute_text_embeddings(
+                prompts, text_encoders, tokenizers, max_sequence_length=128, device=device
+            )
+            prompt_ids = tokenizers[0](
+                prompts, padding="max_length", max_length=256, truncation=True, return_tensors="pt"
+            ).input_ids.to(device)
+            with torch.amp.autocast("cuda", enabled=enable_amp, dtype=mixed_precision_dtype):
+                with torch.no_grad():
+                    images, latents, _ = pipeline_with_logprob(
+                        pipeline,
+                        prompt_embeds=prompt_embeds,
+                        pooled_prompt_embeds=pooled_prompt_embeds,
+                        negative_prompt_embeds=sample_neg_prompt_embeds[: len(prompts)],
+                        negative_pooled_prompt_embeds=sample_neg_pooled_prompt_embeds[: len(prompts)],
+                        num_inference_steps=config.sample.num_steps,
+                        guidance_scale=config.sample.guidance_scale,
+                        output_type="pt",
+                        height=config.resolution,
+                        width=config.resolution,
+                        noise_level=config.sample.noise_level,
+                        deterministic=config.sample.deterministic,
+                        solver=config.sample.solver,
+                        model_type="sd3",
+                    )
+            transformer_ddp.module.set_adapter("default")
 
-                latents = torch.stack(latents, dim=1)
-                timesteps = pipeline.scheduler.timesteps.repeat(len(prompts), 1).to(device)
+            latents = torch.stack(latents, dim=1)
+            timesteps = pipeline.scheduler.timesteps.repeat(len(prompts), 1).to(device)
 
-                torch.cuda.empty_cache()
-                rewards, reward_metadata = reward_fn(images, prompts, prompt_metadata, only_strict=True, offload_to_cpu=True)
-
+            rewards, reward_metadata = reward_fn(images, prompts, prompt_metadata, only_strict=True, offload_to_cpu=True)
+            rewards = {k: torch.as_tensor(v, device=device).float() for k, v in rewards.items()}
+            
+            single_prompt_gathered_avg_rewards = gather_tensor_to_all(rewards["avg"], world_size).numpy() # (config.sample.num_image_per_prompt)
+            # if (single_prompt_gathered_avg_rewards < config.filter_sample.lose_sample_threshold).sum() >= config.filter_sample.lose_sample_num \
+            #     and (single_prompt_gathered_avg_rewards > config.filter_sample.win_sample_threshold).sum() >= config.filter_sample.win_sample_num:
+            if True:
                 samples_data_list.append(
                     {
                         "prompt_ids": prompt_ids,
@@ -704,14 +699,45 @@ def main(_):
                         "timesteps": timesteps,
                         "next_timesteps": torch.concatenate([timesteps[:, 1:], torch.zeros_like(timesteps[:, :1])], dim=1),
                         "latents_clean": latents[:, -1],
-                        "rewards": {k: torch.as_tensor(v, device=device).float() for k, v in rewards.items()}
+                        "rewards": rewards
                     }
                 )
-                del latents, _, prompt_metadata
-                if i != config.sample.num_batches_per_epoch - 1 or mini_sample_idx != config.sample.train_batch_size // config.sample.mini_sample_size - 1:
-                    del prompts, images
+                
+                if log_images_to_swanlab and is_main_process(rank):
+                    images_to_log = images.cpu()  # from last sampling batch on this rank
+                    prompts_to_log = prompts  # from last sampling batch on this rank
 
-        torch.cuda.empty_cache()
+                    with tempfile.TemporaryDirectory() as tmpdir:
+                        num_to_log = min(15, len(images_to_log))
+                        for idx in range(num_to_log):  # log first N
+                            img_data = images_to_log[idx]
+                            pil = Image.fromarray((img_data.numpy().transpose(1, 2, 0) * 255).astype(np.uint8))
+                            pil = pil.resize((config.resolution, config.resolution))
+                            pil.save(os.path.join(tmpdir, f"{idx}.jpg"))
+
+                        swanlab.log(
+                            {
+                                "images": [
+                                    swanlab.Image(
+                                        os.path.join(tmpdir, f"{idx}.jpg"),
+                                        caption=f"{prompts_to_log[idx]:.100}",
+                                    )
+                                    for idx in range(num_to_log)
+                                ],
+                            },
+                            step=global_step,
+                        )
+                    log_images_to_swanlab = False
+            
+                current_group_num += 1
+                current_group_bar.update(1)
+                
+                if is_main_process(rank): 
+                    logger.info(f"select prompt: {prompts[0]}")
+                    logger.info(f"rewards: {single_prompt_gathered_avg_rewards}")
+            
+            del images, latents, _, timesteps, rewards, reward_metadata, single_prompt_gathered_avg_rewards
+            torch.cuda.empty_cache()
     
 
         # Collate samples
@@ -724,32 +750,6 @@ def main(_):
             for k in samples_data_list[0].keys()
         }
 
-        # Logging images (main process)
-        if epoch % 10 == 0 and is_main_process(rank):
-            images_to_log = images.cpu()  # from last sampling batch on this rank
-            prompts_to_log = prompts  # from last sampling batch on this rank
-            rewards_to_log = collated_samples["rewards"]["avg"][-len(images_to_log) :].cpu()
-
-            with tempfile.TemporaryDirectory() as tmpdir:
-                num_to_log = min(15, len(images_to_log))
-                for idx in range(num_to_log):  # log first N
-                    img_data = images_to_log[idx]
-                    pil = Image.fromarray((img_data.numpy().transpose(1, 2, 0) * 255).astype(np.uint8))
-                    pil = pil.resize((config.resolution, config.resolution))
-                    pil.save(os.path.join(tmpdir, f"{idx}.jpg"))
-
-                swanlab.log(
-                    {
-                        "images": [
-                            swanlab.Image(
-                                os.path.join(tmpdir, f"{idx}.jpg"),
-                                caption=f"{prompts_to_log[idx]:.100} | avg: {rewards_to_log[idx]:.2f}",
-                            )
-                            for idx in range(num_to_log)
-                        ],
-                    },
-                    step=global_step,
-                )
         collated_samples["rewards"]["avg"] = (
             collated_samples["rewards"]["avg"].unsqueeze(1).repeat(1, num_train_timesteps)
         )
@@ -772,38 +772,19 @@ def main(_):
                 step=global_step,
             )
 
-        if config.per_prompt_stat_tracking:
-            prompt_ids_all = gather_tensor_to_all(collated_samples["prompt_ids"], world_size)
-            prompts_all_decoded = pipeline.tokenizer.batch_decode(
-                prompt_ids_all.cpu().numpy(), skip_special_tokens=True
+        advantages = gathered_rewards_dict["avg"]
+        if is_main_process(rank):
+            mean, std = advantages.mean(), advantages.std()
+            sample_image_num = advantages.shape[0]
+            swanlab.log(
+                {
+                    "sample_image_num": sample_image_num,
+                    "mean": mean,
+                    "std": std
+                },
+                step=global_step
             )
-            # Stat tracker update expects numpy arrays for rewards
-            advantages = stat_tracker.update(prompts_all_decoded, gathered_rewards_dict["avg"])
-
-            if is_main_process(rank):
-                group_size, trained_prompt_num = stat_tracker.get_stats()
-                zero_std_ratio, reward_std_mean = calculate_zero_std_ratio(prompts_all_decoded, gathered_rewards_dict)
-                swanlab.log(
-                    {
-                        "group_size": group_size,
-                        "trained_prompt_num": trained_prompt_num,
-                        "zero_std_ratio": zero_std_ratio,
-                        "reward_std_mean": reward_std_mean,
-                        "mean_reward_100": stat_tracker.get_mean_of_top_rewards(100),
-                        "mean_reward_75": stat_tracker.get_mean_of_top_rewards(75),
-                        "mean_reward_50": stat_tracker.get_mean_of_top_rewards(50),
-                        "mean_reward_25": stat_tracker.get_mean_of_top_rewards(25),
-                        "mean_reward_10": stat_tracker.get_mean_of_top_rewards(10),
-                    },
-                    step=global_step,
-                )
-            stat_tracker.clear()
-            del prompt_ids_all, prompts_all_decoded
-            torch.cuda.empty_cache()
-        else:
-            avg_rewards_all = gathered_rewards_dict["avg"]
-            advantages = (avg_rewards_all - avg_rewards_all.mean()) / (avg_rewards_all.std() + 1e-4)
-        
+            
         # Distribute advantages back to processes
         samples_per_gpu = collated_samples["timesteps"].shape[0]
         if advantages.ndim == 1:
@@ -893,7 +874,7 @@ def main(_):
 
                     xt = (1 - t_expanded) * x0 + t_expanded * noise
 
-                    with torch_autocast(enabled=enable_amp, dtype=mixed_precision_dtype):
+                    with torch.amp.autocast("cuda", enabled=enable_amp, dtype=mixed_precision_dtype):
                         transformer_ddp.module.set_adapter("old")
                         with torch.no_grad():
                             # prediction v
@@ -931,26 +912,27 @@ def main(_):
                                 assert False
                     loss_terms = {}
                     # Policy Gradient Loss
-                    advantages_clip = torch.clamp(
-                        train_sample_batch["advantages"][:, j_idx],
-                        -config.train.adv_clip_max,
-                        config.train.adv_clip_max,
-                    )
-                    if hasattr(config.train, "adv_mode"):
-                        if config.train.adv_mode == "positive_only":
-                            advantages_clip = torch.clamp(advantages_clip, 0, config.train.adv_clip_max)
-                        elif config.train.adv_mode == "negative_only":
-                            advantages_clip = torch.clamp(advantages_clip, -config.train.adv_clip_max, 0)
-                        elif config.train.adv_mode == "one_only":
-                            advantages_clip = torch.where(
-                                advantages_clip > 0, torch.ones_like(advantages_clip), torch.zeros_like(advantages_clip)
-                            )
-                        elif config.train.adv_mode == "binary":
-                            advantages_clip = torch.sign(advantages_clip)
+                    # advantages_clip = torch.clamp(
+                    #     train_sample_batch["advantages"][:, j_idx],
+                    #     -config.train.adv_clip_max,
+                    #     config.train.adv_clip_max,
+                    # )
+                    # if hasattr(config.train, "adv_mode"):
+                    #     if config.train.adv_mode == "positive_only":
+                    #         advantages_clip = torch.clamp(advantages_clip, 0, config.train.adv_clip_max)
+                    #     elif config.train.adv_mode == "negative_only":
+                    #         advantages_clip = torch.clamp(advantages_clip, -config.train.adv_clip_max, 0)
+                    #     elif config.train.adv_mode == "one_only":
+                    #         advantages_clip = torch.where(
+                    #             advantages_clip > 0, torch.ones_like(advantages_clip), torch.zeros_like(advantages_clip)
+                    #         )
+                    #     elif config.train.adv_mode == "binary":
+                    #         advantages_clip = torch.sign(advantages_clip)
 
                     # normalize advantage
-                    normalized_advantages_clip = (advantages_clip / config.train.adv_clip_max) / 2.0 + 0.5
-                    r = torch.clamp(normalized_advantages_clip, 0, 1)
+                    # normalized_advantages_clip = (advantages_clip / config.train.adv_clip_max) / 2.0 + 0.5
+                    # r = torch.clamp(normalized_advantages_clip, 0, 1)
+                    r = train_sample_batch["advantages"][:, j_idx]
                     loss_terms["x0_norm"] = torch.mean(x0**2).detach()
                     loss_terms["x0_norm_max"] = torch.max(x0**2).detach()
                     loss_terms["old_deviate"] = torch.mean((forward_prediction - old_prediction) ** 2).detach()
@@ -1059,7 +1041,6 @@ def main(_):
                     ema.step(transformer_trainable_parameters, global_step)
                 
         
-        del images, prompts, prompt_ids, prompt_embeds, pooled_prompt_embeds
         del samples_data_list, collated_samples, filtered_samples, advantages
         torch.cuda.empty_cache()
         if world_size > 1:

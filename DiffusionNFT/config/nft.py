@@ -25,9 +25,10 @@ def _get_config(base_model="sd3", n_gpus=1, gradient_step_per_epoch=1, dataset="
         config.sample.noise_level = 0.7
         bsz = 7
 
+    num_groups = 48
+    config.num_groups = num_groups
     config.sample.num_image_per_prompt = 24 # 24
-    num_groups = 48 # 48
-
+    
     while True:
         if bsz < 1:
             assert False, "Cannot find a proper batch size."
@@ -126,14 +127,25 @@ def sd3_code():
     reward_fn = {
         "code": 1.0,
     }
+    mean=0.45
+    win_sample_threshold = 0.4
+    win_sample_num=3
+    lose_sample_threshold = 0.05
+    lose_sample_num=3
     config = _get_config(
         base_model="sd3",
-        n_gpus=6,
+        n_gpus=4,
         gradient_step_per_epoch=1,
         dataset="pickscore",
         reward_fn=reward_fn,
-        name="sd3.5m-diffusionnft-multireward-next-code-beta_1.0-cfg_1.0",
+        name=f"sd3.5m-diffusionnft-multireward-next-code-wo_normalize-wo_optprob",
     )
+    config.filter_sample.mean = mean
+    config.filter_sample.win_sample_threshold = win_sample_threshold
+    config.filter_sample.win_sample_num = win_sample_num
+    config.filter_sample.lose_sample_threshold = lose_sample_threshold
+    config.filter_sample.lose_sample_num = lose_sample_num
+    
     config.sample.num_steps=10
     config.sample.mini_sample_size = 2
     
@@ -143,7 +155,7 @@ def sd3_code():
     #### for faster reward increase ####
     
     #### config.resume_lora_path ####
-    config.resume_lora = "/data_center/data2/dataset/chenwy/21164-data/diffusionnft/model-ckpt/sd3/SD3.5M-DiffusionNFT-MultiReward"
+    config.resume_from = "/data_center/data2/dataset/chenwy/21164-data/diffusionnft/model-ckpt/sd3/SD3.5M-DiffusionNFT-MultiReward/checkpoints/checkpoint-0"
     return config
 
 def sd3_b_free():

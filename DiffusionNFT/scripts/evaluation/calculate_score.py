@@ -97,10 +97,8 @@ def main(args):
 
     # --- Instantiate Reward Models ---
     print("Initializing reward models...")
-    if args.reward_model in ["imagereward", "pickscore", "aesthetic", "clipscore", "hpsv2"]:
-        all_reward_scorers = {
-            args.reward_model: 1.0
-        }
+    if args.reward_model in ["imagereward", "pickscore", "aesthetic", "clipscore", "hpsv2", "unifiedreward"]:
+        all_reward_scorers = { args.reward_model: 1.0 }
         scoring_fn, reward_models = multi_score(device, all_reward_scorers)
         for reward_model in reward_models.values(): reward_model.to(device)
         print(f"Initializing reward models {args.reward_model} from DiffusionNFT...")
@@ -189,7 +187,7 @@ def main(args):
         current_batch_size = len(prompts)
         image_paths = [ os.path.join(args.output_dir, "images", f"{sample_idx:05d}.png") for sample_idx in indices ]
         
-        if args.reward_model in [ "imagereward",  "pickscore",  "aesthetic", "clipscore", "hpsv2"]:
+        if args.reward_model in [ "imagereward",  "pickscore",  "aesthetic", "clipscore", "hpsv2", "unifiedreward"]:
             pil_images = [ Image.open(image_path) for image_path in image_paths ] # imagereward, pickscore get pil image input
             
             if args.reward_model == "aesthetic":
@@ -203,7 +201,7 @@ def main(args):
                 images = images.transpose(0, 3, 1, 2)  # NHWC -> NCHW
                 images = torch.tensor(images, dtype=torch.uint8) / 255.0
             
-            elif args.reward_model in [ "imagereward", "pickscore"]:
+            elif args.reward_model in [ "imagereward", "pickscore", "unifiedreward"]:
                 images = pil_images
         
         elif args.reward_model in [ "vqascore", "clip_iqa", "deqa", "aesthetic_v2_5" ]:
