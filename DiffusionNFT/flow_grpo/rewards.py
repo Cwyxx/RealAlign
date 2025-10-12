@@ -261,9 +261,8 @@ def unifiedreward_score(device):
     # print(f"Loading from /data3/chenweiyan/model-ckpt/UnifiedReward-7b-v1.5")
     # model_path = "/data3/chenweiyan/model-ckpt/UnifiedReward-7b-v1.5"
     model_path="CodeGoat24/UnifiedReward-qwen-7b"
-    model = Qwen2_5_VLForConditionalGeneration.from_pretrained(model_path, torch_dtype="auto", device_map={"": 'cuda:0'})
+    model = Qwen2_5_VLForConditionalGeneration.from_pretrained(model_path, torch_dtype=torch.float16, device_map={"": 'cuda:0'})
     processor = AutoProcessor.from_pretrained(model_path)
-    print(f"Loading Done!")
     
     def _extract_scores(text_outputs):
         scores = []
@@ -288,7 +287,7 @@ def unifiedreward_score(device):
             images = [Image.fromarray(image).resize((512, 512)) for image in images]
             
         text_outputs = []
-        for image, prompt in zip(images, prompt):
+        for image, prompt in zip(images, prompts):
             messages = [
                 {
                     "role": "user",
@@ -308,16 +307,12 @@ def unifiedreward_score(device):
                 generated_ids = model.generate(**inputs, max_new_tokens=512)
             generated_ids_trimmed = [ out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids) ]
             output_text = processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
-            print(f'prompt: You are given a text caption and a generated image based on that caption. Your task is to evaluate this image based on two key criteria:\n1. Alignment with the Caption: Assess how well this image aligns with the provided caption. Consider the accuracy of depicted objects, their relationships, and attributes as described in the caption.\n2. Overall Image Quality: Examine the visual quality of this image, including clarity, detail preservation, color accuracy, and overall aesthetic appeal.\nExtract key elements from the provided text caption, evaluate their presence in the generated image using the format: \'element (type): value\' (where value=0 means not generated, and value=1 means generated), and assign a score from 1 to 5 after \'Final Score:\'.\nYour task is provided as follows:\nText Caption: [{prompt}]')
-            print(f"output_text: {output_text}")
-            exit(0)
             text_outputs.append(output_text)
         scores = _extract_scores(text_outputs)
         return scores, {}
 
     return _fn, model
             
-
 def code(device):
     from flow_grpo.code_models.models import VITContrastiveHF as CoDE_Model
     classification_type = "linear"

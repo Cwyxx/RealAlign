@@ -29,8 +29,8 @@ echo "image_dir: ${image_dir}"
 #     --save_images
 # chmod 777 "${image_dir}/evaluation_results.jsonl"
 
-# reward_model_list=("pickscore" "hpsv2" "imagereward" "clipscore" "vqascore" "clip_iqa" "deqa" "aesthetic" "aesthetic_v2_5")
-reward_model_list=("unifiedreward")
+# reward_model_list=("pickscore" "hpsv2" "imagereward" "unifiedreward" "clipscore" "vqascore" "clip_iqa" "deqa" "aesthetic" "aesthetic_v2_5")
+reward_model_list=("hpsv3")
 for reward_model in "${reward_model_list[@]}"; do
     echo "********************************************"
     echo "reward_model: ${reward_model}"
@@ -42,6 +42,8 @@ for reward_model in "${reward_model_list[@]}"; do
         conda activate utils
     elif [[ "$reward_model" == "vqascore" ]]; then
         conda activate t2v
+    elif [[ "$reward_model" == "hpsv3" ]]; then
+        conda activate hpsv3
     fi
     
     python calculate_score.py --reward_model ${reward_model} --dataset ${dataset} --output_dir ${image_dir} 

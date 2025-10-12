@@ -602,10 +602,11 @@ def main(_):
     log_images_to_swanlab = False
     consume_prompt_num = 0
     for epoch in range(first_epoch, config.num_epochs):
-        if is_main_process(rank): log_images_to_swanlab = True
+        if epoch % 1 == 0 and is_main_process(rank): log_images_to_swanlab = True
             
         if hasattr(train_sampler, "set_epoch"):
             train_sampler.set_epoch(epoch)
+            
             
         # SAMPLING
         transformer_ddp.eval()  # Sets DDP model and its submodules to eval mode.
@@ -688,9 +689,9 @@ def main(_):
             rewards = {k: torch.as_tensor(v, device=device).float() for k, v in rewards.items()}
             
             single_prompt_gathered_avg_rewards = gather_tensor_to_all(rewards["avg"], world_size).numpy() # (config.sample.num_image_per_prompt)
-            # if (single_prompt_gathered_avg_rewards < config.filter_sample.lose_sample_threshold).sum() >= config.filter_sample.lose_sample_num \
-            #     and (single_prompt_gathered_avg_rewards > config.filter_sample.win_sample_threshold).sum() >= config.filter_sample.win_sample_num:
-            if True:
+            if (single_prompt_gathered_avg_rewards < config.filter_sample.lose_sample_threshold).sum() >= config.filter_sample.lose_sample_num \
+                and (single_prompt_gathered_avg_rewards > config.filter_sample.win_sample_threshold).sum() >= config.filter_sample.win_sample_num:
+                
                 samples_data_list.append(
                     {
                         "prompt_ids": prompt_ids,
@@ -773,6 +774,18 @@ def main(_):
             )
 
         advantages = gathered_rewards_dict["avg"]
+        # if config.per_prompt_stat_tracking:
+        #     prompt_ids_all = gather_tensor_to_all(collated_samples["prompt_ids"], world_size)
+        #     prompts_all_decoded = pipeline.tokenizer.batch_decode(
+        #         prompt_ids_all.cpu().numpy(), skip_special_tokens=True
+        #     )
+        #     # Stat tracker update expects numpy arrays for rewards
+        #     advantages = stat_tracker.update(prompts_all_decoded, gathered_rewards_dict["avg"])
+        #     stat_tracker.clear()
+        #     del prompt_ids_all, prompts_all_decoded
+        #     torch.cuda.empty_cache()
+        
+        # swanlab log advantages
         if is_main_process(rank):
             mean, std = advantages.mean(), advantages.std()
             sample_image_num = advantages.shape[0]

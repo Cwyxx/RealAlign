@@ -23,11 +23,11 @@ def _get_config(base_model="sd3", n_gpus=1, gradient_step_per_epoch=1, dataset="
         config.resolution = 512
         config.train.beta = 0.0001
         config.sample.noise_level = 0.7
-        bsz = 7
+        bsz = 5
 
     num_groups = 48
     config.num_groups = num_groups
-    config.sample.num_image_per_prompt = 24 # 24
+    config.sample.num_image_per_prompt = 12 # 24
     
     while True:
         if bsz < 1:
@@ -130,7 +130,7 @@ def sd3_code():
     mean=0.45
     win_sample_threshold = 0.4
     win_sample_num=3
-    lose_sample_threshold = 0.05
+    lose_sample_threshold = 0.1
     lose_sample_num=3
     config = _get_config(
         base_model="sd3",
@@ -138,8 +138,10 @@ def sd3_code():
         gradient_step_per_epoch=1,
         dataset="pickscore",
         reward_fn=reward_fn,
-        name=f"sd3.5m-diffusionnft-multireward-next-code-wo_normalize-wo_optprob",
+        name=f"sd3.5m-diffusionnft-multireward-next-code-win_{win_sample_threshold}_{win_sample_num}-lose_{lose_sample_threshold}_{lose_sample_num}-group_size_12-wo_normalize-wo_optprob",
     )
+    assert config.sample.num_image_per_prompt == 12
+    
     config.filter_sample.mean = mean
     config.filter_sample.win_sample_threshold = win_sample_threshold
     config.filter_sample.win_sample_num = win_sample_num

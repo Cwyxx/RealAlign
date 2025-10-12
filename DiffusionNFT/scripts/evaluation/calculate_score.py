@@ -87,6 +87,7 @@ def main(args):
     elif args.dataset == "pick_a_pic_spo":
         dataset = TextPromptDataset(dataset_path, split="test")
     eval_batch_size = 2
+    if args.reward_model == "hpsv3": eval_batch_size=1
     
     dataloader = DataLoader(
         dataset,
@@ -173,6 +174,21 @@ def main(args):
                 
             score_details = { args.reward_model: score_list}
             return score_details, {}
+        
+    elif args.reward_model == "hpsv3":
+        from hpsv3 import HPSv3RewardInferencer
+        inferencer = HPSv3RewardInferencer(device='cuda')
+        # inferencer.model = inferencer.model.to(device).to(torch.float16) 
+        def scoring_fn(images, prompts, metadata, only_strict=False):
+            ### images is image_paths #### 
+            assert type(images[0]) == str
+            
+            with torch.no_grad():
+                rewards = inferencer.reward(prompts=prompts, image_paths=image_paths)
+                score_list = [reward[0].item() for reward in rewards]
+            
+            score_details = { args.reward_model: score_list }
+            return score_details, {}
 
     score_list = []
     # --- Evaluation Loop ---
@@ -204,7 +220,7 @@ def main(args):
             elif args.reward_model in [ "imagereward", "pickscore", "unifiedreward"]:
                 images = pil_images
         
-        elif args.reward_model in [ "vqascore", "clip_iqa", "deqa", "aesthetic_v2_5" ]:
+        elif args.reward_model in [ "vqascore", "clip_iqa", "deqa", "aesthetic_v2_5", "hpsv3" ]:
             images = image_paths # path
                 
         all_scores, _ = scoring_fn(images, prompts, metadata, only_strict=False) # calculate_score
