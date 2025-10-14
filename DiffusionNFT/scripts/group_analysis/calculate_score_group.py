@@ -16,7 +16,7 @@
 import argparse
 import os
 import sys
-sys.path.append(os.path.join(os.getcwd(), "../"))
+sys.path.append(os.path.join(os.getcwd(), "../.."))
 import json
 import torch
 import numpy as np
@@ -75,7 +75,7 @@ def main(args):
     results_filepath = os.path.join(args.output_dir, "evaluation_results.jsonl")
 
     # --- Load Dataset with Distributed Sampler ---
-    dataset_path = f"../dataset/{args.dataset}"
+    dataset_path = f"../../dataset/{args.dataset}"
     print(f"Loading dataset from: {dataset_path}")
 
     if args.dataset == "geneval":
@@ -111,7 +111,7 @@ def main(args):
 
     # --- Instantiate Reward Models ---
     print("Initializing reward models...")
-    if args.reward_model in ["imagereward", "pickscore", "aesthetic", "clipscore", "hpsv2", "code", "b_free"]:
+    if args.reward_model in ["imagereward", "pickscore", "aesthetic", "clipscore", "hpsv2", "code", "b_free", "dinov2"]:
         all_reward_scorers = {
             args.reward_model: 1.0
         }
@@ -205,7 +205,7 @@ def main(args):
             image_paths = [ os.path.join(args.output_dir, "images", f"{indices[sample_idx]:05d}_{tmp_group_idx}.png") for sample_idx in range(current_batch_size) for tmp_group_idx in range(start_idx, end_idx) ]
 
             assert len(prompts) == len(image_paths)
-            if args.reward_model in [ "imagereward",  "pickscore",  "aesthetic", "clipscore", "hpsv2", "code", "b_free" ]:
+            if args.reward_model in [ "imagereward",  "pickscore",  "aesthetic", "clipscore", "hpsv2", "code", "b_free", "dinov2" ]:
                 pil_images = [ Image.open(image_path) for image_path in image_paths ] # imagereward, pickscore get pil image input
                 
                 if args.reward_model == "aesthetic":
@@ -219,7 +219,7 @@ def main(args):
                     images = images.transpose(0, 3, 1, 2)  # NHWC -> NCHW
                     images = torch.tensor(images, dtype=torch.uint8) / 255.0
                 
-                elif args.reward_model in [ "imagereward", "pickscore", "code", "b_free"]:
+                elif args.reward_model in [ "imagereward", "pickscore", "code", "b_free", "dinov2"]:
                     images = pil_images
             
             elif args.reward_model in [ "vqascore", "clip_iqa", "deqa", "aesthetic_v2_5" ]:

@@ -313,6 +313,38 @@ def unifiedreward_score(device):
 
     return _fn, model
             
+def dinov2(device):
+    from flow_grpo.dinov2 import Dinov2
+    import safetensors
+    aigi_detector = Dinov2("facebook/dinov2-base")
+    _transform = torchvision.transforms.Compose([
+            torchvision.transforms.Resize(256, interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
+            torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.ToTensor(),                  
+            torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        ])
+    aigi_detector_ckpt = "/data_center/data2/dataset/chenwy/21164-data/model-ckpt/dinov2/genimage/best_model/model.safetensors"
+    ckpt = safetensors.torch.load_file(aigi_detector_ckpt)
+    aigi_detector.load_state_dict(ckpt)
+    aigi_detector = aigi_detector.to(dtype=torch.float32, device=device)
+    aigi_detector.eval()
+    
+    def _fn(images, prompts, metadata):
+        if isinstance(images, torch.Tensor):
+            images = (images * 255).round().clamp(0, 255).to(torch.uint8).cpu().numpy()
+            images = images.transpose(0, 2, 3, 1)  # NCHW -> NHWC
+            images = [Image.fromarray(image) for image in images]
+        
+        transformed_images = [_transform(image) for image in images]
+        image_tensor = torch.stack(transformed_images).to(device)
+        with torch.no_grad():
+            logits = aigi_detector(image_tensor)
+            outputs = torch.sigmoid(logits)
+            scores = 1 - outputs
+        return scores.squeeze(), {}
+    
+    return _fn, aigi_detector
+
 def code(device):
     from flow_grpo.code_models.models import VITContrastiveHF as CoDE_Model
     classification_type = "linear"
@@ -340,7 +372,7 @@ def code(device):
         with torch.no_grad():
             logits = aigi_detector(image_tensor)
             outputs = logits[:, 1].reshape(-1, 1)
-            scores = 1 - outputs
+            scores = outputs # scores = 1 - outputs
             scores = scores.squeeze()
             
         return scores, {}
@@ -401,7 +433,8 @@ def multi_score(device, score_dict):
         "clipscore": clip_score,
         "hpsv2": hpsv2_score,
         "code": code,
-        "b_free": b_free
+        "b_free": b_free,
+        "dinov2": dinov2
     }
     score_fns, score_models = {}, {}
     for score_name, weight in score_dict.items():
@@ -410,7 +443,7 @@ def multi_score(device, score_dict):
         score_models[score_name] = score_model
         score_model.to(torch.device("cpu"))
         
-    offload_reward_model_list = ["pickscore", "clipscore", "hpsv2", "code", "b_free"]
+    offload_reward_model_list = ["pickscore", "clipscore", "hpsv2", "code", "b_free", "dinov2"]
     # only_strict is only for geneval. During training, only the strict reward is needed, and non-strict rewards don't need to be computed, reducing reward calculation time.
     def _fn(images, prompts, metadata, only_strict=True, offload_to_cpu=False):
         total_scores = []

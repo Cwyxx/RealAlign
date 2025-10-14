@@ -27,7 +27,7 @@ def _get_config(base_model="sd3", n_gpus=1, gradient_step_per_epoch=1, dataset="
 
     num_groups = 48
     config.num_groups = num_groups
-    config.sample.num_image_per_prompt = 12 # 24
+    config.sample.num_image_per_prompt = 24 # 24
     
     while True:
         if bsz < 1:
@@ -42,7 +42,7 @@ def _get_config(base_model="sd3", n_gpus=1, gradient_step_per_epoch=1, dataset="
                 config.sample.num_batches_per_epoch = n_batch_per_epoch
                 config.train.batch_size = 2
                 config.train.gradient_accumulation_steps = (
-                    config.sample.num_batches_per_epoch * (config.sample.train_batch_size // config.train.batch_size) // gradient_step_per_epoch
+                    config.sample.num_batches_per_epoch * config.sample.train_batch_size // config.train.batch_size // gradient_step_per_epoch
                 )
                 break
         bsz -= 1
@@ -127,18 +127,43 @@ def sd3_code():
     reward_fn = {
         "code": 1.0,
     }
+    config = _get_config(
+        base_model="sd3",
+        n_gpus=6,
+        gradient_step_per_epoch=1,
+        dataset="geneval",
+        reward_fn=reward_fn,
+        name=f"sd3.5m-diffusionnft-multireward-next-code-geneval-reverse_score",
+    )
+    config.sample.num_steps=10
+    config.sample.mini_sample_size = 2
+    
+    #### for faster reward increase ####
+    config.save_freq = 1 # 30
+    config.eval_freq = 1
+    #### for faster reward increase ####
+    
+    #### config.resume_lora_path ####
+    config.resume_from = "/data_center/data2/dataset/chenwy/21164-data/diffusionnft/model-ckpt/sd3/SD3.5M-DiffusionNFT-MultiReward/checkpoints/checkpoint-0"
+    return config
+
+def sd3_dinov2():
+    reward_model="dinov2"
+    reward_fn = {
+        reward_model: 1.0,
+    }
     mean=0.45
-    win_sample_threshold = 0.4
-    win_sample_num=3
+    win_sample_threshold = 0.3
+    win_sample_num=2
     lose_sample_threshold = 0.1
-    lose_sample_num=3
+    lose_sample_num=2
     config = _get_config(
         base_model="sd3",
         n_gpus=4,
         gradient_step_per_epoch=1,
         dataset="pickscore",
         reward_fn=reward_fn,
-        name=f"sd3.5m-diffusionnft-multireward-next-code-win_{win_sample_threshold}_{win_sample_num}-lose_{lose_sample_threshold}_{lose_sample_num}-group_size_12-wo_normalize-wo_optprob",
+        name=f"sd3.5m-diffusionnft-multireward-next-{reward_model}-win_{win_sample_threshold}_{win_sample_num}-lose_{lose_sample_threshold}_{lose_sample_num}-group_size_12-wo_normalize-wo_optprob",
     )
     assert config.sample.num_image_per_prompt == 12
     

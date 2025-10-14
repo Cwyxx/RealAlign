@@ -597,22 +597,24 @@ def main(_):
 
     train_iter = iter(train_dataloader)
     optimizer.zero_grad()
-
+    
     for src_param, tgt_param in zip(
         transformer_trainable_parameters, old_transformer_trainable_parameters, strict=True
     ):
         tgt_param.data.copy_(src_param.detach().data)
         assert src_param is not tgt_param
 
+    log_images_to_swanlab = False
     for epoch in range(first_epoch, config.num_epochs):
         if hasattr(train_sampler, "set_epoch"):
             train_sampler.set_epoch(epoch)
 
+        if epoch % 1 == 0 and is_main_process(rank): log_images_to_swanlab = True
+        
         # SAMPLING
         transformer_ddp.eval()  # Sets DDP model and its submodules to eval mode.
         pipeline.transformer.eval()
         samples_data_list = []
-        # for reward_model in reward_models.values(): reward_model.to(device)
         torch.cuda.empty_cache()
 
         for i in tqdm(range(config.sample.num_batches_per_epoch), desc=f"Epoch {epoch}: sampling", disable=not is_main_process(rank), position=0):
@@ -621,7 +623,6 @@ def main(_):
                 train_sampler.set_epoch(epoch * config.sample.num_batches_per_epoch + i)
 
             train_prompts, train_prompt_metadata = next(train_iter)
-
 
             if i == 0 and epoch % config.eval_freq == 0 and not config.debug:
                 eval_fn(
@@ -658,7 +659,7 @@ def main(_):
             for mini_sample_idx in range(config.sample.train_batch_size // config.sample.mini_sample_size):
                 start = mini_sample_idx * config.sample.mini_sample_size
                 end = start + config.sample.mini_sample_size
-                prompts, prompt_metadata = train_prompts[:2], train_prompt_metadata[0:2]  # For debug, comment out for full run
+                prompts, prompt_metadata = train_prompts[start:end], train_prompt_metadata[start:end]  # For debug, comment out for full run
                 prompt_embeds, pooled_prompt_embeds = compute_text_embeddings(
                     prompts, text_encoders, tokenizers, max_sequence_length=128, device=device
                 )
@@ -688,7 +689,6 @@ def main(_):
                 latents = torch.stack(latents, dim=1)
                 timesteps = pipeline.scheduler.timesteps.repeat(len(prompts), 1).to(device)
 
-                torch.cuda.empty_cache()
                 rewards, reward_metadata = reward_fn(images, prompts, prompt_metadata, only_strict=True, offload_to_cpu=True)
 
                 samples_data_list.append(
@@ -702,13 +702,36 @@ def main(_):
                         "rewards": {k: torch.as_tensor(v, device=device).float() for k, v in rewards.items()}
                     }
                 )
-                del latents, _, prompt_metadata
-                if i != config.sample.num_batches_per_epoch - 1 or mini_sample_idx != config.sample.train_batch_size // config.sample.mini_sample_size - 1:
-                    del prompts, images
+                
+                if log_images_to_swanlab and is_main_process(rank):
+                    images_to_log = images.cpu()  # from last sampling batch on this rank
+                    prompts_to_log = prompts  # from last sampling batch on this rank
 
-        torch.cuda.empty_cache()
-    
+                    with tempfile.TemporaryDirectory() as tmpdir:
+                        num_to_log = min(15, len(images_to_log))
+                        for idx in range(num_to_log):  # log first N
+                            img_data = images_to_log[idx]
+                            pil = Image.fromarray((img_data.numpy().transpose(1, 2, 0) * 255).astype(np.uint8))
+                            pil = pil.resize((config.resolution, config.resolution))
+                            pil.save(os.path.join(tmpdir, f"{idx}.jpg"))
 
+                        swanlab.log(
+                            {
+                                "images": [
+                                    swanlab.Image(
+                                        os.path.join(tmpdir, f"{idx}.jpg"),
+                                        caption=f"{prompts_to_log[idx]:.100}",
+                                    )
+                                    for idx in range(num_to_log)
+                                ],
+                            },
+                            step=global_step,
+                        )
+                    log_images_to_swanlab = False
+
+                del images, latents, _, timesteps, rewards, reward_metadata
+                torch.cuda.empty_cache()
+                
         # Collate samples
         collated_samples = {
             k: (
@@ -718,33 +741,6 @@ def main(_):
             )
             for k in samples_data_list[0].keys()
         }
-
-        # Logging images (main process)
-        if epoch % 1 == 0 and is_main_process(rank):
-            images_to_log = images.cpu()  # from last sampling batch on this rank
-            prompts_to_log = prompts  # from last sampling batch on this rank
-            rewards_to_log = collated_samples["rewards"]["avg"][-len(images_to_log) :].cpu()
-
-            with tempfile.TemporaryDirectory() as tmpdir:
-                num_to_log = min(15, len(images_to_log))
-                for idx in range(num_to_log):  # log first N
-                    img_data = images_to_log[idx]
-                    pil = Image.fromarray((img_data.numpy().transpose(1, 2, 0) * 255).astype(np.uint8))
-                    pil = pil.resize((config.resolution, config.resolution))
-                    pil.save(os.path.join(tmpdir, f"{idx}.jpg"))
-
-                swanlab.log(
-                    {
-                        "images": [
-                            swanlab.Image(
-                                os.path.join(tmpdir, f"{idx}.jpg"),
-                                caption=f"{prompts_to_log[idx]:.100} | avg: {rewards_to_log[idx]:.2f}",
-                            )
-                            for idx in range(num_to_log)
-                        ],
-                    },
-                    step=global_step,
-                )
         
         collated_samples["rewards"]["avg"] = (
             collated_samples["rewards"]["avg"].unsqueeze(1).repeat(1, num_train_timesteps)
@@ -1055,7 +1051,6 @@ def main(_):
                     ema.step(transformer_trainable_parameters, global_step)
                 
         
-        del images, prompts, prompt_ids, prompt_embeds, pooled_prompt_embeds
         del samples_data_list, collated_samples, filtered_samples, advantages
         torch.cuda.empty_cache()
         if world_size > 1:

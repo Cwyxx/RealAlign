@@ -42,7 +42,7 @@ class TextPromptDataset(Dataset):
         if not os.path.exists(self.file_path):
             raise FileNotFoundError(f"Dataset file not found at {self.file_path}")
         with open(self.file_path, "r") as f:
-            self.prompts = [line.strip() for line in f.readlines()]
+            self.prompts = [line.strip() for line in f.readlines()][0:100]
 
     def __len__(self):
         return len(self.prompts)
@@ -153,7 +153,7 @@ def main(args):
     )
 
     # --- Load Dataset with Distributed Sampler ---
-    dataset_path = f"../dataset/{args.dataset}"
+    dataset_path = f"../../dataset/{args.dataset}"
     print(f"Loading dataset from: {dataset_path}")
 
     if args.dataset == "geneval":
@@ -192,7 +192,7 @@ def main(args):
         shuffle=False,
     )
     
-    group_size = 24
+    group_size = 1
     result_this_rank = []
     for batch in tqdm(dataloader, desc=f"Evaluating"):
         prompts, metadata, indices = batch
@@ -220,7 +220,8 @@ def main(args):
                 }
 
                 if args.save_images:
-                    image_path = os.path.join(args.output_dir, "images", f"{sample_idx:05d}_{group_idx}.png")
+                    # image_path = os.path.join(args.output_dir, "images", f"{sample_idx:05d}_{group_idx}.png")
+                    image_path = os.path.join(args.output_dir, "images", f"{sample_idx:05d}.png")
                     pil_image = Image.fromarray((images[i].cpu().numpy().transpose(1, 2, 0) * 255).astype(np.uint8))
                     pil_image.save(image_path)
                     result_item["image_path"] = image_path
