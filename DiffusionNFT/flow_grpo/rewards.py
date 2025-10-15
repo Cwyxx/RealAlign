@@ -354,7 +354,8 @@ def code(device):
     aigi_detector.eval()
     
     _transform = torchvision.transforms.Compose([
-        torchvision.transforms.CenterCrop(224),               # Center crop to 224x224
+        torchvision.transforms.Resize(224, interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
+        # torchvision.transforms.CenterCrop(224),               # Center crop to 224x224
         torchvision.transforms.ToTensor(),                     # Convert PIL image to tensor
         torchvision.transforms.Normalize(                      # Normalize with mean and std
             mean=[0.485, 0.456, 0.406],            # ImageNet mean values
@@ -372,9 +373,8 @@ def code(device):
         with torch.no_grad():
             logits = aigi_detector(image_tensor)
             outputs = logits[:, 1].reshape(-1, 1)
-            scores = outputs # scores = 1 - outputs
-            scores = scores.squeeze()
-            
+            scores = 1 - outputs
+            if len(images) > 1: scores = scores.squeeze()            
         return scores, {}
     
     return _fn, aigi_detector

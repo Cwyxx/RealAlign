@@ -42,7 +42,10 @@ class TextPromptDataset(Dataset):
         if not os.path.exists(self.file_path):
             raise FileNotFoundError(f"Dataset file not found at {self.file_path}")
         with open(self.file_path, "r") as f:
-            self.prompts = [line.strip() for line in f.readlines()][0:100]
+            self.prompts = [line.strip() for line in f.readlines()]
+        
+        if split == "test":
+            self.prompts = self.prompts[0:20]
 
     def __len__(self):
         return len(self.prompts)
@@ -59,6 +62,9 @@ class GenevalPromptDataset(Dataset):
         with open(self.file_path, "r", encoding="utf-8") as f:
             self.metadatas = [json.loads(line) for line in f]
             self.prompts = [item["prompt"] for item in self.metadatas]
+        
+        if split == "test":
+            self.prompts = self.prompts[0:20]
 
     def __len__(self):
         return len(self.prompts)
@@ -192,7 +198,7 @@ def main(args):
         shuffle=False,
     )
     
-    group_size = 1
+    group_size = 12
     result_this_rank = []
     for batch in tqdm(dataloader, desc=f"Evaluating"):
         prompts, metadata, indices = batch
@@ -220,8 +226,8 @@ def main(args):
                 }
 
                 if args.save_images:
-                    # image_path = os.path.join(args.output_dir, "images", f"{sample_idx:05d}_{group_idx}.png")
-                    image_path = os.path.join(args.output_dir, "images", f"{sample_idx:05d}.png")
+                    image_path = os.path.join(args.output_dir, "images", f"{sample_idx:05d}_{group_idx}.png")
+                    # image_path = os.path.join(args.output_dir, "images", f"{sample_idx:05d}.png")
                     pil_image = Image.fromarray((images[i].cpu().numpy().transpose(1, 2, 0) * 255).astype(np.uint8))
                     pil_image.save(image_path)
                     result_item["image_path"] = image_path

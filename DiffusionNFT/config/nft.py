@@ -23,7 +23,7 @@ def _get_config(base_model="sd3", n_gpus=1, gradient_step_per_epoch=1, dataset="
         config.resolution = 512
         config.train.beta = 0.0001
         config.sample.noise_level = 0.7
-        bsz = 5
+        bsz = 7
 
     num_groups = 48
     config.num_groups = num_groups
@@ -127,19 +127,19 @@ def sd3_code():
     reward_fn = {
         "code": 1.0,
     }
+    dataset_name="geneval"
     config = _get_config(
         base_model="sd3",
-        n_gpus=6,
+        n_gpus=4,
         gradient_step_per_epoch=1,
-        dataset="geneval",
+        dataset=dataset_name,
         reward_fn=reward_fn,
-        name=f"sd3.5m-diffusionnft-multireward-next-code-geneval-reverse_score",
+        name=f"sd3.5m-diffusionnft-multireward-next-code-{dataset_name}-resize_224",
     )
-    config.sample.num_steps=10
     config.sample.mini_sample_size = 2
-    
+    config.sample.num_steps=10
     #### for faster reward increase ####
-    config.save_freq = 1 # 30
+    config.save_freq = 1
     config.eval_freq = 1
     #### for faster reward increase ####
     

@@ -3,6 +3,6 @@ source /data3/chenweiyan/miniconda3/etc/profile.d/conda.sh
 conda activate alignprop
 
 export HF_ENDPOINT=https://hf-mirror.com 
-export CUDA_VISIBLE_DEVICES=1,2,3,4,5,7
+export CUDA_VISIBLE_DEVICES=3,4,5,7
 # export HF_HOME_TOKEN="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"
-torchrun --nproc_per_node=6 scripts/train_nft_sd3.py --config config/nft.py:sd3_code
+torchrun --nproc_per_node=4 scripts/train_nft_sd3.py --config config/nft.py:sd3_code
