@@ -127,15 +127,43 @@ def sd3_code():
     reward_fn = {
         "code": 1.0,
     }
+    lr = 1e-4
     dataset_name="geneval"
+    
+    # #### filter_sample_v1 ####
+    # lose_sample_threshold = 0.1
+    # lose_sample_num = 4
+    # win_sample_threshold = 0.4
+    # win_sample_num = 4
+    # #### filter_sample_v1 ####
+    
+    #### filter_sample_v2 ####
+    max_min_threshold=0.4
+    decay_type=3
+    #### filter_sample_v2 ####
+    
     config = _get_config(
         base_model="sd3",
         n_gpus=4,
         gradient_step_per_epoch=1,
         dataset=dataset_name,
         reward_fn=reward_fn,
-        name=f"sd3.5m-diffusionnft-multireward-next-code-{dataset_name}-resize_224",
+        name=f"sd3.5m-diffusionnft-multireward-next-code-{dataset_name}-lr_{lr}-resize_256_crop_224-max_min_{max_min_threshold}-decay_type_{decay_type}",
     )
+    config.train.learning_rate=lr
+    
+    # #### filter_sample_v1 ####
+    # config.filter_sample.lose_sample_threshold = lose_sample_threshold
+    # config.filter_sample.lose_sample_num = lose_sample_num
+    # config.filter_sample.win_sample_threshold = win_sample_threshold
+    # config.filter_sample.win_sample_num = win_sample_num
+    # #### filter_sample_v1 ####
+    
+    #### filter_sample_v2 ####
+    config.filter_sample.max_min_threshold = max_min_threshold
+    config.decay_type=decay_type
+    #### filter_sample_v2 ####
+    
     config.sample.mini_sample_size = 2
     config.sample.num_steps=10
     #### for faster reward increase ####

@@ -135,14 +135,35 @@ if __name__ == "__main__":
     model = VITContrastiveHF(
         pretraiend_model="/data_center/data2/dataset/chenwy/21164-data/detection-method-ckpt/CoDE", classificator_type=classificator_type
     )
-
+    
+    
     transform = transforms.Compose(
         [
+            transforms.Resize(256, interpolation=transforms.InterpolationMode.BICUBIC),
             transforms.CenterCrop(224),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ]
     )
+    
+    # def get_image_patches(image, patch_size=224):
+    #     width, height = image.size
+    #     patches = []
+    #     x_positions = [0, (width - patch_size) // 2, width - patch_size]
+    #     y_positions = [0, (height - patch_size) // 2, height - patch_size]
+        
+    #     for i in range(3):
+    #         for j in range(3):
+    #             left = x_positions[i]
+    #             upper = y_positions[j]
+    #             right = left + patch_size
+    #             lower = upper + patch_size
+                
+                
+    #             patch = image.crop((left, upper, right, lower))
+    #             patches.append(patch)
+        
+    #     return patches
 
     model.eval().to(device)
     y_pred = []
@@ -158,18 +179,24 @@ if __name__ == "__main__":
             image_path = os.path.join(source_image_dir, image_name)
             y_true.append(1 if image_type=="fake" else 0)
             image = Image.open(image_path).convert("RGB")
+            # patches = get_image_patches(image)
+            
+            # patch_tensors = []
+            # for patch in patches:
+            #     in_tens = transform(patch).unsqueeze(0).to(device)  # Add batch dimension and move to device
+            #     patch_tensors.append(in_tens)
+            # batch_tensors = torch.cat(patch_tensors, dim=0)
+            batch_tensors = transform(image).unsqueeze(0).to(device)
             
             with torch.no_grad():
-                in_tens = transform(image)
-                in_tens = in_tens.unsqueeze(0).to(device)  # add batch dimension
-                output = model(in_tens)
-                output = output[:, 1].reshape(-1, 1)
-                y_pred.append(output.flatten().tolist()[0])
-                
+                output = model(batch_tensors)
+                output = output[:, 1].reshape(-1, 1)  # Assuming the second output is the score
+                mean_score = output.mean().item()
+                y_pred.append(mean_score)
                 predictions_log.append({
                     'image_name': image_name,
                     'image_type': 1 if image_type=="fake" else 0,
-                    'model_output': output.flatten().tolist()[0]
+                    'model_output': mean_score
                 })
 
-    pd.DataFrame(predictions_log).to_csv(os.path.join(base_image_dir, "detect_score", "code.csv"), index=False)
+    pd.DataFrame(predictions_log).to_csv(os.path.join(base_image_dir, "detect_score", "code-resize_256_crop_224.csv"), index=False)

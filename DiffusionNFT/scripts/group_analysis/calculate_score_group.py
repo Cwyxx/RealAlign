@@ -279,7 +279,7 @@ if __name__ == "__main__":
         help="Directory to save evaluation results and generated images.",
     )
     parser.add_argument(
-        "--num_inference_steps", type=int, default=40, help="Number of inference steps for the diffusion pipeline."
+        "--num_inference_steps", type=int, default=10, help="Number of inference steps for the diffusion pipeline."
     )
     parser.add_argument("--guidance_scale", type=float, default=1.0, help="Classifier-free guidance scale.")
     parser.add_argument("--resolution", type=int, default=512, help="Resolution of the generated images.")

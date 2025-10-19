@@ -191,6 +191,15 @@ def return_decay(step, decay_type):
         flat = 75
         uprate = 0.0075
         uphold = 0.999
+    elif decay_type == 3:
+        flat = 0
+        uprate = 0.25
+        uphold = 0.5   
+    elif decay_type == 4:
+        flat = 0
+        uprate = 0.005
+        uphold = 0.5     
+    
     else:
         assert False
 
@@ -362,6 +371,16 @@ def save_ckpt(
             ema.copy_temp_to(transformer_trainable_parameters)
         logger.info(f"Saved checkpoint to {save_root}")
 
+
+def validate_sample(single_prompt_gathered_avg_rewards, config):
+    x = single_prompt_gathered_avg_rewards
+    max_score = np.max(x)
+    min_score = np.min(x)
+    
+    if (max_score - min_score) <= config.filter_sample.max_min_threshold:
+        return False
+    
+    return True
 
 def main(_):
     config = FLAGS.config
@@ -692,9 +711,7 @@ def main(_):
             rewards = {k: torch.as_tensor(v, device=device).float() for k, v in rewards.items()}
             
             single_prompt_gathered_avg_rewards = gather_tensor_to_all(rewards["avg"], world_size).numpy() # (config.sample.num_image_per_prompt)
-            if (single_prompt_gathered_avg_rewards < config.filter_sample.lose_sample_threshold).sum() >= config.filter_sample.lose_sample_num \
-                and (single_prompt_gathered_avg_rewards > config.filter_sample.win_sample_threshold).sum() >= config.filter_sample.win_sample_num:
-                
+            if validate_sample(single_prompt_gathered_avg_rewards, config):
                 samples_data_list.append(
                     {
                         "prompt_ids": prompt_ids,
@@ -736,8 +753,8 @@ def main(_):
                 current_group_num += 1
                 current_group_bar.update(1)
                 
+                logger.info(f"rank: {rank}, select prompt: {prompts[0]}")
                 if is_main_process(rank): 
-                    logger.info(f"select prompt: {prompts[0]}")
                     logger.info(f"rewards: {single_prompt_gathered_avg_rewards}")
             
             del images, latents, _, timesteps, rewards, reward_metadata, single_prompt_gathered_avg_rewards
@@ -776,20 +793,37 @@ def main(_):
                 step=global_step,
             )
 
-        advantages = gathered_rewards_dict["avg"]
-        
-        # swanlab log advantages
-        if is_main_process(rank):
-            mean, std = advantages.mean(), advantages.std()
-            sample_image_num = advantages.shape[0]
-            swanlab.log(
-                {
-                    "sample_image_num": sample_image_num,
-                    "mean": mean,
-                    "std": std
-                },
-                step=global_step
+        if config.per_prompt_stat_tracking:
+            prompt_ids_all = gather_tensor_to_all(collated_samples["prompt_ids"], world_size)
+            prompts_all_decoded = pipeline.tokenizer.batch_decode(
+                prompt_ids_all.cpu().numpy(), skip_special_tokens=True
             )
+            # Stat tracker update expects numpy arrays for rewards
+            advantages = stat_tracker.update(prompts_all_decoded, gathered_rewards_dict["avg"])
+
+            if is_main_process(rank):
+                group_size, trained_prompt_num = stat_tracker.get_stats()
+                zero_std_ratio, reward_std_mean = calculate_zero_std_ratio(prompts_all_decoded, gathered_rewards_dict)
+                swanlab.log(
+                    {
+                        "group_size": group_size,
+                        "trained_prompt_num": trained_prompt_num,
+                        "zero_std_ratio": zero_std_ratio,
+                        "reward_std_mean": reward_std_mean,
+                        "mean_reward_100": stat_tracker.get_mean_of_top_rewards(100),
+                        "mean_reward_75": stat_tracker.get_mean_of_top_rewards(75),
+                        "mean_reward_50": stat_tracker.get_mean_of_top_rewards(50),
+                        "mean_reward_25": stat_tracker.get_mean_of_top_rewards(25),
+                        "mean_reward_10": stat_tracker.get_mean_of_top_rewards(10),
+                    },
+                    step=global_step,
+                )
+            stat_tracker.clear()
+            del prompt_ids_all, prompts_all_decoded
+            torch.cuda.empty_cache()
+        else:
+            avg_rewards_all = gathered_rewards_dict["avg"]
+            advantages = (avg_rewards_all - avg_rewards_all.mean()) / (avg_rewards_all.std() + 1e-4)
             
         # Distribute advantages back to processes
         samples_per_gpu = collated_samples["timesteps"].shape[0]
@@ -918,7 +952,28 @@ def main(_):
                                 assert False
                     loss_terms = {}
                     
-                    r = train_sample_batch["advantages"][:, j_idx]
+                    # Policy Gradient Loss
+                    advantages_clip = torch.clamp(
+                        train_sample_batch["advantages"][:, j_idx],
+                        -config.train.adv_clip_max,
+                        config.train.adv_clip_max,
+                    )
+                    if hasattr(config.train, "adv_mode"):
+                        if config.train.adv_mode == "positive_only":
+                            advantages_clip = torch.clamp(advantages_clip, 0, config.train.adv_clip_max)
+                        elif config.train.adv_mode == "negative_only":
+                            advantages_clip = torch.clamp(advantages_clip, -config.train.adv_clip_max, 0)
+                        elif config.train.adv_mode == "one_only":
+                            advantages_clip = torch.where(
+                                advantages_clip > 0, torch.ones_like(advantages_clip), torch.zeros_like(advantages_clip)
+                            )
+                        elif config.train.adv_mode == "binary":
+                            advantages_clip = torch.sign(advantages_clip)
+
+                    # normalize advantage
+                    normalized_advantages_clip = (advantages_clip / config.train.adv_clip_max) / 2.0 + 0.5
+                    r = torch.clamp(normalized_advantages_clip, 0, 1)
+                    
                     loss_terms["x0_norm"] = torch.mean(x0**2).detach()
                     loss_terms["x0_norm_max"] = torch.max(x0**2).detach()
                     loss_terms["old_deviate"] = torch.mean((forward_prediction - old_prediction) ** 2).detach()
@@ -1034,6 +1089,8 @@ def main(_):
 
         with torch.no_grad():
             decay = return_decay(global_step, config.decay_type)
+            if is_main_process(rank): logger.info(f"global_step:{global_step}, decay:{decay}")
+            
             for src_param, tgt_param in zip(
                 transformer_trainable_parameters, old_transformer_trainable_parameters, strict=True
             ):

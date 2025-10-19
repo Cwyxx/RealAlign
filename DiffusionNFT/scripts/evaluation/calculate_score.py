@@ -133,6 +133,23 @@ def main(args):
             score_details = { args.reward_model: score_list}
             return score_details, {}
         
+    elif args.reward_model == "q-align":
+        import pyiqa
+        reward_model = pyiqa.create_metric("qalign", device=device)
+        print(f"Initializing reward models {args.reward_model}...")
+        
+        def scoring_fn(images, prompts, metadata, only_strict=False):
+            ### images is image_paths #### 
+            score_list = []
+            for image in images:
+                score = reward_model(image)
+                if isinstance(score, torch.Tensor):
+                    score = score.item()
+                score_list.append(score)
+                
+            score_details = { args.reward_model: score_list}
+            return score_details, {}
+        
     elif args.reward_model == "deqa":
         from transformers import AutoModelForCausalLM
         reward_model = AutoModelForCausalLM.from_pretrained(
@@ -189,6 +206,21 @@ def main(args):
             
             score_details = { args.reward_model: score_list }
             return score_details, {}
+        
+    elif args.reward_model == "cpbd":
+        import cpbd
+
+        def scoring_fn(images, prompts, metadata, only_strict=False):
+            score_list = []
+            image_paths = images
+            for image_path in image_paths:
+                img = np.array(Image.open(image_path).convert('L'))
+                score = cpbd.compute(img)
+                score_list.append(score)
+            
+            score_details = { args.reward_model: score_list }
+            return score_details, {}
+                
 
     score_list = []
     # --- Evaluation Loop ---
@@ -220,7 +252,7 @@ def main(args):
             elif args.reward_model in [ "imagereward", "pickscore", "unifiedreward"]:
                 images = pil_images
         
-        elif args.reward_model in [ "vqascore", "clip_iqa", "deqa", "aesthetic_v2_5", "hpsv3" ]:
+        elif args.reward_model in [ "vqascore", "clip_iqa", "deqa", "aesthetic_v2_5", "hpsv3", "cpbd", "q-align" ]:
             images = image_paths # path
                 
         all_scores, _ = scoring_fn(images, prompts, metadata, only_strict=False) # calculate_score
