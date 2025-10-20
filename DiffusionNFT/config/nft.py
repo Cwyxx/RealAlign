@@ -139,7 +139,7 @@ def sd3_code():
     
     #### filter_sample_v2 ####
     max_min_threshold=0.4
-    decay_type=3
+    decay_type=4
     #### filter_sample_v2 ####
     
     config = _get_config(
