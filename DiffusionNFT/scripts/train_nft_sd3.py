@@ -190,8 +190,32 @@ def return_decay(step, decay_type):
         flat = 75
         uprate = 0.0075
         uphold = 0.999
-    else:
-        assert False
+    elif decay_type == 3:
+        flat = 0
+        uprate = 0.25
+        uphold = 0.5   
+    elif decay_type == 4:
+        flat = 0
+        uprate = 0.002
+        uphold = 0.5    
+    elif decay_type == 5:
+        flat = 0
+        uprate = 0.05
+        uphold = 0.2   
+    elif decay_type == 6:
+        flat = 0
+        uprate = 0.05
+        uphold = 0.3 
+        
+    elif decay_type == 7:
+        flat = 0
+        uprate = 0.01
+        uphold = 0.5 
+        
+    elif decay_type == 8:
+        flat = 0
+        uprate = 0.02
+        uphold = 0.5 
 
     if step < flat:
         return 0.0

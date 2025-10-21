@@ -28,7 +28,7 @@ python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --model_type sd
     --guidance_scale ${cfg_guidance} \
     --save_images
 
-reward_model_list=("pickscore" "hpsv2" "imagereward" "hpsv3" "unifiedreward" "clipscore" "clip_iqa" "deqa" "q-align" "aesthetic_v2_5")
+reward_model_list=("pickscore" "hpsv2" "imagereward" "clipscore" "clip_iqa" "deqa" "q-align" "aesthetic_v2_5" "hpsv3" "unifiedreward")
 for reward_model in "${reward_model_list[@]}"; do
     echo "********************************************"
     echo "reward_model: ${reward_model}"

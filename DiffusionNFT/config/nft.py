@@ -138,8 +138,7 @@ def sd3_code():
     # #### filter_sample_v1 ####
     
     #### filter_sample_v2 ####
-    max_min_threshold=0.4
-    decay_type=4
+    decay_type=8
     #### filter_sample_v2 ####
     
     config = _get_config(
@@ -148,10 +147,10 @@ def sd3_code():
         gradient_step_per_epoch=1,
         dataset=dataset_name,
         reward_fn=reward_fn,
-        name=f"sd3.5m-diffusionnft-multireward-next-code-{dataset_name}-lr_{lr}-resize_256_crop_224-max_min_{max_min_threshold}-decay_type_{decay_type}",
+        name=f"sd3.5m-diffusionnft-multireward-next-code-{dataset_name}-lr_{lr}-resize_256_crop_224-decay_type_{decay_type}_0.02",
     )
     config.train.learning_rate=lr
-    
+    config.decay_type=decay_type
     # #### filter_sample_v1 ####
     # config.filter_sample.lose_sample_threshold = lose_sample_threshold
     # config.filter_sample.lose_sample_num = lose_sample_num
@@ -160,8 +159,7 @@ def sd3_code():
     # #### filter_sample_v1 ####
     
     #### filter_sample_v2 ####
-    config.filter_sample.max_min_threshold = max_min_threshold
-    config.decay_type=decay_type
+    # config.filter_sample.max_min_threshold = max_min_threshold
     #### filter_sample_v2 ####
     
     config.sample.mini_sample_size = 2
