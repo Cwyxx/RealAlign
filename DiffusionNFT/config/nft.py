@@ -138,7 +138,7 @@ def sd3_code():
     # #### filter_sample_v1 ####
     
     #### filter_sample_v2 ####
-    decay_type=8
+    decay_type=7
     #### filter_sample_v2 ####
     
     config = _get_config(
@@ -147,7 +147,7 @@ def sd3_code():
         gradient_step_per_epoch=1,
         dataset=dataset_name,
         reward_fn=reward_fn,
-        name=f"sd3.5m-diffusionnft-multireward-next-code-{dataset_name}-lr_{lr}-resize_256_crop_224-decay_type_{decay_type}_0.02",
+        name=f"sd3.5m-diffusionnft-multireward-next-code_reverse_score-{dataset_name}-lr_{lr}-resize_256_crop_224-decay_type_{decay_type}_0.01",
     )
     config.train.learning_rate=lr
     config.decay_type=decay_type
