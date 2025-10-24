@@ -9,7 +9,7 @@ cuda_device=$1 # 0
 method=$2 # "sd-3-5-medium"
 ckpt=$3 # 0
 cfg_guidance=$4
-dataset="pick_a_pic_spo"
+dataset="drawbench"
 
 export CUDA_VISIBLE_DEVICES=${cuda_device}
 
@@ -24,14 +24,14 @@ echo "ckpt_dir: ${ckpt_dir}"
 echo "image_dir: ${image_dir}"
 
 # sleep 3600
-python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --model_type sd3 --dataset ${dataset} \
-    --output_dir ${image_dir} \
-    --guidance_scale ${cfg_guidance} \
-    --save_images
+# python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --model_type sd3 --dataset ${dataset} \
+#     --output_dir ${image_dir} \
+#     --guidance_scale ${cfg_guidance} \
+#     --save_images
 
 # reward_model_list=("clip_iqa" "deqa" "q-align" "hpsv3")
-reward_model_list=("pickscore" "hpsv2" "imagereward")
-# reward_model_list=("pickscore" "imagereward" "clipscore" "aesthetic_v2_5" "unifiedreward")
+# reward_model_list=("pickscore" "hpsv2" "imagereward" "clip_iqa" "deqa" "q-align" "hpsv3")
+reward_model_list=("aesthetic_v2_5" "unifiedreward")
 for reward_model in "${reward_model_list[@]}"; do
     echo "********************************************"
     echo "reward_model: ${reward_model}"
@@ -52,24 +52,24 @@ for reward_model in "${reward_model_list[@]}"; do
     python calculate_score.py --reward_model ${reward_model} --dataset ${dataset} --output_dir ${image_dir} 
 done
 
-conda activate vila
-echo "********************************************"
-echo "reward_model: vila_score"
-cd ../../../evaluate_metric
-python3 -m vila.run_vila_predict_by_gemini_diffusionnft \
-    --output_dir ${image_dir} \
-    --ckpt_dir "/data_center/data2/dataset/chenwy/21164-data/model-ckpt/vila/checkpoints/vila_rank_tuned/" \
-    --spm_model_path "/data_center/data2/dataset/chenwy/21164-data/model-ckpt/vila/spm_model/spm.model" \
-    --dataset "${dataset}"
+# conda activate vila
+# echo "********************************************"
+# echo "reward_model: vila_score"
+# cd ../../../evaluate_metric
+# python3 -m vila.run_vila_predict_by_gemini_diffusionnft \
+#     --output_dir ${image_dir} \
+#     --ckpt_dir "/data_center/data2/dataset/chenwy/21164-data/model-ckpt/vila/checkpoints/vila_rank_tuned/" \
+#     --spm_model_path "/data_center/data2/dataset/chenwy/21164-data/model-ckpt/vila/spm_model/spm.model" \
+#     --dataset "${dataset}"
 
-cd ../DiffusionNFT/scripts/evaluation
+# cd ../DiffusionNFT/scripts/evaluation
 
-echo "********************************************"
-echo "reward_model: MA-AGIQA"
-conda activate mplug_owl2
-cd ../../../evaluate_metric/MA-AGIQA
-python inference_diffusionnft.py --config configs/AGIQA_3k/MA_AGIQA.yaml --dataset ${dataset} --output_dir ${image_dir}
-cd ../../DiffusionNFT/scripts/evaluation
+# echo "********************************************"
+# echo "reward_model: MA-AGIQA"
+# conda activate mplug_owl2
+# cd ../../../evaluate_metric/MA-AGIQA
+# python inference_diffusionnft.py --config configs/AGIQA_3k/MA_AGIQA.yaml --dataset ${dataset} --output_dir ${image_dir}
+# cd ../../DiffusionNFT/scripts/evaluation
 
 # echo "********************************************"
 # echo "reward_model: PKU-AIGIQA"

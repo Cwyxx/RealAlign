@@ -76,7 +76,6 @@ def collate_fn(examples):
 
 def main(args):
     device = torch.device("cuda")
-    torch.cuda.set_device(device)
 
     # --- Mixed Precision Setup ---
     mixed_precision_dtype = None
