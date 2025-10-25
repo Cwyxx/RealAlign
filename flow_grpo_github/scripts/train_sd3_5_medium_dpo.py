@@ -404,19 +404,23 @@ def main(_):
 
     progress_bar = tqdm(range(global_step, config.dpo.max_train_steps), position=0, disable=not accelerator.is_local_main_process)
     progress_bar.set_description("Steps")
+    
+    eval_and_save_ckpt = True
+    info = defaultdict(list)
     while True:
-        #################### EVAL ####################
-        pipeline.transformer.eval()
-        if global_step % config.eval_freq == 0:
-            eval(pipeline, val_dataloader, text_encoders, tokenizers, config, accelerator, global_step, None, None, autocast, None, ema, transformer_trainable_parameters)
-        if global_step % config.save_freq == 0 and global_step > 0 and accelerator.is_main_process:
-            save_ckpt(config.save_dir, transformer, global_step, accelerator, ema, transformer_trainable_parameters, config)
-            
-        #################### TRAINING ####################
-        pipeline.transformer.set_adapter("learner")
-        pipeline.transformer.train()
-        info = defaultdict(list)
         for step, (prompts, pixel_values) in enumerate(train_dataloader):
+            #################### EVAL ####################
+            pipeline.transformer.eval()
+            if eval_and_save_ckpt:
+                eval_and_save_ckpt = False
+                eval(pipeline, val_dataloader, text_encoders, tokenizers, config, accelerator, global_step, None, None, autocast, None, ema, transformer_trainable_parameters)
+                if accelerator.is_main_process:
+                    save_ckpt(config.save_dir, transformer, global_step, accelerator, ema, transformer_trainable_parameters, config)
+                
+            
+            #################### TRAINING ####################
+            pipeline.transformer.set_adapter("learner")
+            pipeline.transformer.train()
             with torch.no_grad():
                 # y_w and y_l were concatenated along channel dimension
                 feed_pixel_values = torch.cat(pixel_values.chunk(2, dim=1)).to(device=accelerator.device, dtype=pipeline.vae.dtype) # pixel [batch_size, 6, H, W] -> [ batch_size, 3, H, W]*2 -> [batch_size*2, 3, H, W]
@@ -523,6 +527,9 @@ def main(_):
                 info = defaultdict(list)
                 progress_bar.update(1)
                 global_step += 1
+                if global_step % config.save_freq == 0:
+                    eval_and_save_ckpt = True
+                    
                 if config.train.ema:
                     ema.step(transformer_trainable_parameters, global_step)
                     
