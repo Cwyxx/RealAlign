@@ -90,7 +90,7 @@ def pickscore_score(device):
         scores = scorer(prompts, images)
         return scores, {}
 
-    return _fn
+    return scorer, _fn
 
 def imagereward_score(device):
     from flow_grpo.imagereward_scorer import ImageRewardScorer
@@ -422,10 +422,18 @@ def multi_score(device, score_dict):
         "clipscore": clip_score,
         "image_similarity": image_similarity_score,
     }
+    score_models={}
     score_fns={}
     for score_name, weight in score_dict.items():
-        score_fns[score_name] = score_functions[score_name](device) if 'device' in score_functions[score_name].__code__.co_varnames else score_functions[score_name]()
+        score_model, score_fn = score_functions[score_name](device) if 'device' in score_functions[score_name].__code__.co_varnames else score_functions[score_name]()
+        score_models[score_name], score_fns[score_name] = score_model, score_fn
+        # score_fns[score_name] = score_functions[score_name](device) if 'device' in score_functions[score_name].__code__.co_varnames else score_functions[score_name]()
 
+    #### Offload to cpu ####
+    for score_name, score_model in score_models.items():
+        score_model.to(torch.device("cpu"))
+    #### Offload to cpu ####
+        
     # only_strict is only for geneval. During training, only the strict reward is needed, and non-strict rewards don't need to be computed, reducing reward calculation time.
     def _fn(images, prompts, metadata, ref_images=None, only_strict=True):
         total_scores = []
