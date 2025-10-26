@@ -44,7 +44,7 @@ def paired_real_generated_dataset_sd3():
 
     config.train.algorithm = 'dpo'
     # Change ref_update_step to a small number, e.g., 40, to switch to OnlineDPO.
-    config.train.ref_update_step=10000000
+    config.train.ref_update_step=40
     config.train.batch_size = config.sample.train_batch_size
     config.train.gradient_accumulation_steps = 1
     config.train.num_inner_epochs = 1
@@ -61,14 +61,15 @@ def paired_real_generated_dataset_sd3():
     
     #### DPO parameters ####
     config.dpo = ml_collections.ConfigDict()
+    config.dpo.project_name = "online-dpo"
     config.dpo.batch_size = 1
     config.dpo.max_train_steps = 2000
     config.dpo.dataset_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset"
-    config.dpo.generative_model_list = [ "SD_1.4", "SD_2.1", "SDXL_1.0", "SD_3", "PA_alpha"]
+    config.dpo.generative_model_list = [ "SD_1.4", "SD_2.1", "SDXL_1.0", "SD_3" ]
     model_str = "-".join(config.dpo.generative_model_list)
     config.prompt_fn = "paired_real_generated_dataset"
     config.run_name = f"{config.prompt_fn}/diffusionnft-next-{model_str}"
-    config.save_dir = f"/data_center/data2/dataset/chenwy/21164-data/dpo/model-ckpt/paired_real_generated_dataset_sd3_5_medium/{config.run_name}"
+    config.save_dir = f"/data_center/data2/dataset/chenwy/21164-data/online-dpo/model-ckpt/paired_real_generated_dataset_sd3_5_medium/{config.run_name}"
     config.train.gradient_accumulation_steps = 128
     
     ### Resume from DiffusionNFT ###

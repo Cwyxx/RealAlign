@@ -200,7 +200,7 @@ def save_ckpt(save_dir, transformer, global_step, accelerator, ema, transformer_
     if accelerator.is_main_process:
         if config.train.ema:
             ema.copy_ema_to(transformer_trainable_parameters, store_temp=True)
-        unwrap_model(transformer, accelerator).base_model.model.save_pretrained(save_root_lora)
+        unwrap_model(transformer, accelerator).save_pretrained(save_root_lora)
         if config.train.ema:
             ema.copy_temp_to(transformer_trainable_parameters)
 
@@ -248,7 +248,7 @@ def main(_):
         gradient_accumulation_steps=config.train.gradient_accumulation_steps,
     )
     if accelerator.is_main_process:
-        swanlab.init(project="dpo",
+        swanlab.init(project=config.dpo.project_name,
                      config=config.to_dict(),
                      name=config.run_name)
         os.makedirs(config.save_dir, exist_ok=True)
@@ -327,22 +327,31 @@ def main(_):
         )
         if config.train.lora_path:
             # After loading with PeftModel.from_pretrained, all parameters have requires_grad set to False. You need to call set_adapter to enable gradients for the adapter parameters.
-            pipeline.transformer = PeftModel.from_pretrained(pipeline.transformer, config.train.lora_path, adapter_name="learner", is_trainable=True) # append an exist adapter to pipeline.transformer.
+            pipeline.transformer = PeftModel.from_pretrained(pipeline.transformer, config.train.lora_path, adapter_name="learner", is_trainable=True)
+            pipeline.transformer.load_adapter(config.train.lora_path, adapter_name="ref", is_trainable=False)# append an exist adapter to pipeline.transformer.
             logger.info(f"Loading lora form {config.train.lora_path}")
         else:
             pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config, adapter_name="learner")
+            pipeline.transformer.add_adapter("ref", transformer_lora_config)
             
-        pipeline.transformer.add_adapter("ref", transformer_lora_config)
         pipeline.transformer.set_adapter("learner")
-        copy_learner_to_ref(pipeline.transformer)
     #### Use LoRA to fine-tune SD-3-5-Medium ####
         
     transformer = pipeline.transformer
-    transformer_trainable_parameters = []
+    pipeline.transformer.set_adapter("learner")
     for name, param in transformer.named_parameters():
         if "learner" in name:
             assert param.requires_grad == True
-            transformer_trainable_parameters.append(param)
+    
+    transformer_trainable_parameters = list(filter(lambda p: p.requires_grad, transformer.parameters()))
+    pipeline.transformer.set_adapter("ref")
+    ref_transformer_trainable_parameters = list(filter(lambda p: p.requires_grad, transformer.parameters()))
+    transformer.set_adapter("learner")
+    for src_param, tgt_param in zip(
+        transformer_trainable_parameters, ref_transformer_trainable_parameters, strict=True
+    ):
+        assert src_param is not tgt_param
+    
     logger.info(f"trainable_parameters_num: {len(transformer_trainable_parameters)}")
     
     # This ema setting affects the previous 20 × 8 = 160 steps on average.
@@ -410,13 +419,15 @@ def main(_):
     while True:
         for step, (prompts, pixel_values) in enumerate(train_dataloader):
             #################### EVAL ####################
+            if global_step>0 and global_step%config.train.ref_update_step==0:
+                copy_learner_to_ref(transformer)
+                
             pipeline.transformer.eval()
             if eval_and_save_ckpt:
                 eval_and_save_ckpt = False
                 eval(pipeline, val_dataloader, text_encoders, tokenizers, config, accelerator, global_step, None, None, autocast, None, ema, transformer_trainable_parameters)
                 if accelerator.is_main_process:
                     save_ckpt(config.save_dir, transformer, global_step, accelerator, ema, transformer_trainable_parameters, config)
-                
             
             #################### TRAINING ####################
             pipeline.transformer.set_adapter("learner")
