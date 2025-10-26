@@ -51,7 +51,13 @@ from diffusers.utils import check_min_version, deprecate, is_wandb_available, ma
 from diffusers.utils.import_utils import is_xformers_available
 
 import pandas as pd
-    
+import swanlab
+from peft import LoraConfig
+from peft.utils import (
+    get_peft_model_state_dict,
+    set_peft_model_state_dict,
+)
+
 ## SDXL
 import functools
 import gc
@@ -256,7 +262,7 @@ def parse_args():
     parser.add_argument(
         "--report_to",
         type=str,
-        default="tensorboard",
+        default="swanlab",
         help=(
             'The integration to report the results and logs to. Supported platforms are `"tensorboard"`'
             ' (default), `"wandb"` and `"comet_ml"`. Use `"all"` to report to all integrations.'
@@ -275,7 +281,7 @@ def parse_args():
     parser.add_argument(
         "--resume_from_checkpoint",
         type=str,
-        default='latest',
+        default=None,
         help=(
             "Whether training should be resumed from a previous checkpoint. Use a path saved by"
             ' `--checkpointing_steps`, or `"latest"` to automatically select the last available checkpoint.'
@@ -325,15 +331,14 @@ def parse_args():
     parser.add_argument(
         "--dreamlike_pairs_only", action="store_true", help="Only train on pairs where both generations are from dreamlike"
     )
+    parser.add_argument(
+        "--run_name"
+    )
     
     args = parser.parse_args()
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
     if env_local_rank != -1 and env_local_rank != args.local_rank:
         args.local_rank = env_local_rank
-
-    # Sanity checks
-    if args.dataset_name is None and args.train_data_dir is None:
-        raise ValueError("Need either a dataset name or a training folder.")
 
     ## SDXL
     if args.sdxl:
@@ -398,14 +403,14 @@ class X_AIGD_Dataset(Dataset):
         self.ext_list = [ ".png", ".PNG", ".jpg", ".JPG", ".jpeg", ".JPEG" ]
         self.df = pd.read_csv(self.csv_file_path)
         
-        if split == "val": self.df = self.df.head(16)
+        if split == "val": self.df = self.df.head(6)
         
     def __len__(self):
         return len(self.df)
     
     def __getitem__(self, idx):
         row_data = self.df.iloc[idx]
-        uid, prompt, win_image_path, lose_image_path = row_data["uid"], row_data["PROMPT"], row_data["win_image_path"], row_data["lose_image_path"]
+        uid, prompt, win_image_path, lose_image_path = row_data["uid"], row_data["prompt"], row_data["win_image_path"], row_data["lose_image_path"]
         
         if win_image_path is None:
             raise FileNotFoundError(f"Missing WIN image for uid: {uid} at {win_image_path}")
@@ -416,7 +421,7 @@ class X_AIGD_Dataset(Dataset):
         win_pixel_values = self.image_transform(Image.open(win_image_path).convert("RGB"))
         lose_pixel_values = self.image_transform(Image.open(lose_image_path).convert("RGB"))
         pixel_values = torch.cat([win_pixel_values, lose_pixel_values], dim=0) # torch.cat [3, 512, 512] -> [6, 512, 512]
-        input_ids = self.tokenize_captions(prompt)
+        input_ids = self.tokenize_caption(prompt)
         
         return {
             "prompt": prompt,
@@ -428,9 +433,7 @@ class X_AIGD_Dataset(Dataset):
     def collate_fn(examples):
         prompts = [ example["prompt"] for example in examples ]
         input_ids = [ example["input_ids"] for example in examples ]
-        print(f"input_ids[0].shape: {input_ids[0].shape}")
         input_ids = torch.cat(input_ids, dim=0) # [1, max_sequence_length] -> [batch_size, max_sequence_length]
-        print(f"input_ids: {input_ids.shape}")
         pixel_values = [ example["pixel_values"] for example in examples ]
         pixel_values = torch.stack(pixel_values, dim=0).to(memory_format=torch.contiguous_format).float()  # torch.stack [6, 512, 512] -> [batch_size, 6, 512, 512]
         return {
@@ -439,17 +442,56 @@ class X_AIGD_Dataset(Dataset):
             "pixel_values": pixel_values
         }
 
+def save_and_evaluation(accelerator, global_step, pipeline, val_dataloader, output_dir):
+    prompt_list, image_list = [], []
+
+    with torch.cuda.amp.autocast():
+        with torch.no_grad():
+            for val_batch in tqdm(val_dataloader, desc="Eval: ", disable=not accelerator.is_main_process):
+                generator = torch.Generator(device=accelerator.device).manual_seed(42)
+                images = pipeline(val_batch["prompts"], generator=generator).images
+                
+                prompt_list.extend(val_batch["prompts"])
+                image_list.extend(images)
+    
+    if accelerator.is_main_process:
+        logged_images = []
+        for idx in range(len(prompt_list)):
+            prompt, image = prompt_list[idx], image_list[idx]
+            
+            logged_images.append(
+                swanlab.Image(
+                    image,
+                    caption=f"Prompt: {prompt}",
+                )
+            )
+        
+        swanlab.log({
+            "validation_samples": logged_images,
+            "step": global_step
+        })
+        
+        checkpoint_dir = os.path.join(output_dir, "checkpoints", f"checkpoint-{global_step}")
+        os.makedirs(checkpoint_dir, exist_ok=True)
+        
+        pipeline.save_pretrained(checkpoint_dir)
+    
+    if 'val_batch' in locals():
+        del val_batch
+    torch.cuda.empty_cache()
+    
+            
 def main():
     config = ml_collections.ConfigDict()
     config.dpo = ml_collections.ConfigDict()
     config.dpo.csv_file_path = {
-        "x_aigd" : "",
-        "val": ""
+        "x_aigd" : "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/x_aigd/x_aigd.csv",
+        "val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
     }
-    config.dpo.save_and_eval_freq = 40
     args = parse_args()
-    
-    
+    args_dict = {k:v for k, v in vars(args).items()}
+    config.update(args_dict)
+        
     #### START ACCELERATOR BOILERPLATE ###
     logging_dir = os.path.join(args.output_dir, args.logging_dir)
 
@@ -457,9 +499,10 @@ def main():
     accelerator = Accelerator(
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         mixed_precision=args.mixed_precision,
-        log_with=args.report_to,
         project_config=accelerator_project_config,
     )
+    if accelerator.is_main_process:
+        swanlab.init(project="diffusion_dpo", name=args.run_name, config=config.to_dict())
 
     # Make one log on every process with the configuration for debugging.
     logging.basicConfig(
@@ -519,23 +562,9 @@ def main():
     if 'turbo' in args.pretrained_model_name_or_path:
         enforce_zero_terminal_snr(noise_scheduler)
     
-    # SDXL has two text encoders
-    if args.sdxl:
-        # Load the tokenizers
-        if args.pretrained_model_name_or_path=="stabilityai/stable-diffusion-xl-refiner-1.0":
-            tokenizer_and_encoder_name = "stabilityai/stable-diffusion-xl-base-1.0"
-        else:
-            tokenizer_and_encoder_name = args.pretrained_model_name_or_path
-        tokenizer_one = AutoTokenizer.from_pretrained(
-            tokenizer_and_encoder_name, subfolder="tokenizer", revision=args.revision, use_fast=False
-        )
-        tokenizer_two = AutoTokenizer.from_pretrained(
-            args.pretrained_model_name_or_path, subfolder="tokenizer_2", revision=args.revision, use_fast=False
-        )
-    else:
-        tokenizer = CLIPTokenizer.from_pretrained(
-            args.pretrained_model_name_or_path, subfolder="tokenizer", revision=args.revision
-        )
+    tokenizer = CLIPTokenizer.from_pretrained(
+        args.pretrained_model_name_or_path, subfolder="tokenizer", revision=args.revision
+    )
 
     # Not sure if we're hitting this at all
     def deepspeed_zero_init_disabled_context_manager():
@@ -562,30 +591,9 @@ def main():
     # across multiple gpus and only UNet2DConditionModel will get ZeRO sharded.
     with ContextManagers(deepspeed_zero_init_disabled_context_manager()):
         # SDXL has two text encoders
-        if args.sdxl:
-            # import correct text encoder classes
-            text_encoder_cls_one = import_model_class_from_model_name_or_path(
-               tokenizer_and_encoder_name, args.revision
-            )
-            text_encoder_cls_two = import_model_class_from_model_name_or_path(
-                tokenizer_and_encoder_name, args.revision, subfolder="text_encoder_2"
-            )
-            text_encoder_one = text_encoder_cls_one.from_pretrained(
-                tokenizer_and_encoder_name, subfolder="text_encoder", revision=args.revision
-            )
-            text_encoder_two = text_encoder_cls_two.from_pretrained(
-                args.pretrained_model_name_or_path, subfolder="text_encoder_2", revision=args.revision
-            )
-            if args.pretrained_model_name_or_path=="stabilityai/stable-diffusion-xl-refiner-1.0":
-                text_encoders = [text_encoder_two]
-                tokenizers = [tokenizer_two]
-            else:
-                text_encoders = [text_encoder_one, text_encoder_two]
-                tokenizers = [tokenizer_one, tokenizer_two]
-        else:
-            text_encoder = CLIPTextModel.from_pretrained(
-                args.pretrained_model_name_or_path, subfolder="text_encoder", revision=args.revision
-            )
+        text_encoder = CLIPTextModel.from_pretrained(
+            args.pretrained_model_name_or_path, subfolder="text_encoder", revision=args.revision
+        )
         # Can custom-select VAE (used in original SDXL tuning)
         vae_path = (
             args.pretrained_model_name_or_path
@@ -602,17 +610,15 @@ def main():
         )
     if args.unet_init:
         print("Initializing unet from", args.unet_init)
+    
+    # torch.float32
     unet = UNet2DConditionModel.from_pretrained(
         args.unet_init if args.unet_init else args.pretrained_model_name_or_path, subfolder="unet", revision=args.revision
     )
-
+    
     # Freeze vae, text_encoder(s), reference unet
     vae.requires_grad_(False)
-    if args.sdxl:
-        text_encoder_one.requires_grad_(False)
-        text_encoder_two.requires_grad_(False)
-    else:
-        text_encoder.requires_grad_(False)
+    text_encoder.requires_grad_(False)
     if args.train_method == 'dpo': ref_unet.requires_grad_(False)
 
     # xformers efficient attention
@@ -700,6 +706,13 @@ def main():
     ##### START BIG OLD DATASET BLOCK #####
     
     #### START PREPROCESSING/COLLATION ####
+    val_pipeline = StableDiffusionPipeline.from_pretrained(
+        args.pretrained_model_name_or_path,
+        text_encoder=text_encoder,
+        vae=vae,
+        unet=unet,
+        safety_checker=None,
+    )
     # Preprocessing the datasets.
     # We need to tokenize input captions and transform the images.
     def tokenize_captions(caption, is_train=True):
@@ -862,8 +875,8 @@ def main():
         for step, batch in enumerate(train_dataloader):
             if save_and_eval:
                 save_and_eval = False
-                print(f"eval") # ToDo
-                
+                save_and_evaluation(accelerator, global_step, val_pipeline, val_dataloader, args.output_dir)
+            
             # Skip steps until we reach the resumed step
             if args.resume_from_checkpoint and epoch == first_epoch and step < resume_step and (not args.hard_skip_resume):
                 if step % args.gradient_accumulation_steps == 0:
@@ -918,45 +931,11 @@ def main():
                                                           new_noise if args.input_perturbation else noise,
                                                           timesteps)
                 ### START PREP BATCH ###
-                if args.sdxl:
-                    # Get the text embedding for conditioning
-                    with torch.no_grad():
-                        # Need to compute "time_ids" https://github.com/huggingface/diffusers/blob/v0.20.0-release/examples/text_to_image/train_text_to_image_sdxl.py#L969
-                        # for SDXL-base these are torch.tensor([args.resolution, args.resolution, *crop_coords_top_left, *target_size))
-                        if 'refiner' in args.pretrained_model_name_or_path:
-                            add_time_ids = torch.tensor([args.resolution, 
-                                                         args.resolution,
-                                                         0,
-                                                         0,
-                                                          6.0], # aesthetics conditioning https://github.com/huggingface/diffusers/blob/v0.20.0/src/diffusers/pipelines/stable_diffusion_xl/pipeline_stable_diffusion_xl_img2img.py#L691C9-L691C24
-                                                         dtype=weight_dtype,
-                                                         device=accelerator.device)[None, :].repeat(timesteps.size(0), 1)
-                        else: # SDXL-base
-                            add_time_ids = torch.tensor([args.resolution, 
-                                                         args.resolution,
-                                                         0,
-                                                         0,
-                                                          args.resolution, 
-                                                         args.resolution],
-                                                         dtype=weight_dtype,
-                                                         device=accelerator.device)[None, :].repeat(timesteps.size(0), 1)
-                        prompt_batch = encode_prompt_sdxl(batch, 
-                                                          text_encoders,
-                                                           tokenizers,
-                                                           args.proportion_empty_prompts, 
-                                                          caption_column='caption',
-                                                           is_train=True,
-                                                          )
-                    if args.train_method == 'dpo':
-                        prompt_batch["prompt_embeds"] = prompt_batch["prompt_embeds"].repeat(2, 1, 1)
-                        prompt_batch["pooled_prompt_embeds"] = prompt_batch["pooled_prompt_embeds"].repeat(2, 1)
-                    unet_added_conditions = {"time_ids": add_time_ids,
-                                            "text_embeds": prompt_batch["pooled_prompt_embeds"]}
-                else: # sd1.5
-                    # Get the text embedding for conditioning
-                    encoder_hidden_states = text_encoder(batch["input_ids"])[0]
-                    if args.train_method == 'dpo':
-                        encoder_hidden_states = encoder_hidden_states.repeat(2, 1, 1)
+                
+                # Get the text embedding for conditioning
+                encoder_hidden_states = text_encoder(batch["input_ids"])[0]
+                if args.train_method == 'dpo':
+                    encoder_hidden_states = encoder_hidden_states.repeat(2, 1, 1)
                 #### END PREP BATCH ####
                         
                 assert noise_scheduler.config.prediction_type == "epsilon"
@@ -965,8 +944,8 @@ def main():
                 # Make the prediction from the model we're learning
                 model_batch_args = (noisy_latents,
                                     timesteps, 
-                                    prompt_batch["prompt_embeds"] if args.sdxl else encoder_hidden_states)
-                added_cond_kwargs = unet_added_conditions if args.sdxl else None
+                                    encoder_hidden_states)
+                added_cond_kwargs = None
                 
                 model_pred = unet(
                                 *model_batch_args,
@@ -1027,10 +1006,9 @@ def main():
             if accelerator.sync_gradients:
                 progress_bar.update(1)
                 global_step += 1
-                if global_step % config.dpo.save_and_eval_freq == 0:
-                    save_and_eval = True
-                    
-                accelerator.log({"train_loss": train_loss}, step=global_step)
+                
+                if accelerator.is_main_process:
+                    swanlab.log({"train_loss": train_loss}, step=global_step)
                 if args.train_method == 'dpo':
                     accelerator.log({"model_mse_unaccumulated": avg_model_mse}, step=global_step)
                     accelerator.log({"ref_mse_unaccumulated": avg_ref_mse}, step=global_step)
@@ -1039,8 +1017,9 @@ def main():
                 implicit_acc_accumulated = 0.0
 
                 if global_step % args.checkpointing_steps == 0:
+                    save_and_eval = True
                     if accelerator.is_main_process:
-                        save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
+                        save_path = os.path.join(args.output_dir, "checkpoints", f"checkpoint-{global_step}")
                         accelerator.save_state(save_path)
                         logger.info(f"Saved state to {save_path}")
                         logger.info("Pretty sure saving/loading is fixed but proceed cautiously")
@@ -1052,35 +1031,14 @@ def main():
 
             if global_step >= args.max_train_steps:
                 break
-
+            
+        if global_step >= args.max_train_steps:
+                break
+        
 
     # Create the pipeline using the trained modules and save it.
     # This will save to top level of output_dir instead of a checkpoint directory
     accelerator.wait_for_everyone()
-    if accelerator.is_main_process:
-        unet = accelerator.unwrap_model(unet)
-        if args.sdxl:
-            # Serialize pipeline.
-            vae = AutoencoderKL.from_pretrained(
-                vae_path,
-                subfolder="vae" if args.pretrained_vae_model_name_or_path is None else None,
-                revision=args.revision,
-                torch_dtype=weight_dtype,
-            )
-            pipeline = StableDiffusionXLPipeline.from_pretrained(
-                args.pretrained_model_name_or_path, unet=unet, vae=vae, revision=args.revision, torch_dtype=weight_dtype
-            )
-            pipeline.save_pretrained(args.output_dir)
-        else:
-            pipeline = StableDiffusionPipeline.from_pretrained(
-                args.pretrained_model_name_or_path,
-                text_encoder=text_encoder,
-                vae=vae,
-                unet=unet,
-                revision=args.revision,
-            )
-        pipeline.save_pretrained(args.output_dir)
-
 
     accelerator.end_training()
 

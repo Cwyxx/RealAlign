@@ -13,8 +13,8 @@ dataset="drawbench"
 
 export CUDA_VISIBLE_DEVICES=${cuda_device}
 
-base_ckpt_dir="/data_center/data2/dataset/chenwy/21164-data/online-dpo/model-ckpt/paired_real_generated_dataset_sd3_5_medium/paired_real_generated_dataset"
-base_image_dir="/data_center/data2/dataset/chenwy/21164-data/online-dpo/generate_images/sd3_textencoder_3_none_cfg_${cfg_guidance}/${dataset}"
+base_ckpt_dir="/data_center/data2/dataset/chenwy/21164-data/diffusionnft/model-ckpt/paired_real_generated_dataset_sd3_5_medium/paired_real_generated_dataset"
+base_image_dir="/data_center/data2/dataset/chenwy/21164-data/diffusionnft/generate_images/sd3_textencoder_3_none_cfg_${cfg_guidance}/${dataset}"
 
 ckpt_dir="${base_ckpt_dir}/${method}/checkpoints/checkpoint-${ckpt}"
 image_dir="${base_image_dir}/${method}/ckpt-${ckpt}"
@@ -23,14 +23,15 @@ echo "dataset: ${dataset}"
 echo "ckpt_dir: ${ckpt_dir}"
 echo "image_dir: ${image_dir}"
 
-python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --model_type sd3 --dataset ${dataset} \
-    --output_dir ${image_dir} \
-    --guidance_scale ${cfg_guidance} \
-    --save_images
+# python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --model_type sd3 --dataset ${dataset} \
+#     --output_dir ${image_dir} \
+#     --guidance_scale ${cfg_guidance} \
+#     --save_images
 
 # reward_model_list=("clip_iqa" "deqa" "q-align" "hpsv3")
-reward_model_list=("pickscore" "hpsv2" "imagereward" "clip_iqa" "deqa" "q-align" "hpsv3")
+# reward_model_list=("pickscore" "hpsv2" "imagereward" "clip_iqa" "deqa" "q-align" "hpsv3")
 # reward_model_list=("aesthetic_v2_5" "unifiedreward")
+reward_model_list=("code" "dinov2")
 for reward_model in "${reward_model_list[@]}"; do
     echo "********************************************"
     echo "reward_model: ${reward_model}"

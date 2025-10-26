@@ -373,8 +373,8 @@ def code(device):
         with torch.no_grad():
             logits = aigi_detector(image_tensor)
             outputs = logits[:, 1].reshape(-1, 1)
-            scores = outputs
-            # scores = 1 - outputs
+            # scores = outputs
+            scores = 1 - outputs
             if len(images) > 1: scores = scores.squeeze()            
         return scores, {}
     
