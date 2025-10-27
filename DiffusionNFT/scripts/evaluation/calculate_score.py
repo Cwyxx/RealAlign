@@ -22,13 +22,12 @@ import torch
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
-
+from transformers import  AutoProcessor, AutoModelForCausalLM
 from torch.utils.data import DataLoader, Dataset
 from flow_grpo.rewards import multi_score
 from collections import defaultdict
-from transformers import  AutoProcessor, AutoModelForCausalLM
 import random
-from qwen_vl_utils import process_vision_info
+
 
 
 class TextPromptDataset(Dataset):
@@ -221,11 +220,6 @@ def main(args):
             
             score_details = { args.reward_model: score_list }
             return score_details, {}
-        
-    elif args.reward_model == "imagedoctor":
-        checkpoint = "GYX97/ImageDoctor"
-        processor = AutoProcessor.from_pretrained(checkpoint, trust_remote_code=True)
-        model = AutoModelForCausalLM.from_pretrained(checkpoint, device_map="auto", trust_remote_code=True)
                 
 
     score_list = []

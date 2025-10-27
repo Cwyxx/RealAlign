@@ -124,16 +124,15 @@ def main(args):
         print(f"Loading LoRA weights from HuggingFace: {args.lora_hf_path}.")
         
     elif args.checkpoint_path is not None and args.checkpoint_path and os.path.exists(os.path.join(args.checkpoint_path, "lora")):
-        adapter_name = "learner"
-        lora_path = os.path.join(args.checkpoint_path, "lora", adapter_name)
-        print(f"Loading LoRA {adapter_name} weights from: {lora_path}")
+        lora_path = os.path.join(args.checkpoint_path, "lora")
+        print(f"Loading LoRA weights from: {lora_path}")
         if not os.path.exists(lora_path):
             raise FileNotFoundError(
                 f"LoRA directory not found at {lora_path}. Ensure your checkpoint has a 'lora' subdirectory."
             )
 
         pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config)
-        pipeline.transformer.load_adapter(lora_path, adapter_name=adapter_name, is_trainable=False)
+        pipeline.transformer.load_adapter(lora_path, adapter_name="default", is_trainable=False)
 
     pipeline.transformer.eval()
     text_encoder_dtype = mixed_precision_dtype if enable_amp else torch.float32

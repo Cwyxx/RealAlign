@@ -181,16 +181,19 @@ def sd3_dinov2():
     dataset_name="geneval"
     decay_type=7
     
+    max_min_threshold = 0.4
+    
     config = _get_config(
         base_model="sd3",
         n_gpus=4,
         gradient_step_per_epoch=1,
         dataset=dataset_name,
         reward_fn=reward_fn,
-        name=f"sd3.5m-diffusionnft-multireward-next-dinov2-{dataset_name}-lr_{lr}-resize_256_crop_224-decay_type_{decay_type}_0.01",
+        name=f"sd3.5m-diffusionnft-multireward-next-dinov2-{dataset_name}-lr_{lr}-resize_256_crop_224-decay_type_{decay_type}_0.01-max_min_threshold_{max_min_threshold}",
     )
     config.train.learning_rate=lr
     config.decay_type=decay_type
+    config.filter_sample.max_min_threshold = max_min_threshold
     
     config.sample.mini_sample_size = 2
     config.sample.num_steps=10

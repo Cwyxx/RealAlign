@@ -9,7 +9,7 @@ cuda_device=$1 # 0
 method=$2 # "sd-3-5-medium"
 ckpt=$3 # 0
 cfg_guidance=$4
-dataset="pickscore-analysis"
+dataset="geneval-analysis"
 
 export CUDA_VISIBLE_DEVICES=${cuda_device}
 
@@ -30,5 +30,23 @@ echo "image_dir: ${image_dir}"
 #     --num_inference_steps ${num_inference_steps} \
 #     --save_images
 
-
-python calculate_score_group.py --reward_model "code" --dataset ${dataset} --output_dir ${image_dir} 
+reward_model_list=("code" "dinov2")
+for reward_model in "${reward_model_list[@]}"; do
+    echo "********************************************"
+    echo "reward_model: ${reward_model}"
+    conda activate alignprop
+    
+    if [[ "$reward_model" == "deqa" ]] || [[ "$reward_model" == "clip_iqa" ]] || [[ "$reward_model" == "q-align" ]]; then
+        conda activate internvl
+    elif [[ "$reward_model" == "aesthetic_v2_5" ]] || [[ "$reward_model" == "unifiedreward" ]] || [[ "$reward_model" == "imagedoctor" ]]; then
+        conda activate utils
+    elif [[ "$reward_model" == "vqascore" ]]; then
+        conda activate t2v
+    elif [[ "$reward_model" == "hpsv3" ]]; then
+        conda activate hpsv3
+    elif [[ "$reward_model" == "cpbd" ]]; then
+        conda activate utils
+    fi
+    
+    python calculate_score_group.py --reward_model ${reward_model} --dataset ${dataset} --output_dir ${image_dir} 
+done

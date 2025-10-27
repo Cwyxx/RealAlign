@@ -81,6 +81,9 @@ def main(args):
     if args.dataset == "geneval":
         dataset = GenevalPromptDataset(dataset_path, split="test")
         
+    elif args.dataset == "geneval-analysis":
+        dataset = GenevalPromptDataset(dataset_path, split="train")
+        
     elif args.dataset == "ocr":
         dataset = TextPromptDataset(dataset_path, split="test")
     
@@ -270,7 +273,7 @@ if __name__ == "__main__":
     #     help="Type of the base model ('sd3').",
     # )
     parser.add_argument(
-        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "drawbench-analysis", "pickscore-analysis"], help="Dataset type."
+        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "drawbench-analysis", "pickscore-analysis", "geneval-analysis"], help="Dataset type."
     )
     parser.add_argument(
         "--output_dir",

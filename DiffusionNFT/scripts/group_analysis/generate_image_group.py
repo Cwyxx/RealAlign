@@ -63,8 +63,6 @@ class GenevalPromptDataset(Dataset):
             self.metadatas = [json.loads(line) for line in f]
             self.prompts = [item["prompt"] for item in self.metadatas]
         
-        if split == "test":
-            self.prompts = self.prompts[0:20]
 
     def __len__(self):
         return len(self.prompts)
@@ -141,6 +139,7 @@ def main(args):
         pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config)
         pipeline.transformer.load_adapter(lora_path, adapter_name="default", is_trainable=False)
 
+    print(f"pipeline.transformer.activate_adapter: {pipeline.transformer.active_adapter}")
     pipeline.transformer.eval()
     text_encoder_dtype = mixed_precision_dtype if enable_amp else torch.float32
 
@@ -164,6 +163,9 @@ def main(args):
 
     if args.dataset == "geneval":
         dataset = GenevalPromptDataset(dataset_path, split="test")
+        
+    elif args.dataset == "geneval-analysis":
+        dataset = GenevalPromptDataset(dataset_path, split="train")
 
     elif args.dataset == "ocr":
         dataset = TextPromptDataset(dataset_path, split="test")
@@ -198,7 +200,7 @@ def main(args):
         shuffle=False,
     )
     
-    group_size = 12
+    group_size = 24
     result_this_rank = []
     for batch in tqdm(dataloader, desc=f"Evaluating"):
         prompts, metadata, indices = batch
@@ -227,13 +229,11 @@ def main(args):
 
                 if args.save_images:
                     image_path = os.path.join(args.output_dir, "images", f"{sample_idx:05d}_{group_idx}.png")
-                    # image_path = os.path.join(args.output_dir, "images", f"{sample_idx:05d}.png")
                     pil_image = Image.fromarray((images[i].cpu().numpy().transpose(1, 2, 0) * 255).astype(np.uint8))
                     pil_image.save(image_path)
                     result_item["image_path"] = image_path
 
             result_this_rank.append(result_item)
-            # del images, all_scores
             del images
             
     result_this_rank.sort(key=lambda x: x["sample_id"])
@@ -274,7 +274,7 @@ if __name__ == "__main__":
         help="Type of the base model ('sd3').",
     )
     parser.add_argument(
-        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "pickscore_train", "drawbench-analysis", "pickscore-analysis"], help="Dataset type."
+        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "pickscore_train", "drawbench-analysis", "pickscore-analysis", "geneval-analysis"], help="Dataset type."
     )
     parser.add_argument(
         "--output_dir",
