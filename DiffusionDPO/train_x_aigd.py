@@ -403,7 +403,7 @@ class X_AIGD_Dataset(Dataset):
         self.ext_list = [ ".png", ".PNG", ".jpg", ".JPG", ".jpeg", ".JPEG" ]
         self.df = pd.read_csv(self.csv_file_path)
         
-        if split == "val": self.df = self.df.head(6)
+        if "val" in split: self.df = self.df.head(6)
         
     def __len__(self):
         return len(self.df)
@@ -484,9 +484,13 @@ def save_and_evaluation(accelerator, global_step, pipeline, val_dataloader, outp
 def main():
     config = ml_collections.ConfigDict()
     config.dpo = ml_collections.ConfigDict()
+    config.dpo.dataset = {
+        "train" : "x_aigd",
+        "val": "high_quality_val"
+    }
     config.dpo.csv_file_path = {
         "x_aigd" : "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/x_aigd/x_aigd.csv",
-        "val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
+        "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
     }
     args = parse_args()
     args_dict = {k:v for k, v in vars(args).items()}
@@ -733,8 +737,8 @@ def main():
         ]
     )
     
-    train_dataset = X_AIGD_Dataset(config, tokenize_captions, train_transforms, "x_aigd")
-    val_dataset = X_AIGD_Dataset(config, tokenize_captions, train_transforms, "val")
+    train_dataset = X_AIGD_Dataset(config, tokenize_captions, train_transforms, config.dpo.dataset["train"])
+    val_dataset = X_AIGD_Dataset(config, tokenize_captions, train_transforms, config.dpo.dataset["val"])
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
         shuffle=True,
@@ -790,22 +794,9 @@ def main():
         
     # Move text_encode and vae to gpu and cast to weight_dtype
     vae.to(accelerator.device, dtype=weight_dtype)
-    if args.sdxl:
-        text_encoder_one.to(accelerator.device, dtype=weight_dtype)
-        text_encoder_two.to(accelerator.device, dtype=weight_dtype)
-        print("offload vae (this actually stays as CPU)")
-        vae = accelerate.cpu_offload(vae)
-        print("Offloading text encoders to cpu")
-        text_encoder_one = accelerate.cpu_offload(text_encoder_one)
-        text_encoder_two = accelerate.cpu_offload(text_encoder_two)
-        if args.train_method == 'dpo':
-            ref_unet.to(accelerator.device, dtype=weight_dtype)
-            print("offload ref_unet")
-            ref_unet = accelerate.cpu_offload(ref_unet)
-    else:
-        text_encoder.to(accelerator.device, dtype=weight_dtype)
-        if args.train_method == 'dpo':
-            ref_unet.to(accelerator.device, dtype=weight_dtype)
+    text_encoder.to(accelerator.device, dtype=weight_dtype)
+    if args.train_method == 'dpo':
+        ref_unet.to(accelerator.device, dtype=weight_dtype)
     ### END ACCELERATOR PREP ###
     
     

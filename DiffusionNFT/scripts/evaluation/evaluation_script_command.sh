@@ -31,7 +31,7 @@ echo "image_dir: ${image_dir}"
 # reward_model_list=("clip_iqa" "deqa" "q-align" "hpsv3")
 # reward_model_list=("pickscore" "hpsv2" "imagereward" "clip_iqa" "deqa" "q-align" "hpsv3")
 # reward_model_list=("aesthetic_v2_5" "unifiedreward")
-reward_model_list=("code" "dinov2")
+reward_model_list=("imagedoctor")
 for reward_model in "${reward_model_list[@]}"; do
     echo "********************************************"
     echo "reward_model: ${reward_model}"
@@ -39,7 +39,7 @@ for reward_model in "${reward_model_list[@]}"; do
     
     if [[ "$reward_model" == "deqa" ]] || [[ "$reward_model" == "clip_iqa" ]] || [[ "$reward_model" == "q-align" ]]; then
         conda activate internvl
-    elif [[ "$reward_model" == "aesthetic_v2_5" ]] || [[ "$reward_model" == "unifiedreward" ]]; then
+    elif [[ "$reward_model" == "aesthetic_v2_5" ]] || [[ "$reward_model" == "unifiedreward" ]] || [[ "$reward_model" == "imagedoctor" ]]; then
         conda activate utils
     elif [[ "$reward_model" == "vqascore" ]]; then
         conda activate t2v

@@ -147,7 +147,7 @@ def sd3_code():
         gradient_step_per_epoch=1,
         dataset=dataset_name,
         reward_fn=reward_fn,
-        name=f"sd3.5m-diffusionnft-multireward-next-code_reverse_score-{dataset_name}-lr_{lr}-resize_256_crop_224-decay_type_{decay_type}_0.01",
+        name=f"sd3.5m-diffusionnft-multireward-next-code-{dataset_name}-lr_{lr}-resize_256_crop_224-decay_type_{decay_type}_0.01",
     )
     config.train.learning_rate=lr
     config.decay_type=decay_type
@@ -174,36 +174,29 @@ def sd3_code():
     return config
 
 def sd3_dinov2():
-    reward_model="dinov2"
     reward_fn = {
-        reward_model: 1.0,
+        "dinov2": 1.0,
     }
-    mean=0.45
-    win_sample_threshold = 0.3
-    win_sample_num=2
-    lose_sample_threshold = 0.1
-    lose_sample_num=2
+    lr = 1e-4
+    dataset_name="geneval"
+    decay_type=7
+    
     config = _get_config(
         base_model="sd3",
         n_gpus=4,
         gradient_step_per_epoch=1,
-        dataset="pickscore",
+        dataset=dataset_name,
         reward_fn=reward_fn,
-        name=f"sd3.5m-diffusionnft-multireward-next-{reward_model}-win_{win_sample_threshold}_{win_sample_num}-lose_{lose_sample_threshold}_{lose_sample_num}-group_size_12-wo_normalize-wo_optprob",
+        name=f"sd3.5m-diffusionnft-multireward-next-dinov2-{dataset_name}-lr_{lr}-resize_256_crop_224-decay_type_{decay_type}_0.01",
     )
-    assert config.sample.num_image_per_prompt == 12
+    config.train.learning_rate=lr
+    config.decay_type=decay_type
     
-    config.filter_sample.mean = mean
-    config.filter_sample.win_sample_threshold = win_sample_threshold
-    config.filter_sample.win_sample_num = win_sample_num
-    config.filter_sample.lose_sample_threshold = lose_sample_threshold
-    config.filter_sample.lose_sample_num = lose_sample_num
-    
-    config.sample.num_steps=10
     config.sample.mini_sample_size = 2
+    config.sample.num_steps=10
     
     #### for faster reward increase ####
-    config.save_freq = 1 # 30
+    config.save_freq = 1
     config.eval_freq = 1
     #### for faster reward increase ####
     
