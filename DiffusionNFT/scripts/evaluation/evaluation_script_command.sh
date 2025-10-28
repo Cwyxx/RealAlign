@@ -9,7 +9,7 @@ cuda_device=$1 # 0
 method=$2 # "sd-3-5-medium"
 ckpt=$3 # 0
 cfg_guidance=$4
-dataset="pick_a_pic_spo"
+dataset="drawbench"
 
 export CUDA_VISIBLE_DEVICES=${cuda_device}
 
@@ -23,10 +23,10 @@ echo "dataset: ${dataset}"
 echo "ckpt_dir: ${ckpt_dir}"
 echo "image_dir: ${image_dir}"
 
-# python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --model_type sd3 --dataset ${dataset} \
-#     --output_dir ${image_dir} \
-#     --guidance_scale ${cfg_guidance} \
-#     --save_images
+python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --model_type sd3 --dataset ${dataset} \
+    --output_dir ${image_dir} \
+    --guidance_scale ${cfg_guidance} \
+    --save_images
 
 # reward_model_list=("unifiedreward")
 # reward_model_list=("pickscore" "hpsv2" "imagereward" "clip_iqa" "deqa" "q-align")
