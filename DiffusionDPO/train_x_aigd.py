@@ -485,11 +485,11 @@ def main():
     config = ml_collections.ConfigDict()
     config.dpo = ml_collections.ConfigDict()
     config.dpo.dataset = {
-        "train" : "higu_quality-SD_1.4-SD_2.1-SD_3",
+        "train" : "higu_quality-SD_1_4-SD_2_1-SD_3",
         "val": "high_quality_val"
     }
     config.dpo.csv_file_path = {
-        "higu_quality-SD_1.4-SD_2.1-SD_3": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_train/SD_1.4-SD_2.1_SD_3.csv",
+        "higu_quality-SD_1_4-SD_2_1-SD_3": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_train/SD_1.4-SD_2.1_SD_3.csv",
         "x_aigd" : "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/x_aigd/x_aigd.csv",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
     }

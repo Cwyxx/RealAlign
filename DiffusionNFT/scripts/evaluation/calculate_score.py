@@ -220,7 +220,36 @@ def main(args):
             
             score_details = { args.reward_model: score_list }
             return score_details, {}
+        
+    elif args.reward_model == "imagedoctor":
+        from imagedoctor import ImageDoctor
+        reward_model = ImageDoctor(image_dir=args.output_dir)
+        
+        def scoring_fn(images, prompts, metadata, only_strict=False):
+            score_list = []
+            image_paths = images
+            
+            for image_path, prompt in zip(image_paths, prompts):
+                perceptual_artifact_ratio = reward_model(image_path, prompt)
+                score_list.append(perceptual_artifact_ratio)
                 
+            score_details = { args.reward_model: score_list }
+            return score_details, {}
+        
+    elif args.reward_model == "diffdoctor":
+        from diffdoctor import DiffDoctor
+        reward_model = DiffDoctor(image_dir=args.output_dir)
+        
+        def scoring_fn(images, prompts, metadata, only_strict=False):
+            score_list = []
+            image_paths = images
+            
+            for image_path in image_paths:
+                perceptual_artifact_ratio = reward_model(image_path)
+                score_list.append(perceptual_artifact_ratio)
+                
+            score_details = { args.reward_model: score_list }
+            return score_details, {}
 
     score_list = []
     # --- Evaluation Loop ---
@@ -252,7 +281,7 @@ def main(args):
             elif args.reward_model in [ "imagereward", "pickscore", "unifiedreward", "code", "dinov2"]:
                 images = pil_images
         
-        elif args.reward_model in [ "vqascore", "clip_iqa", "deqa", "aesthetic_v2_5", "hpsv3", "cpbd", "q-align" ]:
+        elif args.reward_model in [ "vqascore", "clip_iqa", "deqa", "aesthetic_v2_5", "hpsv3", "cpbd", "q-align", "imagedoctor", "diffdoctor" ]:
             images = image_paths # path
                 
         all_scores, _ = scoring_fn(images, prompts, metadata, only_strict=False) # calculate_score

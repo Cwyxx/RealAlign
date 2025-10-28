@@ -197,6 +197,7 @@ def save_ckpt(save_dir, transformer, global_step, accelerator, ema, transformer_
     save_root = os.path.join(save_dir, "checkpoints", f"checkpoint-{global_step}")
     save_root_lora = os.path.join(save_root, "lora")
     os.makedirs(save_root_lora, exist_ok=True)
+    logger.info(f"Saving LoRA to {save_root_lora}")
     if accelerator.is_main_process:
         if config.train.ema:
             ema.copy_ema_to(transformer_trainable_parameters, store_temp=True)
@@ -328,30 +329,23 @@ def main(_):
         if config.train.lora_path:
             # After loading with PeftModel.from_pretrained, all parameters have requires_grad set to False. You need to call set_adapter to enable gradients for the adapter parameters.
             pipeline.transformer = PeftModel.from_pretrained(pipeline.transformer, config.train.lora_path, adapter_name="learner", is_trainable=True)
-            pipeline.transformer.load_adapter(config.train.lora_path, adapter_name="ref", is_trainable=False)# append an exist adapter to pipeline.transformer.
             logger.info(f"Loading lora form {config.train.lora_path}")
         else:
             pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config, adapter_name="learner")
-            pipeline.transformer.add_adapter("ref", transformer_lora_config)
-            
+        
+        pipeline.transformer.add_adapter("ref", transformer_lora_config)
         pipeline.transformer.set_adapter("learner")
+        logger.info(f"type(pipeline.transformer) {type(pipeline.transformer)}")
+        logger.info(f"LoRA adapter names {pipeline.transformer.peft_config.keys()}")
     #### Use LoRA to fine-tune SD-3-5-Medium ####
         
     transformer = pipeline.transformer
     pipeline.transformer.set_adapter("learner")
+    transformer_trainable_parameters = list(filter(lambda p: p.requires_grad, transformer.parameters()))
     for name, param in transformer.named_parameters():
         if "learner" in name:
             assert param.requires_grad == True
-    
-    transformer_trainable_parameters = list(filter(lambda p: p.requires_grad, transformer.parameters()))
-    pipeline.transformer.set_adapter("ref")
-    ref_transformer_trainable_parameters = list(filter(lambda p: p.requires_grad, transformer.parameters()))
-    transformer.set_adapter("learner")
-    for src_param, tgt_param in zip(
-        transformer_trainable_parameters, ref_transformer_trainable_parameters, strict=True
-    ):
-        assert src_param is not tgt_param
-    
+            
     logger.info(f"trainable_parameters_num: {len(transformer_trainable_parameters)}")
     
     # This ema setting affects the previous 20 × 8 = 160 steps on average.
@@ -414,20 +408,21 @@ def main(_):
     progress_bar = tqdm(range(global_step, config.dpo.max_train_steps), position=0, disable=not accelerator.is_local_main_process)
     progress_bar.set_description("Steps")
     
-    eval_and_save_ckpt = True
+    eval_and_save_indicator = True
     info = defaultdict(list)
     while True:
         for step, (prompts, pixel_values) in enumerate(train_dataloader):
             #################### EVAL ####################
-            if global_step>0 and global_step%config.train.ref_update_step==0:
+            pipeline.transformer.eval()
+            if global_step%config.train.ref_update_step==0:
                 copy_learner_to_ref(transformer)
                 
-            pipeline.transformer.eval()
-            if eval_and_save_ckpt:
-                eval_and_save_ckpt = False
+            if eval_and_save_indicator:
+                eval_and_save_indicator = False
                 eval(pipeline, val_dataloader, text_encoders, tokenizers, config, accelerator, global_step, None, None, autocast, None, ema, transformer_trainable_parameters)
                 if accelerator.is_main_process:
                     save_ckpt(config.save_dir, transformer, global_step, accelerator, ema, transformer_trainable_parameters, config)
+            
             
             #################### TRAINING ####################
             pipeline.transformer.set_adapter("learner")
@@ -539,7 +534,7 @@ def main(_):
                 progress_bar.update(1)
                 global_step += 1
                 if global_step % config.save_freq == 0:
-                    eval_and_save_ckpt = True
+                    eval_and_save_indicator = True
                     
                 if config.train.ema:
                     ema.step(transformer_trainable_parameters, global_step)

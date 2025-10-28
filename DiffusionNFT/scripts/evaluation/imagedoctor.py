@@ -6,15 +6,21 @@ import math
 from PIL import Image
 import numpy as np
 import torch
+import torch.nn.functional as F
+import cv2
 
 class ImageDoctor(nn.Module):
-    def __init__(self):
+    def __init__(self, image_dir):
+        super().__init__()
         checkpoint = "GYX97/ImageDoctor"
         self.processor = AutoProcessor.from_pretrained(checkpoint, trust_remote_code=True)
         self.model = AutoModelForCausalLM.from_pretrained(checkpoint, device_map="auto", trust_remote_code=True)
-        
+        method = os.path.basename(os.path.dirname(image_dir))
+        dataset = os.path.basename(os.path.dirname(os.path.dirname(image_dir)))
+        self.output_dir = f"/data_center/data2/dataset/chenwy/21164-data/Artifact_Segmentor_Tmp/visualization/ImageDoctor/{dataset}/{method}"
+        os.makedirs( self.output_dir, exist_ok=True)
     
-    def build_messages(image, task_prompt):
+    def build_messages(self, image, task_prompt):
       return [{
           "role": "user",
           "content": [
@@ -25,13 +31,27 @@ class ImageDoctor(nn.Module):
                   }
           ]
       }]
+      
+    def overlay_heatmap(self, img, heatmap, output_path, alpha=0.4):
+        img_np = np.array(img)
+        
+        heatmap_uint8 = (heatmap * 255).astype(np.uint8)
+        
+        heatmap_colored = cv2.applyColorMap(heatmap_uint8, cv2.COLORMAP_JET)
+        heatmap_colored = cv2.cvtColor(heatmap_colored, cv2.COLOR_BGR2RGB)
+        
+        overlay = cv2.addWeighted(img_np, 1 - alpha, heatmap_colored, alpha, 0)
+        
+        Image.fromarray(overlay).save(output_path)
 
     def __call__(self, image_path, prompt):
+        uid, _ = os.path.splitext((os.path.basename(image_path)))
         img = Image.open(image_path).convert("RGB")
+        original_img = img.copy()
         r = math.sqrt(512*512 / (img.width * img.height))
         new_size = (max(1, int(img.width * r)), max(1, int(img.height * r)))
         img = img.resize(new_size, resample=Image.BICUBIC)
-        
+        # print(f"image_size: {img.size}")
         messages = self.build_messages(img, prompt)
         text = self.processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         image_inputs, video_inputs = process_vision_info(messages)    
@@ -103,36 +123,27 @@ class ImageDoctor(nn.Module):
                     return self.model.sigmoid(low_res)  # [N, 1, H, W]
 
                 artifact_np_path = None
-                misalign_np_path = None
 
-                if self.output_dir:
-                    os.makedirs( self.output_dir, exist_ok=True)
-
-                if mis_tokens is not None and art_tokens is not None:
-                    fused = torch.cat([mis_tokens, art_tokens], dim=0)
-                    pred = run_heatmap(fused)
-                    mis_pred = pred[0:1, 0]  # [1,H,W] pick first
-                    art_pred = pred[1:2, 0]  # [1,H,W] pick second
-
-                    mis_np = mis_pred[0].detach().cpu().float().numpy()
-                    art_np = art_pred[0].detach().cpu().float().numpy()
-
-                    if  self.output_dir:
-                        misalign_np_path = os.path.join( self.output_dir, f"misalignment.npy")
-                        artifact_np_path = os.path.join( self.output_dir, f"artifact.npy")
-                        np.save(misalign_np_path, mis_np)
-                        np.save(artifact_np_path, art_np)
-
-                elif art_tokens is not None:
+                if art_tokens is not None:
                     pred = run_heatmap(art_tokens[:1])
-                    art_np = pred[0, 0].detach().cpu().float().numpy()
-                    if  self.output_dir:
-                        artifact_np_path = os.path.join( self.output_dir, f"artifact.npy")
-                        np.save(artifact_np_path, art_np)
+                    art_pred = pred[0, 0]  # [H, W]
+                    art_pred = art_pred.unsqueeze(0).unsqueeze(0)
+                    target_size = (original_img.height, original_img.width)
+                    art_pred = F.interpolate(
+                        art_pred, 
+                        size=target_size, 
+                        mode='bilinear', 
+                        align_corners=False
+                    )
+                    art_np = art_pred[0, 0].detach().cpu().float().numpy()
+                    
+                    overlay_path = os.path.join(self.output_dir, f"{uid}.png")
+                    self.overlay_heatmap(original_img, art_np, overlay_path, alpha=0.4)
+                    
+                    # artifact_np_path = os.path.join(self.output_dir, f"{uid}.npy")
+                    # np.save(artifact_np_path, art_np)
 
-                elif mis_tokens is not None:
-                    pred = run_heatmap(mis_tokens[:1])
-                    mis_np = pred[0, 0].detach().cpu().float().numpy()
-                    if  self.output_dir:
-                        misalign_np_path = os.path.join( self.output_dir, f"misalignment.npy")
-                        np.save(misalign_np_path, mis_np)
+        art_problem_pixels = np.sum(art_np >= 0.5)
+        total_pixel_nums = art_np.size
+        perceptual_artifact_ratio = art_problem_pixels / total_pixel_nums
+        return perceptual_artifact_ratio
