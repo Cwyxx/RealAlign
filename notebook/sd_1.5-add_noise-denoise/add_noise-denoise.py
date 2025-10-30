@@ -7,6 +7,7 @@ import inspect
 import argparse
 import os
 from pathlib import Path
+import random
 from PIL import Image
 import torch
 from torchvision import transforms
@@ -247,6 +248,8 @@ class RealFakePairGenerator:
         latent = self.encode_image(real_tensor)
         # print(f"encode_image_latent.shape: {latent.shape}")
         
+        add_noise_step = random.randint(20, 40)
+        self.args.add_noise_step = add_noise_step
         # Add noise
         noisy_latent = self.add_noise(latent, noise_steps=self.inference_timesteps[self.args.total_inference_step - self.args.add_noise_step])
         
@@ -281,7 +284,7 @@ class RealFakePairGenerator:
         
         # Set seed for reproducibility
         torch.manual_seed(self.args.seed)
-        
+        random.seed(self.args.seed)
         for img_file in tqdm(image_files):
             uid, _ = os.path.splitext(img_file)
             prompt = self.df[self.df["uid"] == uid ].iloc[0]['PROMPT']
