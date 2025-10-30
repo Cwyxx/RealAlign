@@ -33,7 +33,7 @@ python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --model_type sd
 # reward_model_list=("code" "dinov2")
 # reward_model_list=("aesthetic_v2_5")
 # reward_model_list=("aesthetic_v2_5" "unifiedreward")
-# reward_model_list=("hpsv3")
+ reward_model_list=("aesthetic_v2_5" "deqa" "imagereward" "pickscore")
 # for reward_model in "${reward_model_list[@]}"; do
 #     echo "********************************************"
 #     echo "reward_model: ${reward_model}"
