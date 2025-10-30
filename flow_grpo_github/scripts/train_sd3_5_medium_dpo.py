@@ -42,56 +42,34 @@ logger = get_logger(__name__)
 
 class Paired_Real_Generated_Dataset(Dataset):
     def __init__(self, config, image_transform, split="train"):
-        self.dataset_dir = os.path.join(config.dpo.dataset_dir, split)
-        self.generative_model_list = config.dpo.generative_model_list
         self.image_transform = image_transform
-        self.csv_file_path = os.path.join(config.dpo.dataset_dir, f"{split}.csv")
+        self.csv_file_path = config.dpo.csv_file_path[split]
         self.ext_list = [ ".png", ".PNG", ".jpg", ".JPG", ".jpeg", ".JPEG" ]
-        self.df = pd.read_csv(self.csv_file_path)
         
-        if split == "high_quality_val": self.df = self.df.head(8)
+        self.df = pd.read_csv(self.csv_file_path)
+        if split == "high_quality_val": self.df = self.df.head(24)
         
     def __len__(self):
-        return len(self.df) * len(self.generative_model_list)
+        return len(self.df)
     
     def __getitem__(self, idx):
-        generative_model_idx = idx // len(self.df)
-        idx = idx % len(self.df)
-        generative_model = self.generative_model_list[generative_model_idx]
         row_data = self.df.iloc[idx]
-        uid, prompt = row_data["uid"], row_data["PROMPT"]
-        
-        ### Load win image ###
-        win_image_path = None
-        for ext in self.ext_list:
-            image_path = os.path.join(self.dataset_dir, "real", f"{uid}{ext}")
-            if os.path.exists(image_path):
-                win_image_path = image_path
-                break
-        ### Load win image ###
-        
-        ### Load lose image ###
-        lose_image_path = None
-        for ext in self.ext_list:
-            image_path = os.path.join(self.dataset_dir, generative_model, f"{uid}{ext}")
-            if os.path.exists(image_path):
-                lose_image_path = image_path
-                break
-        ### Load lose image ###
+        uid, prompt, win_image_path, lose_image_path = row_data["uid"], row_data["prompt"], row_data["win_image_path"], row_data["lose_image_path"]
         
         if win_image_path is None:
-            raise FileNotFoundError(f"Missing WIN image for uid: {uid} at {os.path.join(self.dataset_dir, 'real')}")
+            raise FileNotFoundError(f"Missing WIN image for uid: {uid} at {win_image_path}")
         
         if lose_image_path is None:
-            raise FileNotFoundError(f"Missing LOSE image for uid: {uid} (model: {generative_model}) at {os.path.join(self.dataset_dir, generative_model)}")
+            raise FileNotFoundError(f"Missing LOSE image for uid: {uid} at {lose_image_path}")
         
         win_pixel_values = self.image_transform(Image.open(win_image_path).convert("RGB"))
         lose_pixel_values = self.image_transform(Image.open(lose_image_path).convert("RGB"))
         pixel_values = torch.cat([win_pixel_values, lose_pixel_values], dim=0) # torch.cat [3, 512, 512] -> [6, 512, 512]
+        input_ids = self.tokenize_caption(prompt)
+        
         return {
             "prompt": prompt,
-            "win_model": "real",
-            "lose_model": generative_model,
+            "input_ids": input_ids,
             "pixel_values": pixel_values
         }
         
@@ -329,6 +307,7 @@ def main(_):
         if config.train.lora_path:
             # After loading with PeftModel.from_pretrained, all parameters have requires_grad set to False. You need to call set_adapter to enable gradients for the adapter parameters.
             pipeline.transformer = PeftModel.from_pretrained(pipeline.transformer, config.train.lora_path, adapter_name="learner", is_trainable=True)
+            pipeline.transformer.set_adapter("learner")
             logger.info(f"Loading lora form {config.train.lora_path}")
         else:
             pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config, adapter_name="learner")
@@ -372,8 +351,8 @@ def main(_):
     #### image_transform, copy from dive-into-sd-3-5-medium ####
     
     if config.prompt_fn == "paired_real_generated_dataset":
-        train_dataset = Paired_Real_Generated_Dataset(config, image_transform, split="high_quality_train")
-        val_dataset = Paired_Real_Generated_Dataset(config, image_transform, split="high_quality_val")
+        train_dataset = Paired_Real_Generated_Dataset(config, image_transform, split=config.dpo.dataset["train"])
+        val_dataset = Paired_Real_Generated_Dataset(config, image_transform, split=config.dpo.dataset["val"])
         
         train_dataloader = torch.utils.data.DataLoader(
             train_dataset,

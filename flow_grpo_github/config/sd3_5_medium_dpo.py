@@ -65,8 +65,15 @@ def paired_real_generated_dataset_sd3():
     config.dpo.batch_size = 1
     config.dpo.max_train_steps = 2000
     config.dpo.dataset_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset"
-    config.dpo.generative_model_list = [ "SD_1.4", "SD_2.1", "SDXL_1.0", "SD_3" ]
-    model_str = "-".join(config.dpo.generative_model_list)
+    config.dpo.dataset = {
+        "train": "add_noise-denoise",
+        "val": "high_quality_val"
+    }
+    ### ToDo ####
+    config.dpo.csv_file_path = {
+        
+    }
+    ### ToDo ####
     config.prompt_fn = "paired_real_generated_dataset"
     config.run_name = f"{config.prompt_fn}/diffusionnft-next-{model_str}"
     config.save_dir = f"/data_center/data2/dataset/chenwy/21164-data/online-dpo/model-ckpt/paired_real_generated_dataset_sd3_5_medium/{config.run_name}"
