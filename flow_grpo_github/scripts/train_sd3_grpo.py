@@ -1,6 +1,8 @@
 from collections import defaultdict
 import contextlib
 import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import datetime
 from concurrent import futures
 import time
@@ -21,7 +23,7 @@ from flow_grpo.diffusers_patch.sd3_pipeline_with_logprob import pipeline_with_lo
 from flow_grpo.diffusers_patch.sd3_sde_with_logprob import sde_step_with_logprob
 from flow_grpo.diffusers_patch.train_dreambooth_lora_sd3 import encode_prompt
 import torch
-import wandb
+import swanlab
 from functools import partial
 import tqdm
 import tempfile
@@ -44,6 +46,8 @@ class TextPromptDataset(Dataset):
         self.file_path = os.path.join(dataset, f'{split}.txt')
         with open(self.file_path, 'r') as f:
             self.prompts = [line.strip() for line in f.readlines()]
+            
+        if split == "test": self.prompts = self.prompts[0:48]
         
     def __len__(self):
         return len(self.prompts)
@@ -299,10 +303,10 @@ def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerat
             sampled_rewards = [{k: last_batch_rewards_gather[k][index] for k in last_batch_rewards_gather} for index in sample_indices]
             for key, value in all_rewards.items():
                 print(key, value.shape)
-            wandb.log(
+            swanlab.log(
                 {
                     "eval_images": [
-                        wandb.Image(
+                        swanlab.Image(
                             os.path.join(tmpdir, f"{idx}.jpg"),
                             caption=f"{prompt:.1000} | " + " | ".join(f"{k}: {v:.2f}" for k, v in reward.items() if v != -10),
                         )
@@ -335,12 +339,6 @@ def main(_):
     # basic Accelerate and logging setup
     config = FLAGS.config
 
-    unique_id = datetime.datetime.now().strftime("%Y.%m.%d_%H.%M.%S")
-    if not config.run_name:
-        config.run_name = unique_id
-    else:
-        config.run_name += "_" + unique_id
-
     # number of timesteps within each trajectory to train on
     num_train_timesteps = int(config.sample.num_steps * config.train.timestep_fraction)
 
@@ -351,7 +349,7 @@ def main(_):
     )
 
     accelerator = Accelerator(
-        # log_with="wandb",
+        # log_with="swanlab",
         mixed_precision=config.mixed_precision,
         project_config=accelerator_config,
         # we always accumulate gradients across timesteps; we want config.train.gradient_accumulation_steps to be the
@@ -360,14 +358,11 @@ def main(_):
         gradient_accumulation_steps=config.train.gradient_accumulation_steps * num_train_timesteps,
     )
     if accelerator.is_main_process:
-        wandb.init(
+        swanlab.init(
             project="flow_grpo",
+            name=config.run_name,
+            config=config.to_dict(),
         )
-        # accelerator.init_trackers(
-        #     project_name="flow-grpo",
-        #     config=config.to_dict(),
-        #     init_kwargs={"wandb": {"name": config.run_name}},
-        # )
     logger.info(f"\n{config}")
 
     # set seed (device_specific is very important to get different prompts on different devices)
@@ -375,13 +370,15 @@ def main(_):
 
     # load scheduler, tokenizer and models.
     pipeline = StableDiffusion3Pipeline.from_pretrained(
-        config.pretrained.model
+        config.pretrained.model,
+        text_encoder_3=None,
+        tokenizer_3=None
     )
     # freeze parameters of models to save more memory
     pipeline.vae.requires_grad_(False)
     pipeline.text_encoder.requires_grad_(False)
     pipeline.text_encoder_2.requires_grad_(False)
-    pipeline.text_encoder_3.requires_grad_(False)
+    if pipeline.text_encoder_3 is not None: pipeline.text_encoder_3.requires_grad_(False)
     pipeline.transformer.requires_grad_(not config.use_lora)
 
     text_encoders = [pipeline.text_encoder, pipeline.text_encoder_2, pipeline.text_encoder_3]
@@ -410,7 +407,7 @@ def main(_):
     pipeline.vae.to(accelerator.device, dtype=torch.float32)
     pipeline.text_encoder.to(accelerator.device, dtype=inference_dtype)
     pipeline.text_encoder_2.to(accelerator.device, dtype=inference_dtype)
-    pipeline.text_encoder_3.to(accelerator.device, dtype=inference_dtype)
+    if pipeline.text_encoder_3 is not None: pipeline.text_encoder_3.to(accelerator.device, dtype=inference_dtype)
     
     pipeline.transformer.to(accelerator.device)
 
@@ -589,10 +586,15 @@ def main(_):
         f"  Number of gradient updates per inner epoch = {samples_per_epoch // total_train_batch_size}"
     )
     logger.info(f"  Number of inner epochs = {config.train.num_inner_epochs}")
+    
+    os.makedirs(config.save_dir, exist_ok=True)
+    with open(os.path.join(config.save_dir, "exp_config.txt"), "w") as f:
+        json.dump(config.to_dict(), f, indent=4)     
     # assert config.sample.train_batch_size >= config.train.batch_size
     # assert config.sample.train_batch_size % config.train.batch_size == 0
     # assert samples_per_epoch % total_train_batch_size == 0
 
+    log_image_to_swanlab = True
     epoch = 0
     global_step = 0
     train_iter = iter(train_dataloader)
@@ -604,7 +606,8 @@ def main(_):
             eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerator, global_step, eval_reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters)
         if epoch % config.save_freq == 0 and epoch > 0 and accelerator.is_main_process:
             save_ckpt(config.save_dir, transformer, global_step, accelerator, ema, transformer_trainable_parameters, config)
-
+        log_image_to_swanlab=True
+        
         #################### SAMPLING ####################
         pipeline.transformer.eval()
         samples = []
@@ -655,50 +658,59 @@ def main(_):
                         generator=generator
                 )
 
-            latents = torch.stack(
-                latents, dim=1
-            )  # (batch_size, num_steps + 1, 16, 96, 96)
+            latents = torch.stack(latents, dim=1)  # (batch_size, num_steps + 1, 16, 96, 96)
             log_probs = torch.stack(log_probs, dim=1)  # shape after stack (batch_size, num_steps)
 
-            timesteps = pipeline.scheduler.timesteps.repeat(
-                config.sample.train_batch_size, 1
-            )  # (batch_size, num_steps)
+            timesteps = pipeline.scheduler.timesteps.repeat(config.sample.train_batch_size, 1)  # (batch_size, num_steps)
 
-            # compute rewards asynchronously
-            rewards = executor.submit(reward_fn, images, prompts, prompt_metadata, only_strict=True)
-            # yield to to make sure reward computation starts
-            time.sleep(0)
-
+            rewards, reward_metadata = reward_fn(images, prompts, prompt_metadata, only_strict=True)
+            rewards = {k: torch.as_tensor(v, device=accelerator.device).float() for k, v in rewards.items()}
+            
             samples.append(
                 {
                     "prompt_ids": prompt_ids,
                     "prompt_embeds": prompt_embeds,
                     "pooled_prompt_embeds": pooled_prompt_embeds,
                     "timesteps": timesteps,
-                    "latents": latents[
-                        :, :-1
-                    ],  # each entry is the latent before timestep t
-                    "next_latents": latents[
-                        :, 1:
-                    ],  # each entry is the latent after timestep t
+                    "latents": latents[:, :-1],  # each entry is the latent before timestep t
+                    "next_latents": latents[:, 1:],  # each entry is the latent after timestep t
                     "log_probs": log_probs,
                     "rewards": rewards,
                 }
             )
+            
+            if log_image_to_swanlab and accelerator.is_main_process:
+                # this is a hack to force swanlab to log the images as JPEGs instead of PNGs
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    num_samples = len(images)
+                    sample_indices = random.sample(range(len(images)), num_samples)
 
-        # wait for all rewards to be computed
-        for sample in tqdm(
-            samples,
-            desc="Waiting for rewards",
-            disable=not accelerator.is_local_main_process,
-            position=0,
-        ):
-            rewards, reward_metadata = sample["rewards"].result()
-            # accelerator.print(reward_metadata)
-            sample["rewards"] = {
-                key: torch.as_tensor(value, device=accelerator.device).float()
-                for key, value in rewards.items()
-            }
+                    for idx, i in enumerate(sample_indices):
+                        image = images[i]
+                        pil = Image.fromarray(
+                            (image.cpu().numpy().transpose(1, 2, 0) * 255).astype(np.uint8)
+                        )
+                        pil = pil.resize((config.resolution, config.resolution))
+                        pil.save(os.path.join(tmpdir, f"{idx}.jpg")) 
+
+                    sampled_prompts = [prompts[i] for i in sample_indices]
+                    sampled_rewards = [rewards['avg'][i] for i in sample_indices]
+
+                    swanlab.log(
+                        {
+                            "images": [
+                                swanlab.Image(
+                                    os.path.join(tmpdir, f"{idx}.jpg"),
+                                    caption=f"{prompt:.100} | avg: {avg_reward:.2f}",
+                                )
+                                for idx, (prompt, avg_reward) in enumerate(zip(sampled_prompts, sampled_rewards))
+                            ],
+                        },
+                        step=global_step,
+                    )
+            del images, latents, log_probs, timesteps, rewards, reward_metadata
+            torch.cuda.empty_cache()
+                
 
         # collate samples into dict where each entry has shape (num_batches_per_epoch * sample.batch_size, ...)
         samples = {
@@ -711,35 +723,6 @@ def main(_):
             for k in samples[0].keys()
         }
 
-        if epoch % 10 == 0 and accelerator.is_main_process:
-            # this is a hack to force wandb to log the images as JPEGs instead of PNGs
-            with tempfile.TemporaryDirectory() as tmpdir:
-                num_samples = min(15, len(images))
-                sample_indices = random.sample(range(len(images)), num_samples)
-
-                for idx, i in enumerate(sample_indices):
-                    image = images[i]
-                    pil = Image.fromarray(
-                        (image.cpu().numpy().transpose(1, 2, 0) * 255).astype(np.uint8)
-                    )
-                    pil = pil.resize((config.resolution, config.resolution))
-                    pil.save(os.path.join(tmpdir, f"{idx}.jpg"))  # 使用新的索引
-
-                sampled_prompts = [prompts[i] for i in sample_indices]
-                sampled_rewards = [rewards['avg'][i] for i in sample_indices]
-
-                wandb.log(
-                    {
-                        "images": [
-                            wandb.Image(
-                                os.path.join(tmpdir, f"{idx}.jpg"),
-                                caption=f"{prompt:.100} | avg: {avg_reward:.2f}",
-                            )
-                            for idx, (prompt, avg_reward) in enumerate(zip(sampled_prompts, sampled_rewards))
-                        ],
-                    },
-                    step=global_step,
-                )
         samples["rewards"]["ori_avg"] = samples["rewards"]["avg"]
         # The purpose of repeating `adv` along the timestep dimension here is to make it easier to introduce timestep-dependent advantages later, such as adding a KL reward.
         samples["rewards"]["avg"] = samples["rewards"]["avg"].unsqueeze(1).repeat(1, num_train_timesteps)
@@ -748,7 +731,7 @@ def main(_):
         gathered_rewards = {key: value.cpu().numpy() for key, value in gathered_rewards.items()}
         # log rewards and images
         if accelerator.is_main_process:
-            wandb.log(
+            swanlab.log(
                 {
                     "epoch": epoch,
                     **{f"reward_{key}": value.mean() for key, value in gathered_rewards.items() if '_strict_accuracy' not in key and '_accuracy' not in key},
@@ -773,7 +756,7 @@ def main(_):
             zero_std_ratio, reward_std_mean = calculate_zero_std_ratio(prompts, gathered_rewards)
 
             if accelerator.is_main_process:
-                wandb.log(
+                swanlab.log(
                     {
                         "group_size": group_size,
                         "trained_prompt_num": trained_prompt_num,
@@ -812,7 +795,7 @@ def main(_):
                 random_indices = torch.randperm(len(false_indices))[:num_to_change]
                 mask[false_indices[random_indices]] = True
         if accelerator.is_main_process:
-            wandb.log(
+            swanlab.log(
                 {
                     "actual_batch_size": mask.sum().item()//config.sample.num_batches_per_epoch,
                 },
@@ -835,8 +818,13 @@ def main(_):
             samples = {k: v[perm] for k, v in samples.items()}
 
             # rebatch for training
+            # samples_batched = {
+            #     k: v.reshape(-1, total_batch_size//config.sample.num_batches_per_epoch, *v.shape[1:])
+            #     for k, v in samples.items()
+            # }
+            
             samples_batched = {
-                k: v.reshape(-1, total_batch_size//config.sample.num_batches_per_epoch, *v.shape[1:])
+                k: v.reshape(-1, config.train.batch_size, *v.shape[1:])
                 for k, v in samples.items()
             }
 
@@ -945,15 +933,11 @@ def main(_):
 
                     # Checks if the accelerator has performed an optimization step behind the scenes
                     if accelerator.sync_gradients:
-                        # assert (j == train_timesteps[-1]) and (
-                        #     i + 1
-                        # ) % config.train.gradient_accumulation_steps == 0
-                        # log training-related stuff
                         info = {k: torch.mean(torch.stack(v)) for k, v in info.items()}
                         info = accelerator.reduce(info, reduction="mean")
                         info.update({"epoch": epoch, "inner_epoch": inner_epoch})
                         if accelerator.is_main_process:
-                            wandb.log(info, step=global_step)
+                            swanlab.log(info, step=global_step)
                         global_step += 1
                         info = defaultdict(list)
                 if config.train.ema:

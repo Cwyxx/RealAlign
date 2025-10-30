@@ -2,6 +2,7 @@ from PIL import Image
 import io
 import numpy as np
 import torch
+import torchvision
 from collections import defaultdict
 
 def jpeg_incompressibility():
@@ -90,7 +91,7 @@ def pickscore_score(device):
         scores = scorer(prompts, images)
         return scores, {}
 
-    return scorer, _fn
+    return _fn
 
 def imagereward_score(device):
     from flow_grpo.imagereward_scorer import ImageRewardScorer
@@ -407,6 +408,40 @@ def unifiedreward_score_sglang(device):
     
     return _fn
 
+def dinov2_score(device):
+    from flow_grpo.dinov2 import Dinov2
+    import safetensors
+    aigi_detector = Dinov2("facebook/dinov2-base")
+    _transform = torchvision.transforms.Compose([
+            torchvision.transforms.Resize(256, interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
+            torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.ToTensor(),                  
+            torchvision.transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        ])
+    aigi_detector_ckpt = "/data_center/data2/dataset/chenwy/21164-data/model-ckpt/dinov2/genimage/best_model/model.safetensors"
+    ckpt = safetensors.torch.load_file(aigi_detector_ckpt)
+    aigi_detector.load_state_dict(ckpt)
+    aigi_detector = aigi_detector.to(dtype=torch.float32, device=device)
+    aigi_detector.eval()
+    
+    def _fn(images, prompts, metadata):
+        if isinstance(images, torch.Tensor):
+            images = (images * 255).round().clamp(0, 255).to(torch.uint8).cpu().numpy()
+            images = images.transpose(0, 2, 3, 1)  # NCHW -> NHWC
+            images = [Image.fromarray(image) for image in images]
+        
+        transformed_images = [_transform(image) for image in images]
+        image_tensor = torch.stack(transformed_images).to(device)
+        with torch.no_grad():
+            logits = aigi_detector(image_tensor)
+            outputs = torch.sigmoid(logits)
+            scores = 1 - outputs
+            if len(images) > 1: scores = scores.squeeze()  
+            
+        return scores, {}
+    
+    return _fn
+
 def multi_score(device, score_dict):
     score_functions = {
         "deqa": deqa_score_remote,
@@ -421,18 +456,11 @@ def multi_score(device, score_dict):
         "geneval": geneval_score,
         "clipscore": clip_score,
         "image_similarity": image_similarity_score,
+        "dinov2": dinov2_score,
     }
-    score_models={}
     score_fns={}
     for score_name, weight in score_dict.items():
-        score_model, score_fn = score_functions[score_name](device) if 'device' in score_functions[score_name].__code__.co_varnames else score_functions[score_name]()
-        score_models[score_name], score_fns[score_name] = score_model, score_fn
-        # score_fns[score_name] = score_functions[score_name](device) if 'device' in score_functions[score_name].__code__.co_varnames else score_functions[score_name]()
-
-    #### Offload to cpu ####
-    for score_name, score_model in score_models.items():
-        score_model.to(torch.device("cpu"))
-    #### Offload to cpu ####
+        score_fns[score_name] = score_functions[score_name](device) if 'device' in score_functions[score_name].__code__.co_varnames else score_functions[score_name]()
         
     # only_strict is only for geneval. During training, only the strict reward is needed, and non-strict rewards don't need to be computed, reducing reward calculation time.
     def _fn(images, prompts, metadata, ref_images=None, only_strict=True):
