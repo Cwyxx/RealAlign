@@ -47,19 +47,19 @@ def main():
     parser.add_argument(
         '--csv-path',
         type=str,
-        default="/data3/chenweiyan/dataset/Text-Complexity/data-split-20241028/all-train.csv",
+        default="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_train.csv",
         help='Path to input CSV file'
     )
     parser.add_argument(
         '--image-dir',
         type=str,
-        default="/data3/xy/proj/bench/dataset/train/real",
+        default="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/fake",
         help='Base directory for source images'
     )
     parser.add_argument(
         '--output-dir',
         type=str,
-        default="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset",
+        default="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step",
         help='Output directory for results'
     )
     parser.add_argument(
@@ -74,7 +74,7 @@ def main():
     val_csv_file_path = args.csv_path
     base_source_image_dir = args.image_dir
     output_dir = args.output_dir
-    output_csv_path = os.path.join(output_dir, f"{args.metric}_score.csv")
+    output_csv_path = os.path.join(output_dir, f"{args.metric}_fake_score.csv")
     
     metric_mode = args.metric
     device = torch.device(f"cuda:{args.gpu}" if torch.cuda.is_available() else "cpu")
@@ -91,12 +91,8 @@ def main():
     
     print("Loading and filtering dataset...")
     df = pd.read_csv(val_csv_file_path)
-    print(f"Original dataset length: {len(df)}")
-    
-    df = df[((df['image_path'].str.startswith('SA-1B/')) | 
-             (df['image_path'].str.startswith('Laion-2B'))) & 
-            (df['Text Length'] <= 40)]
-    print(f"Filtered dataset length: {len(df)}")
+    # df = df.head(10000)
+    print(f"df length: {len(df)}")
     
     print("\nChecking image existence...")
     ext_list = [".png", ".PNG", ".jpg", ".jpeg", ".JPG", ".JPEG"]

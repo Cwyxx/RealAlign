@@ -453,11 +453,11 @@ def main():
     config = ml_collections.ConfigDict()
     config.dpo = ml_collections.ConfigDict()
     config.dpo.dataset = {
-        "train" : "add_noise-denoise",
+        "train" : "add_noise-denoise-random",
         "val": "high_quality_val"
     }
     config.dpo.csv_file_path = {
-        "add_noise-denoise": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/25/train.csv",
+        "add_noise-denoise-random": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/train.csv",
         "x_aigd" : "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/x_aigd/x_aigd.csv",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
     }
@@ -648,7 +648,7 @@ def main():
                                           relative_step=False)
     else:
         optimizer = torch.optim.AdamW(
-            unet.parameters(),
+            trainable_para,
             lr=args.learning_rate,
             betas=(args.adam_beta1, args.adam_beta2),
             weight_decay=args.adam_weight_decay,
@@ -946,11 +946,11 @@ def main():
 
                 if global_step % args.checkpointing_steps == 0:
                     save_and_eval = True
-                    if accelerator.is_main_process:
-                        save_path = os.path.join(args.output_dir, "checkpoints", f"checkpoint-{global_step}")
-                        accelerator.save_state(save_path)
-                        logger.info(f"Saved state to {save_path}")
-                        logger.info("Pretty sure saving/loading is fixed but proceed cautiously")
+                    # if accelerator.is_main_process:
+                        # save_path = os.path.join(args.output_dir, "checkpoints", f"checkpoint-{global_step}")
+                        # accelerator.save_state(save_path)
+                        # logger.info(f"Saved state to {save_path}")
+                        # logger.info("Pretty sure saving/loading is fixed but proceed cautiously")
 
             logs = {"step_loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
             if args.train_method == 'dpo':
