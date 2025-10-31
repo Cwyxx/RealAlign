@@ -248,7 +248,7 @@ class RealFakePairGenerator:
         latent = self.encode_image(real_tensor)
         # print(f"encode_image_latent.shape: {latent.shape}")
         
-        add_noise_step = random.randint(20, 40)
+        add_noise_step = random.randint(25, 40)
         self.args.add_noise_step = add_noise_step
         # Add noise
         noisy_latent = self.add_noise(latent, noise_steps=self.inference_timesteps[self.args.total_inference_step - self.args.add_noise_step])

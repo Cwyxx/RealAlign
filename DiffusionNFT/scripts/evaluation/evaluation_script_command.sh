@@ -24,16 +24,16 @@ echo "dataset: ${dataset}"
 echo "ckpt_dir: ${ckpt_dir}"
 echo "image_dir: ${image_dir}"
 
-# python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --model_type sd3 --dataset ${dataset} \
-#     --output_dir ${image_dir} \
-#     --guidance_scale ${cfg_guidance} \
-#     --save_images
+python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --model_type sd3 --dataset ${dataset} \
+     --output_dir ${image_dir} \
+     --guidance_scale ${cfg_guidance} \
+     --save_images
 
 # reward_model_list=("unifiedreward")
 # reward_model_list=("code" "dinov2")
 # reward_model_list=("aesthetic_v2_5")
 # reward_model_list=("aesthetic_v2_5" "unifiedreward")
-reward_model_list=("clip_iqa" "deqa")
+reward_model_list=("pickscore" "imagereward" "clip_iqa" "aesthetic" "aesthetic_v2_5")
 for reward_model in "${reward_model_list[@]}"; do
     echo "********************************************"
     echo "reward_model: ${reward_model}"
