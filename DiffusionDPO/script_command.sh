@@ -14,7 +14,7 @@ accelerate launch --mixed_precision="fp16"  train_x_aigd_lora.py --pretrained_mo
     --max_train_steps 1000 \
     --lr_scheduler "constant_with_warmup" \
     --lr_warmup_steps 125 \
-    --learning_rate 1e-6 --scale_lr \
+    --learning_rate 1e-8 --scale_lr \
     --checkpointing_steps 25 \
     --beta_dpo 5000 \
     --gradient_checkpointing \
