@@ -23,7 +23,7 @@ import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
-from diffusers import StableDiffusionPipeline
+from diffusers import StableDiffusionPipeline, UNet2DConditionModel
 from torch.utils.data import DataLoader, Dataset
 
 
@@ -83,7 +83,9 @@ def main(args):
 
     # --- Load Model and Pipeline ---
     print("Loading model and pipeline (runwayml/stable-diffusion-v1-5)...")
-    pipeline = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
+    unet_init = "mhdang/dpo-sd1.5-text2image-v1"
+    unet = UNet2DConditionModel.from_pretrained(unet_init, subfolder="unet")
+    pipeline = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5", unet=unet)
     
     if args.checkpoint_path is not None and os.path.exists(args.checkpoint_path):
         print(f"Loading LoRA weights from: {args.checkpoint_path}")

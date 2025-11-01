@@ -814,10 +814,13 @@ def main():
             with accelerator.accumulate(unet):
                 # Convert images to latent space
                 if args.train_method == 'dpo':
-                    # y_w and y_l were concatenated along channel dimension
-                    feed_pixel_values = torch.cat(batch["pixel_values"].chunk(2, dim=1)) # [ batch_size, 6, 512, 512 ] -> [ batch_size * 2, 3, 512, 512 ]
-                    # If using AIF then we haven't ranked yet so do so now
-                    # Only implemented for BS=1 (assert-protected)
+                    # batch["pixel_values"] shape: [batch_size, 6, 512, 512]
+                    # Need to convert to [batch_size * 2, 3, 512, 512]
+                    # where first batch_size are win images, last batch_size are lose images
+                    chunks = batch["pixel_values"].chunk(2, dim=1)  # Split along channel dim
+                    # chunks[0]: [batch_size, 3, 512, 512] (win images)
+                    # chunks[1]: [batch_size, 3, 512, 512] (lose images)
+                    feed_pixel_values = torch.cat([chunks[0], chunks[1]], dim=0)  # [batch_size * 2, 3, 512, 512]
                 elif args.train_method == 'sft':
                     feed_pixel_values = batch["pixel_values"]
                 
