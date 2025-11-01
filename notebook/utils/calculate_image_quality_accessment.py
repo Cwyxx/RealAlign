@@ -53,7 +53,7 @@ def main():
     parser.add_argument(
         '--image-dir',
         type=str,
-        default="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/fake",
+        default="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/real",
         help='Base directory for source images'
     )
     parser.add_argument(
@@ -74,7 +74,7 @@ def main():
     val_csv_file_path = args.csv_path
     base_source_image_dir = args.image_dir
     output_dir = args.output_dir
-    output_csv_path = os.path.join(output_dir, f"{args.metric}_fake_score.csv")
+    output_csv_path = os.path.join(output_dir, f"{args.metric}_real_score.csv")
     
     metric_mode = args.metric
     device = torch.device(f"cuda:{args.gpu}" if torch.cuda.is_available() else "cpu")
@@ -91,17 +91,33 @@ def main():
     
     print("Loading and filtering dataset...")
     df = pd.read_csv(val_csv_file_path)
-    # df = df.head(10000)
     print(f"df length: {len(df)}")
+    
+    # Check for existing processed uids
+    processed_uids = set()
+    existing_results_df = None
+    if os.path.exists(output_csv_path):
+        print(f"\nFound existing output file: {output_csv_path}")
+        existing_results_df = pd.read_csv(output_csv_path)
+        processed_uids = set(existing_results_df['uid'].unique())
+        print(f"Already processed {len(processed_uids)} uids")
+    else:
+        print(f"\nNo existing output file found. Starting fresh.")
     
     print("\nChecking image existence...")
     ext_list = [".png", ".PNG", ".jpg", ".jpeg", ".JPG", ".JPEG"]
     valid_data = []
+    skipped_count = 0
     
     for idx, row in tqdm(df.iterrows(), total=len(df), desc="Checking images"):
         uid = row['uid']
-        found = False
         
+        # Skip if already processed
+        if uid in processed_uids:
+            skipped_count += 1
+            continue
+        
+        found = False
         for ext in ext_list:
             potential_file = os.path.join(base_source_image_dir, f"{uid}{ext}")
             if os.path.exists(potential_file):
@@ -116,9 +132,13 @@ def main():
             print(f"Warning: Image not found for uid {uid}")
     
     print(f"Valid images found: {len(valid_data)}")
+    print(f"Skipped (already processed): {skipped_count}")
     
     if len(valid_data) == 0:
-        print("No valid images found. Exiting...")
+        if skipped_count > 0:
+            print("All images have already been processed. Exiting...")
+        else:
+            print("No valid images found. Exiting...")
         return
     
     uids = [item['uid'] for item in valid_data]
@@ -169,19 +189,33 @@ def main():
     
     print("Organizing results...")
     
-    results_df = pd.DataFrame({
+    new_results_df = pd.DataFrame({
         'uid': uids,
         'image_path_full': image_paths,
     })
     
     if 'deqa' in results_dict:
-        results_df['deqa_score'] = results_dict['deqa']
+        new_results_df['deqa_score'] = results_dict['deqa']
     
     if 'qalign' in results_dict:
-        results_df['qalign_score'] = results_dict['qalign']
+        new_results_df['qalign_score'] = results_dict['qalign']
     
     print("\nSaving results to CSV...")
     os.makedirs(output_dir, exist_ok=True)
+    
+    # Merge with existing results if they exist
+    if existing_results_df is not None:
+        print(f"Merging with existing results...")
+        # Combine old and new results
+        results_df = pd.concat([existing_results_df, new_results_df], ignore_index=True)
+        # Remove duplicates based on uid, keeping the last occurrence (new results)
+        results_df = results_df.drop_duplicates(subset=['uid'], keep='last')
+        print(f"  Existing rows: {len(existing_results_df)}")
+        print(f"  New rows: {len(new_results_df)}")
+        print(f"  Total rows after merge (deduplicated): {len(results_df)}")
+    else:
+        results_df = new_results_df
+        print(f"  New rows: {len(new_results_df)}")
     
     results_df.to_csv(output_csv_path, index=False, float_format='%.6f')
     print(f"✓ Results saved to: {output_csv_path}")

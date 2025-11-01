@@ -27,3 +27,4 @@ with open(output_file, 'w', encoding='utf-8') as f:
 
 print(f"Successfully extracted and wrote {len(prompts)} prompts to {output_file}")
 
+

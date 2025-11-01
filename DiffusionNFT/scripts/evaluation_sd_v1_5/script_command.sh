@@ -23,36 +23,39 @@ echo "dataset: ${dataset}"
 echo "ckpt_dir: ${ckpt_dir}"
 echo "image_dir: ${image_dir}"
 
-python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
-     --output_dir ${image_dir} \
-     --save_images
+# python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
+#      --output_dir ${image_dir} \
+#      --save_images
 
 # reward_model_list=("unifiedreward")
 # reward_model_list=("code" "dinov2")
 # reward_model_list=("aesthetic_v2_5")
 # reward_model_list=("aesthetic_v2_5" "unifiedreward")
-# reward_model_list=("pickscore" "imagereward" "clip_iqa" "aesthetic" "aesthetic_v2_5")
-# for reward_model in "${reward_model_list[@]}"; do
-#     echo "********************************************"
-#     echo "reward_model: ${reward_model}"
-#     conda activate alignprop
+cd ../evaluation
+# reward_model_list=("pickscore" "imagereward" "clip_iqa" "aesthetic_v2_5" "deqa")
+reward_model_list=("hpsv3")
+for reward_model in "${reward_model_list[@]}"; do
+    echo "********************************************"
+    echo "reward_model: ${reward_model}"
+    conda activate alignprop
     
-#     if [[ "$reward_model" == "deqa" ]] || [[ "$reward_model" == "clip_iqa" ]] || [[ "$reward_model" == "q-align" ]]; then
-#         conda activate internvl
-#     elif [[ "$reward_model" == "aesthetic_v2_5" ]] || [[ "$reward_model" == "unifiedreward" ]]; then
-#         conda activate utils
-#     elif [[ "$reward_model" == "vqascore" ]]; then
-#         conda activate t2v
-#     elif [[ "$reward_model" == "hpsv3" ]]; then
-#         conda activate hpsv3
-#     elif [[ "$reward_model" == "cpbd" ]]; then
-#         conda activate utils
-#     elif [[ "$reward_model" == "imagedoctor" ]] || [[ "$reward_model" == "diffdoctor" ]]; then
-#         conda activate imagedoctor
-#     fi
+    if [[ "$reward_model" == "deqa" ]] || [[ "$reward_model" == "clip_iqa" ]] || [[ "$reward_model" == "q-align" ]]; then
+        conda activate internvl
+    elif [[ "$reward_model" == "aesthetic_v2_5" ]] || [[ "$reward_model" == "unifiedreward" ]]; then
+        conda activate utils
+    elif [[ "$reward_model" == "vqascore" ]]; then
+        conda activate t2v
+    elif [[ "$reward_model" == "hpsv3" ]]; then
+        conda activate hpsv3
+    elif [[ "$reward_model" == "cpbd" ]]; then
+        conda activate utils
+    elif [[ "$reward_model" == "imagedoctor" ]] || [[ "$reward_model" == "diffdoctor" ]]; then
+        conda activate imagedoctor
+    fi
     
-#     python calculate_score.py --reward_model ${reward_model} --dataset ${dataset} --output_dir ${image_dir} 
-# done
+    python calculate_score.py --reward_model ${reward_model} --dataset ${dataset} --output_dir ${image_dir} 
+done
+cd ../evaluation_sd_v1_5
 
 # # conda activate vila
 # # echo "********************************************"
