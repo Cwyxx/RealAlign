@@ -44,7 +44,7 @@ def paired_real_generated_dataset_sd3():
 
     config.train.algorithm = 'dpo'
     # Change ref_update_step to a small number, e.g., 40, to switch to OnlineDPO.
-    config.train.ref_update_step=40
+    config.train.ref_update_step=10000000
     config.train.batch_size = config.sample.train_batch_size
     config.train.gradient_accumulation_steps = 1
     config.train.num_inner_epochs = 1
@@ -66,23 +66,24 @@ def paired_real_generated_dataset_sd3():
     config.dpo.max_train_steps = 2000
     config.dpo.dataset_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset"
     config.dpo.dataset = {
-        "train": "add_noise-denoise",
+        "train": "train_real_better_3_5",
         "val": "high_quality_val"
     }
     ### ToDo ####
     config.dpo.csv_file_path = {
-        
+        "train_real_better_3_5": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/train_real_better_3.5.csv",
+        "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
     }
     ### ToDo ####
     config.prompt_fn = "paired_real_generated_dataset"
-    config.run_name = f"{config.prompt_fn}/diffusionnft-next-{model_str}"
-    config.save_dir = f"/data_center/data2/dataset/chenwy/21164-data/online-dpo/model-ckpt/paired_real_generated_dataset_sd3_5_medium/{config.run_name}"
-    config.train.gradient_accumulation_steps = 128
+    config.run_name = f"{config.prompt_fn}/add_noise-denoise-random-real_better_3_5-multi_step"
+    config.save_dir = f"/data_center/data2/dataset/chenwy/21164-data/online-dpo/model-ckpt/{config.run_name}"
+    config.train.gradient_accumulation_steps = 6
     
-    ### Resume from DiffusionNFT ###
-    config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusionnft/model-ckpt/sd3/SD3.5M-DiffusionNFT-MultiReward/checkpoints/checkpoint-0/lora"
-    config.sample.guidance_scale = 1.0
-    ### Resume from DiffusionNFT ###
+    # ### Resume from DiffusionNFT ###
+    # config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusionnft/model-ckpt/sd3/SD3.5M-DiffusionNFT-MultiReward/checkpoints/checkpoint-0/lora"
+    # config.sample.guidance_scale = 1.0
+    # ### Resume from DiffusionNFT ###
     #### DPO parameters ####
     
 

@@ -8,7 +8,7 @@ export TOKENIZERS_PARALLELISM=False
 cuda_device=$1 # 0
 method=$2 # "sd-3-5-medium"
 ckpt=$3 # 0
-dataset="x_aigd"
+dataset="drawbench"
 rl_framework="diffusion-dpo"
 
 export CUDA_VISIBLE_DEVICES=${cuda_device}
@@ -32,7 +32,7 @@ echo "image_dir: ${image_dir}"
 # reward_model_list=("aesthetic_v2_5")
 # reward_model_list=("aesthetic_v2_5" "unifiedreward")
 cd ../evaluation
-reward_model_list=("imagedoctor")
+reward_model_list=("dinov2")
 # reward_model_list=("hpsv3")
 for reward_model in "${reward_model_list[@]}"; do
     echo "********************************************"
