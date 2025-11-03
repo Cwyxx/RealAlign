@@ -30,7 +30,7 @@ echo "image_dir: ${image_dir}"
 cd ../evaluation
 # reward_model_list=("pickscore" "imagereward" "deqa" "aesthetic_v2_5")
 # reward_model_list=("hpsv3")
-reward_model_list=("dinov2")
+reward_model_list=("dinov2")    
 for reward_model in "${reward_model_list[@]}"; do
     echo "********************************************"
     echo "reward_model: ${reward_model}"

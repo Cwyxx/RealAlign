@@ -3,15 +3,15 @@ source /data3/chenweiyan/miniconda3/etc/profile.d/conda.sh
 conda activate alignprop
 
 export HF_ENDPOINT=https://hf-mirror.com 
-export CUDA_VISIBLE_DEVICES=2,4,6,7
+export CUDA_VISIBLE_DEVICES=0,6
 
-run_name="add_noise-denoise-imagereward_deqa"
+run_name="pickscore_0.02"
 output_dir="/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/model-ckpt/${run_name}"
 accelerate launch --mixed_precision="fp16"  train-lora-add_noise-denoise.py --pretrained_model_name_or_path "runwayml/stable-diffusion-v1-5" \
-    --train_batch_size 4 \
-    --dataloader_num_workers 4 \
-    --gradient_accumulation_steps 16 \
-    --max_train_steps 1250 \
+    --train_batch_size 2 \
+    --dataloader_num_workers 2 \
+    --gradient_accumulation_steps 64 \
+    --max_train_steps 1000 \
     --lr_scheduler "constant_with_warmup" \
     --lr_warmup_steps 125 \
     --learning_rate 1e-8 --scale_lr \

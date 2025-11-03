@@ -23,7 +23,7 @@ real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_n
 fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/chameleon-random_add_noise_step/fake"
 ext_list = [".png", ".jpg", ".jpeg"]
 device = torch.device("cuda")
-reward_model_name = "deqa"
+reward_model_name = "imagereward"
 output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/chameleon-random_add_noise_step/{reward_model_name}/{reward_model_name}_score.csv"
 
 if reward_model_name in ["imagereward", "pickscore", "clipscore" ]:

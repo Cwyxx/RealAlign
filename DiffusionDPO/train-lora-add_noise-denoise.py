@@ -453,12 +453,11 @@ def main():
     config = ml_collections.ConfigDict()
     config.dpo = ml_collections.ConfigDict()
     config.dpo.dataset = {
-        "train" : "imagereward_deqa_valid_uids",
+        "train" : "pickscore_002",
         "val": "high_quality_val"
     }
     config.dpo.csv_file_path = {
-        "imagereward_deqa_valid_uids": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/imagereward_deqa_valid_uids.csv",
-        "x_aigd" : "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/x_aigd/x_aigd.csv",
+        "pickscore_002": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/pickscore_0.02_uids.csv",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
     }
     args = parse_args()
@@ -691,7 +690,7 @@ def main():
         val_dataset,
         shuffle=False,
         collate_fn=X_AIGD_Dataset.collate_fn,
-        batch_size=args.train_batch_size,
+        batch_size=2,
         num_workers=args.dataloader_num_workers,
         drop_last=True
     )
