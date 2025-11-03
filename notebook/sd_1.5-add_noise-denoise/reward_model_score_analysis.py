@@ -7,21 +7,47 @@ import numpy as np
 from flow_grpo.rewards import multi_score
 from PIL import Image
 from tqdm import tqdm
+from transformers import AutoModelForCausalLM
 
-csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_train.csv"
+# csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_train.csv"
+# df = pd.read_csv(csv_file_path)
+# real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/real"
+# fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/fake"
+# ext_list = [".png", ".jpg", ".jpeg"]
+# device = torch.device("cuda")
+
+
+csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/qwen_3_caption/chameleon_fake_qwen3_caption_results.csv"
 df = pd.read_csv(csv_file_path)
-real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/real"
-fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/fake"
+real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/chameleon-random_add_noise_step/real"
+fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/chameleon-random_add_noise_step/fake"
 ext_list = [".png", ".jpg", ".jpeg"]
 device = torch.device("cuda")
+reward_model_name = "deqa"
+output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/chameleon-random_add_noise_step/{reward_model_name}/{reward_model_name}_score.csv"
 
-reward_model_name = "imagereward"
-
-if reward_model_name in ["imagereward", "pickscore" ]:
+if reward_model_name in ["imagereward", "pickscore", "clipscore" ]:
     all_reward_scorers = { reward_model_name: 1.0 }
     scoring_fn, reward_models = multi_score(device, all_reward_scorers)
     for reward_model in reward_models.values(): reward_model.to(device)
     print(f"Initializing reward models {reward_model_name} from DiffusionNFT...")
+elif reward_model_name == "deqa":
+    reward_model = AutoModelForCausalLM.from_pretrained(
+        "zhiyuanyou/DeQA-Score-Mix3",
+        trust_remote_code=True,
+        attn_implementation="eager",
+        torch_dtype=torch.float16,
+        device_map="auto",
+    )
+    print(f"Initializing reward models {reward_model_name}...")
+    
+    def scoring_fn(images, prompts, metadata, only_strict=False):
+        ### images is image_paths #### 
+        images = [ Image.open(image_path) for image_path in images ]
+        score_list = reward_model.score(images).tolist()
+        
+        score_details = { reward_model_name: score_list}
+        return score_details, {}
 
 real_image_score_list, fake_image_score_list = [], []
 uid_list = []
@@ -30,17 +56,35 @@ total_pairs = 0
 
 for i in tqdm(range(len(df))):
     uid = df.iloc[i]["uid"]
-    prompt = df.iloc[i]["PROMPT"]
+    prompt = df.iloc[i]["prompt"]
     real_image_path = os.path.join(real_image_dir, f"{uid}.png")
     fake_image_path = os.path.join(fake_image_dir, f"{uid}.png")
+    
+    if not os.path.exists(real_image_path) or not os.path.exists(fake_image_path):
+        continue
     
     real_image = Image.open(real_image_path).convert("RGB")
     fake_image = Image.open(fake_image_path).convert("RGB")
     
-    scores, _ = scoring_fn([real_image, fake_image], [prompt, prompt], None)
+    if reward_model_name in ["imagereward", "pickscore"]:
+        scores, _ = scoring_fn([real_image, fake_image], [prompt, prompt], None)
+        
+    elif reward_model_name == "deqa":
+        scores, _ = scoring_fn([real_image_path, fake_image_path], [prompt, prompt], None)
+            
+    elif reward_model_name in ["clipscore"]:
+        images = [ np.array(real_image), np.array(fake_image) ]
+        images = np.array(images)
+        images = images.transpose(0, 3, 1, 2)  # NHWC -> NCHW
+        images = torch.tensor(images, dtype=torch.uint8) / 255.0
+        scores, _ = scoring_fn(images, [prompt, prompt], None)
     
-    real_score = scores[reward_model_name][0].detach().cpu().item()
-    fake_score = scores[reward_model_name][1].detach().cpu().item()
+    if reward_model_name in ["imagereward", "pickscore", "clipscore"]:
+        real_score = scores[reward_model_name][0].detach().cpu().item()
+        fake_score = scores[reward_model_name][1].detach().cpu().item()
+    elif reward_model_name == "deqa":
+        real_score = scores[reward_model_name][0]
+        fake_score = scores[reward_model_name][1]
     
     uid_list.append(uid)
     real_image_score_list.append(real_score)
@@ -73,7 +117,7 @@ results_df = pd.DataFrame({
     'real_image_score': real_image_score_list,
     'fake_image_score': fake_image_score_list,
 })
-output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/{reward_model_name}/{reward_model_name}_score.csv"
+os.makedirs(os.path.dirname(output_csv_path), exist_ok=True)
 results_df.to_csv(output_csv_path, index=False)
 print(f"\nDetailed results saved to: {output_csv_path}")
 

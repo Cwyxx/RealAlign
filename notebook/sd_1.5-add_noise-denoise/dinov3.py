@@ -38,27 +38,37 @@ def extract_patch_tokens(model, processor, image, device):
     
     last_hidden_states = outputs.last_hidden_state  # [1, seq_len, hidden_dim]
     
-    patch_features_flat = last_hidden_states[:, 1:, :].squeeze(0)
+    # patch_features_flat = last_hidden_states[:, 1:, :].squeeze(0) # dinov2
+    # patch_features_flat = last_hidden_states[:, 1 + model.config.num_register_tokens:, :].squeeze(0) # dinov3
     # print(f"patch_features_flat shape: {patch_features_flat.shape}") # [num_patches, hidden_dim]
-    return patch_features_flat
-
-
-def compute_patch_tokens_difference(tokens1, tokens2):
-    assert tokens1.shape == tokens2.shape, f"Tokens shape mismatch: {tokens1.shape} vs {tokens2.shape}"
     
-    # calculate the L2 difference between two patch tokens
-    differences = torch.norm(tokens1 - tokens2, dim=-1)  # [num_patches]
-    max_difference = differences.max().item()
+    cls_token = last_hidden_states[:, 0, :].squeeze(0)
+    return cls_token
+
+
+# def compute_patch_tokens_difference(tokens1, tokens2):
+#     assert tokens1.shape == tokens2.shape, f"Tokens shape mismatch: {tokens1.shape} vs {tokens2.shape}"
+    
+#     # calculate the L2 difference between two patch tokens
+#     differences = torch.norm(tokens1 - tokens2, dim=-1)  # [num_patches]
+#     max_difference = differences.max().item()
         
     
-    return max_difference, differences.cpu().numpy()
+#     return max_difference, differences.cpu().numpy()
+
+def compute_cls_token_difference(tokens1, tokens2):
+    assert tokens1.shape == tokens2.shape, f"Tokens shape mismatch: {tokens1.shape} vs {tokens2.shape}"
+    
+    # calculate the L2 difference between two cls tokens
+    difference = torch.norm(tokens1 - tokens2, dim=-1)
+    return difference.item()
 
 
 def compare_images(model, processor, image1_path, image2_path, device=None):
     tokens1 = extract_patch_tokens(model, processor, image1_path, device)
     tokens2 = extract_patch_tokens(model, processor, image2_path, device)
     
-    max_diff, per_patch_diff = compute_patch_tokens_difference(tokens1, tokens2)
+    max_diff = compute_cls_token_difference(tokens1, tokens2)
     
     return max_diff
 
@@ -69,7 +79,7 @@ if __name__ == "__main__":
     real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/real"
     fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/fake"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model, processor, device = load_dinov3_model(model_name="facebook/dinov2-base", device=device)
+    model, processor, device = load_dinov3_model(model_name="facebook/dinov3-vitb16-pretrain-lvd1689m", device=device)
     
     max_diff_list = []
     for i in tqdm(range(0, len(df))):
@@ -78,4 +88,4 @@ if __name__ == "__main__":
         fake_image_path = os.path.join(fake_image_dir, f"{uid}.png")
         max_diff = compare_images(model, processor, real_image_path, fake_image_path, device)
         max_diff_list.append({"uid": uid, "max_diff": max_diff})
-    pd.DataFrame(max_diff_list).to_csv("dinov2_max_diff.csv", index=False)
+    pd.DataFrame(max_diff_list).to_csv("dinov3_cls_token_diff.csv", index=False)
