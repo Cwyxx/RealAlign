@@ -359,7 +359,7 @@ class X_AIGD_Dataset(Dataset):
         self.ext_list = [ ".png", ".PNG", ".jpg", ".JPG", ".jpeg", ".JPEG" ]
         self.df = pd.read_csv(self.csv_file_path)
         
-        if "val" in split: self.df = self.df.head(6)
+        if "high_quality_val" in split: self.df = self.df.head(6)
         
     def __len__(self):
         return len(self.df)
@@ -453,11 +453,11 @@ def main():
     config = ml_collections.ConfigDict()
     config.dpo = ml_collections.ConfigDict()
     config.dpo.dataset = {
-        "train" : "add_noise-denoise-random",
+        "train" : "imagereward_deqa_valid_uids",
         "val": "high_quality_val"
     }
     config.dpo.csv_file_path = {
-        "add_noise-denoise-random": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/train.csv",
+        "imagereward_deqa_valid_uids": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/imagereward_deqa_valid_uids.csv",
         "x_aigd" : "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/x_aigd/x_aigd.csv",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
     }
@@ -738,7 +738,6 @@ def main():
     if args.train_method == 'dpo':
         ref_unet.to(accelerator.device, dtype=weight_dtype)
     ### END ACCELERATOR PREP ###
-    
     
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)

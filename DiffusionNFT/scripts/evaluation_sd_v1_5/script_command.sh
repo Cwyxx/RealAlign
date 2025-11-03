@@ -23,16 +23,12 @@ echo "dataset: ${dataset}"
 echo "ckpt_dir: ${ckpt_dir}"
 echo "image_dir: ${image_dir}"
 
-# python generate_image-dpo-next.py --seed 42 --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
-#      --output_dir ${image_dir} \
-#      --save_images
+python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
+     --output_dir ${image_dir} \
+     --save_images
 
-# reward_model_list=("unifiedreward")
-# reward_model_list=("code" "dinov2")
-# reward_model_list=("aesthetic_v2_5")
-# reward_model_list=("aesthetic_v2_5" "unifiedreward")
 cd ../evaluation
-reward_model_list=("dinov2")
+reward_model_list=("pickscore" "imagereward" "deqa" "aesthetic_v2_5")
 # reward_model_list=("hpsv3")
 for reward_model in "${reward_model_list[@]}"; do
     echo "********************************************"

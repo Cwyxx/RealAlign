@@ -82,10 +82,11 @@ def main(args):
     results_filepath = os.path.join(args.output_dir, "evaluation_results.jsonl")
 
     # --- Load Model and Pipeline ---
-    print("Loading model and pipeline (runwayml/stable-diffusion-v1-5)...")
     unet_init = "mhdang/dpo-sd1.5-text2image-v1"
+    print("Loading model and pipeline ({unet_init})...")
     unet = UNet2DConditionModel.from_pretrained(unet_init, subfolder="unet")
-    pipeline = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5", unet=unet)
+    pipeline = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
+    pipeline.unet = unet
     
     if args.checkpoint_path is not None and os.path.exists(args.checkpoint_path):
         print(f"Loading LoRA weights from: {args.checkpoint_path}")
