@@ -5,9 +5,9 @@ conda activate alignprop
 export HF_ENDPOINT=https://hf-mirror.com 
 export CUDA_VISIBLE_DEVICES=0,6
 
-run_name="pickscore_0.02"
+run_name="dpo-next-pickscore_0.02"
 output_dir="/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/model-ckpt/${run_name}"
-accelerate launch --mixed_precision="fp16"  train-lora-add_noise-denoise.py --pretrained_model_name_or_path "runwayml/stable-diffusion-v1-5" \
+accelerate launch --mixed_precision="fp16"  train-lora-next-add_noise-denoise.py --pretrained_model_name_or_path "runwayml/stable-diffusion-v1-5" \
     --train_batch_size 2 \
     --dataloader_num_workers 2 \
     --gradient_accumulation_steps 64 \

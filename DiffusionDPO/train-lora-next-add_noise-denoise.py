@@ -344,8 +344,8 @@ def parse_args():
             args.resolution = 512
             
     args.train_method = 'sft' if args.sft else 'dpo'
-    args.unet_init = "mhdang/dpo-sd1.5-text2image-v1"
     
+    args.unet_init = "mhdang/dpo-sd1.5-text2image-v1"
     #### LoRA config ####
     args.lora_rank = 4
     #### LoRA config ####
@@ -360,7 +360,7 @@ class X_AIGD_Dataset(Dataset):
         self.ext_list = [ ".png", ".PNG", ".jpg", ".JPG", ".jpeg", ".JPEG" ]
         self.df = pd.read_csv(self.csv_file_path)
         
-        if "val" in split: self.df = self.df.head(6)
+        if "high_quality_val" in split: self.df = self.df.head(6)
         
     def __len__(self):
         return len(self.df)
@@ -454,12 +454,11 @@ def main():
     config = ml_collections.ConfigDict()
     config.dpo = ml_collections.ConfigDict()
     config.dpo.dataset = {
-        "train" : "add_noise-denoise-random",
+        "train" : "pickscore_002",
         "val": "high_quality_val"
     }
     config.dpo.csv_file_path = {
-        "add_noise-denoise-random": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/train.csv",
-        "x_aigd" : "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/x_aigd/x_aigd.csv",
+        "pickscore_002": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/pickscore_0.02_uids.csv",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
     }
     args = parse_args()
@@ -692,7 +691,7 @@ def main():
         val_dataset,
         shuffle=False,
         collate_fn=X_AIGD_Dataset.collate_fn,
-        batch_size=args.train_batch_size,
+        batch_size=2,
         num_workers=args.dataloader_num_workers,
         drop_last=True
     )
@@ -739,7 +738,6 @@ def main():
     if args.train_method == 'dpo':
         ref_unet.to(accelerator.device, dtype=weight_dtype)
     ### END ACCELERATOR PREP ###
-    
     
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
     num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
@@ -814,13 +812,10 @@ def main():
             with accelerator.accumulate(unet):
                 # Convert images to latent space
                 if args.train_method == 'dpo':
-                    # batch["pixel_values"] shape: [batch_size, 6, 512, 512]
-                    # Need to convert to [batch_size * 2, 3, 512, 512]
-                    # where first batch_size are win images, last batch_size are lose images
-                    chunks = batch["pixel_values"].chunk(2, dim=1)  # Split along channel dim
-                    # chunks[0]: [batch_size, 3, 512, 512] (win images)
-                    # chunks[1]: [batch_size, 3, 512, 512] (lose images)
-                    feed_pixel_values = torch.cat([chunks[0], chunks[1]], dim=0)  # [batch_size * 2, 3, 512, 512]
+                    # y_w and y_l were concatenated along channel dimension
+                    feed_pixel_values = torch.cat(batch["pixel_values"].chunk(2, dim=1)) # [ batch_size, 6, 512, 512 ] -> [ batch_size * 2, 3, 512, 512 ]
+                    # If using AIF then we haven't ranked yet so do so now
+                    # Only implemented for BS=1 (assert-protected)
                 elif args.train_method == 'sft':
                     feed_pixel_values = batch["pixel_values"]
                 

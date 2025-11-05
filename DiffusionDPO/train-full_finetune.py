@@ -403,7 +403,7 @@ class X_AIGD_Dataset(Dataset):
         self.ext_list = [ ".png", ".PNG", ".jpg", ".JPG", ".jpeg", ".JPEG" ]
         self.df = pd.read_csv(self.csv_file_path)
         
-        if "val" in split: self.df = self.df.head(6)
+        if "high_quality_val" in split: self.df = self.df.head(6)
         
     def __len__(self):
         return len(self.df)
@@ -442,9 +442,18 @@ class X_AIGD_Dataset(Dataset):
             "pixel_values": pixel_values
         }
 
-def save_and_evaluation(accelerator, global_step, pipeline, val_dataloader, output_dir):
+def save_and_evaluation(accelerator, global_step, unet, text_encoder, vae, val_dataloader, output_dir, pretrained_model_name_or_path):
     prompt_list, image_list = [], []
 
+    pipeline = StableDiffusionPipeline.from_pretrained(
+        pretrained_model_name_or_path,
+        text_encoder=text_encoder,
+        vae=vae,
+        unet=accelerator.unwrap_model(unet),
+        safety_checker=None,
+    )
+    pipeline = pipeline.to(accelerator.device)
+    
     with torch.cuda.amp.autocast():
         with torch.no_grad():
             for val_batch in tqdm(val_dataloader, desc="Eval: ", disable=not accelerator.is_main_process):
@@ -458,7 +467,7 @@ def save_and_evaluation(accelerator, global_step, pipeline, val_dataloader, outp
         logged_images = []
         for idx in range(len(prompt_list)):
             prompt, image = prompt_list[idx], image_list[idx]
-            
+        
             logged_images.append(
                 swanlab.Image(
                     image,
@@ -473,11 +482,9 @@ def save_and_evaluation(accelerator, global_step, pipeline, val_dataloader, outp
         
         checkpoint_dir = os.path.join(output_dir, "checkpoints", f"checkpoint-{global_step}")
         os.makedirs(checkpoint_dir, exist_ok=True)
-        
-        pipeline.save_pretrained(checkpoint_dir)
+        accelerator.save_state(checkpoint_dir)
     
-    if 'val_batch' in locals():
-        del val_batch
+    del pipeline
     torch.cuda.empty_cache()
     
             
@@ -485,12 +492,11 @@ def main():
     config = ml_collections.ConfigDict()
     config.dpo = ml_collections.ConfigDict()
     config.dpo.dataset = {
-        "train" : "higu_quality-SD_1_4-SD_2_1-SD_3",
+        "train" : "pickscore_002",
         "val": "high_quality_val"
     }
     config.dpo.csv_file_path = {
-        "higu_quality-SD_1_4-SD_2_1-SD_3": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_train/SD_1.4-SD_2.1_SD_3.csv",
-        "x_aigd" : "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/x_aigd/x_aigd.csv",
+        "pickscore_002": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/pickscore_0.02_uids.csv",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
     }
     args = parse_args()
@@ -710,14 +716,6 @@ def main():
     
     ##### START BIG OLD DATASET BLOCK #####
     
-    #### START PREPROCESSING/COLLATION ####
-    val_pipeline = StableDiffusionPipeline.from_pretrained(
-        args.pretrained_model_name_or_path,
-        text_encoder=text_encoder,
-        vae=vae,
-        unet=unet,
-        safety_checker=None,
-    )
     # Preprocessing the datasets.
     # We need to tokenize input captions and transform the images.
     def tokenize_captions(caption, is_train=True):
@@ -867,7 +865,7 @@ def main():
         for step, batch in enumerate(train_dataloader):
             if save_and_eval:
                 save_and_eval = False
-                save_and_evaluation(accelerator, global_step, val_pipeline, val_dataloader, args.output_dir)
+                save_and_evaluation(accelerator, global_step, unet, text_encoder, vae, val_dataloader, args.output_dir, args.pretrained_model_name_or_path)
             
             # Skip steps until we reach the resumed step
             if args.resume_from_checkpoint and epoch == first_epoch and step < resume_step and (not args.hard_skip_resume):

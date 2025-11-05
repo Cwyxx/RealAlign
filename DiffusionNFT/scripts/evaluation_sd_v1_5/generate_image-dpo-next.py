@@ -83,7 +83,7 @@ def main(args):
 
     # --- Load Model and Pipeline ---
     unet_init = "mhdang/dpo-sd1.5-text2image-v1"
-    print("Loading model and pipeline ({unet_init})...")
+    print(f"Loading model and pipeline ({unet_init})...")
     unet = UNet2DConditionModel.from_pretrained(unet_init, subfolder="unet")
     pipeline = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
     pipeline.unet = unet
