@@ -127,7 +127,9 @@ def main(args):
         
     elif args.dataset == "x_aigd":
         dataset = TextPromptDataset(dataset_path, split="test")
-    
+        
+    elif args.dataset == "pick_a_pic_v2":
+        dataset = TextPromptDataset(dataset_path, split="test")
     eval_batch_size = 1
 
     dataloader = DataLoader(
@@ -194,7 +196,7 @@ if __name__ == "__main__":
         help="Local path to the LoRA checkpoint directory (e.g., './save/run_name/checkpoints/checkpoint-5000').",
     )
     parser.add_argument(
-        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "pickscore_train", "x_aigd"], help="Dataset type."
+        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "pickscore_train", "x_aigd", "pick_a_pic_v2"], help="Dataset type."
     )
     parser.add_argument(
         "--output_dir",

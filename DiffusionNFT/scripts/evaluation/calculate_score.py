@@ -89,6 +89,8 @@ def main(args):
         dataset = TextPromptDataset(dataset_path, split="test")
     elif args.dataset == "x_aigd":
         dataset = TextPromptDataset(dataset_path, split="test")
+    elif args.dataset == "pick_a_pic_v2":
+        dataset = TextPromptDataset(dataset_path, split="test")
         
     eval_batch_size = 2
     if args.reward_model == "hpsv3": eval_batch_size=1
@@ -362,7 +364,7 @@ if __name__ == "__main__":
     #     help="Type of the base model ('sd3').",
     # )
     parser.add_argument(
-        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "drawbench-analysis", "x_aigd"], help="Dataset type."
+        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "drawbench-analysis", "x_aigd", "pick_a_pic_v2"], help="Dataset type."
     )
     parser.add_argument(
         "--output_dir",
