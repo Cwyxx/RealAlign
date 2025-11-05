@@ -1,4 +1,6 @@
 import os
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 import torch
 import sys
 sys.path.append("/data3/chenweiyan/notebook/fine-tune-diffusion/spo_gitee/DiffusionNFT")
@@ -17,14 +19,14 @@ from transformers import AutoModelForCausalLM
 # device = torch.device("cuda")
 
 
-csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/qwen_3_caption/qwen3_caption_results.csv"
+csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/qwen_3_caption/chameleon_real_qwen3_caption_results.csv"
 df = pd.read_csv(csv_file_path)
-real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/qwen_3_caption/real"
-fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/qwen_3_caption/fake"
+real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/chameleon_real-random_add_noise_step/real"
+fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/chameleon_real-random_add_noise_step/fake"
 ext_list = [".png", ".jpg", ".jpeg"]
 device = torch.device("cuda")
 reward_model_name = "pickscore"
-output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/qwen_3_caption/{reward_model_name}/{reward_model_name}_score.csv"
+output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/chameleon_real-random_add_noise_step/{reward_model_name}/{reward_model_name}_score.csv"
 
 if reward_model_name in ["imagereward", "pickscore", "clipscore" ]:
     all_reward_scorers = { reward_model_name: 1.0 }

@@ -454,11 +454,11 @@ def main():
     config = ml_collections.ConfigDict()
     config.dpo = ml_collections.ConfigDict()
     config.dpo.dataset = {
-        "train" : "pickscore_002",
+        "train" : "x_aigd",
         "val": "high_quality_val"
     }
     config.dpo.csv_file_path = {
-        "pickscore_002": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/pickscore_0.02_uids.csv",
+        "x_aigd": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/x_aigd/x_aigd.csv",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
     }
     args = parse_args()
