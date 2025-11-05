@@ -4,11 +4,17 @@ from pathlib import Path
 from transformers import Qwen3VLForConditionalGeneration, AutoProcessor
 from PIL import Image
 
+# # Configuration
+# image_dir = "/data3/xy/proj/bench/dataset/train/real"
+# uid_file = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/qwen_3_caption/uid.csv"
+# ext_list = [".png", ".jpg", ".jpeg", ".PNG", ".JPG", ".JPEG"]
+# output_file = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/qwen_3_caption/qwen3_caption_results.csv"  # Output file path
+
 # Configuration
-image_dir = "/data3/xy/proj/bench/dataset/train/real"
-uid_file = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/qwen_3_caption/uid.csv"
+image_dir = "/data_center/data2/dataset/chenwy/21164-data/genimage/stable_diffusion_v_1_5/train/nature"
+uid_file = None
 ext_list = [".png", ".jpg", ".jpeg", ".PNG", ".JPG", ".JPEG"]
-output_file = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/qwen_3_caption/qwen3_caption_results.csv"  # Output file path
+output_file = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/imagenet/imagenet_qwen3_caption_results.csv"  # Output file path
 
 # Load the model on the available device(s)
 model = Qwen3VLForConditionalGeneration.from_pretrained(
@@ -29,6 +35,8 @@ processor = AutoProcessor.from_pretrained("Qwen/Qwen3-VL-8B-Instruct")
 def read_uids_from_csv(csv_path):
     """Read UIDs from CSV file (first column after header)"""
     uids = []
+    if csv_path is None:
+        return uids
     with open(csv_path, 'r', encoding='utf-8') as f:
         reader = csv.reader(f)
         next(reader)  # Skip header
@@ -137,9 +145,13 @@ if __name__ == "__main__":
     print(f"Found {len(processed_uids)} already processed UIDs")
     
     # Read UIDs
-    print(f"Reading UIDs from {uid_file}...")
-    all_uids = read_uids_from_csv(uid_file)
-    print(f"Total UIDs in input file: {len(all_uids)}")
+    if uid_file is not None:
+        print(f"Reading UIDs from {uid_file}...")
+        all_uids = read_uids_from_csv(uid_file)
+        print(f"Total UIDs in input file: {len(all_uids)}")
+    else:
+        all_uids = [os.path.splitext(f)[0] for f in os.listdir(image_dir)]
+        print(f"Total UIDs in input directory: {len(all_uids)}")
     
     # Filter out already processed UIDs
     uids_to_process = [uid for uid in all_uids if uid not in processed_uids]

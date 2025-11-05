@@ -39,7 +39,7 @@ def parse_args():
     parser.add_argument(
         "--add_noise_step",
         type=int,
-        default=10,
+        default=None,
         help="Number of noise steps to add (default: 10)",
     )
     parser.add_argument(
@@ -195,8 +195,6 @@ class RealFakePairGenerator:
                 prompt_embeds = torch.cat([negative_prompt_embeds, prompt_embeds])
         
         timesteps = self.inference_timesteps[self.args.total_inference_step - self.args.add_noise_step:]
-        print(f"len timesteps: {len(timesteps)}")
-        print(f"timesteps: {timesteps}")
         
         latents = noisy_latent
         
@@ -274,27 +272,65 @@ class RealFakePairGenerator:
         os.makedirs(self.args.output_dir, exist_ok=True)
         real_image_output_dir = os.path.join(self.args.output_dir, "real")
         fake_image_output_dir = os.path.join(self.args.output_dir, "fake")
-        os.makedirs(os.path.join(self.args.output_dir, "real"), exist_ok=True)
-        os.makedirs(os.path.join(self.args.output_dir, "fake"), exist_ok=True)
+        os.makedirs(real_image_output_dir, exist_ok=True)
+        os.makedirs(fake_image_output_dir, exist_ok=True)
         
-        image_extensions = {'.jpg', '.jpeg', '.png'}
-        image_files = [ f for f in os.listdir(self.args.input_dir) if os.path.splitext(f)[1].lower() in image_extensions ]
+        processed_uids = set()
+        if os.path.exists(fake_image_output_dir):
+            for f in os.listdir(fake_image_output_dir):
+                if f.endswith('.png'):
+                    uid = os.path.splitext(f)[0]
+                    processed_uids.add(uid)
         
-        print(f"Processing {len(image_files)} images...")
+        print(f"Found {len(processed_uids)} already processed UIDs")
         
-        # Set seed for reproducibility
+        total_uids = len(self.df)
+        print(f"Total UIDs in prompt file: {total_uids}")
+        
         torch.manual_seed(self.args.seed)
         random.seed(self.args.seed)
-        for img_file in tqdm(image_files):
-            uid, _ = os.path.splitext(img_file)
-            prompt = self.df[self.df["uid"] == uid ].iloc[0]['PROMPT']
-                        
-            real_image, fake_image = self.process_image(os.path.join(self.args.input_dir, img_file), prompt)
+        
+        processed_count = 0
+        skipped_count = 0
+        
+        for idx, row in tqdm(self.df.iterrows(), total=total_uids, desc="Processing images"):
+            uid = row['uid']
+            prompt = row['prompt']
             
-            real_image_output_path = os.path.join(real_image_output_dir, f"{uid}.png")
-            fake_image_output_path = os.path.join(fake_image_output_dir, f"{uid}.png")
-            real_image.save(real_image_output_path)
-            fake_image.save(fake_image_output_path)
+            if uid in processed_uids:
+                skipped_count += 1
+                continue
+            
+            image_path = None
+            image_extensions = ['.jpg', '.jpeg', '.png']
+            for ext in image_extensions:
+                potential_path = os.path.join(self.args.input_dir, f"{uid}{ext}")
+                if os.path.exists(potential_path):
+                    image_path = potential_path
+                    break
+            
+            if image_path is None:
+                print(f"\nWarning: Image not found for uid {uid}, skipping...")
+                continue
+            
+            try:
+                real_image, fake_image = self.process_image(image_path, prompt)
+                
+                real_image_output_path = os.path.join(real_image_output_dir, f"{uid}.png")
+                fake_image_output_path = os.path.join(fake_image_output_dir, f"{uid}.png")
+                real_image.save(real_image_output_path)
+                fake_image.save(fake_image_output_path)
+                
+                processed_count += 1
+            except Exception as e:
+                print(f"\nError processing uid {uid}: {str(e)}")
+                continue
+        
+        print(f"\nProcessing complete!")
+        print(f"Processed: {processed_count}")
+        print(f"Skipped (already done): {skipped_count}")
+        print(f"Total in dataset: {total_uids}")
+
             
 
 
