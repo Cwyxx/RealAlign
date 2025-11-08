@@ -453,11 +453,11 @@ def main():
     config = ml_collections.ConfigDict()
     config.dpo = ml_collections.ConfigDict()
     config.dpo.dataset = {
-        "train" : "pickscore_002-general_all",
+        "train" : "pickscore-002-ava_dataset-inpainting",
         "val": "high_quality_val"
     }
     config.dpo.csv_file_path = {
-        "pickscore_002-general_all": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/pickscore_0.02_uids-general_all.csv",
+        "pickscore-002-ava_dataset-inpainting": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/ava_dataset/pickscore_0.02_uids.csv",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
     }
     args = parse_args()

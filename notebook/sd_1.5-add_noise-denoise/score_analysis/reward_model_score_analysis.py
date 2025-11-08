@@ -1,6 +1,6 @@
 import os
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 import torch
 import sys
 sys.path.append("/data3/chenweiyan/notebook/fine-tune-diffusion/spo_gitee/DiffusionNFT")
@@ -19,15 +19,32 @@ from transformers import AutoModelForCausalLM
 # device = torch.device("cuda")
 
 
-csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/qwen_3_caption/chameleon_real_qwen3_caption_results.csv"
-df = pd.read_csv(csv_file_path)
-real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/chameleon_real-random_add_noise_step/real"
-fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/chameleon_real-random_add_noise_step/fake"
-ext_list = [".png", ".jpg", ".jpeg"]
-device = torch.device("cuda")
-reward_model_name = "pickscore"
-output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/chameleon_real-random_add_noise_step/{reward_model_name}/{reward_model_name}_score.csv"
+# csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/qwen_3_caption/chameleon_real_qwen3_caption_results.csv"
+# df = pd.read_csv(csv_file_path)
+# real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/chameleon_real-random_add_noise_step/real"
+# fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/chameleon_real-random_add_noise_step/fake"
 
+reward_model_name = "pickscore"
+output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/chameleon_real/{reward_model_name}/{reward_model_name}_score.csv"
+csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/qwen_3_caption-general_append/chameleon_real_qwen3_caption_results.csv"
+df = pd.read_csv(csv_file_path)
+real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/chameleon_real/real"
+fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/chameleon_real/fake"
+
+# csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/ava_dataset/ava_dataset_qwen3_caption_results.csv"
+# df = pd.read_csv(csv_file_path)
+# real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/ava_dataset/real"
+# fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/ava_dataset/fake"
+
+
+ext_list = [".png", ".jpg", ".jpeg"]
+
+print(f"csv file path: {csv_file_path}")
+print(f"real image dir: {real_image_dir}")
+print(f"fake image dir: {fake_image_dir}")
+print(f"output csv path: {output_csv_path}")
+
+device = torch.device("cuda")
 if reward_model_name in ["imagereward", "pickscore", "clipscore" ]:
     all_reward_scorers = { reward_model_name: 1.0 }
     scoring_fn, reward_models = multi_score(device, all_reward_scorers)

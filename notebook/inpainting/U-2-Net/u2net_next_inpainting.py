@@ -95,6 +95,11 @@ def main(args):
     os.makedirs(real_image_output_dir, exist_ok=True)
     os.makedirs(fake_image_output_dir, exist_ok=True)
 
+    print(f"Processing images from {args.input_dir} to {args.output_dir}")
+    print(f"Prompt file: {args.prompt_file}")
+    print(f"Real image output directory: {real_image_output_dir}")
+    print(f"Fake image output directory: {fake_image_output_dir}")
+    
     processed_uids = set()
     if os.path.exists(fake_image_output_dir):
         for f in os.listdir(fake_image_output_dir):
@@ -135,14 +140,19 @@ def main(args):
             print(f"\nWarning: Image not found for uid {uid}, skipping...")
             continue
         
-        real_image = resize_512_center_crop(Image.open(image_path).convert("RGB"))
-        saliency_mask = get_saliency_mask(real_image, net, device=device)
-        fake_image = pipeline(prompt=prompt, image=real_image, mask_image=saliency_mask).images[0]
+        try:
+            real_image = resize_512_center_crop(Image.open(image_path).convert("RGB"))
+            saliency_mask = get_saliency_mask(real_image, net, device=device)
+            fake_image = pipeline(prompt=prompt, image=real_image, mask_image=saliency_mask).images[0]
+            
+            real_image_output_path = os.path.join(real_image_output_dir, f"{uid}.png")
+            fake_image_output_path = os.path.join(fake_image_output_dir, f"{uid}.png")
+            real_image.save(real_image_output_path)
+            fake_image.save(fake_image_output_path)
         
-        real_image_output_path = os.path.join(real_image_output_dir, f"{uid}.png")
-        fake_image_output_path = os.path.join(fake_image_output_dir, f"{uid}.png")
-        real_image.save(real_image_output_path)
-        fake_image.save(fake_image_output_path)
+        except Exception as e:
+            print(f"\nError processing uid {uid}: {str(e)}")
+            continue
         
         processed_count += 1
         
