@@ -5,7 +5,7 @@ conda activate alignprop
 export HF_ENDPOINT=https://hf-mirror.com 
 export CUDA_VISIBLE_DEVICES=4,5
 
-run_name="pickscore-0.02-ava_dataset-inpainting"
+run_name="pickscore-0.02-chameleon_real-inpainting"
 output_dir="/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/model-ckpt/${run_name}"
 accelerate launch --mixed_precision="fp16"  train-lora.py --pretrained_model_name_or_path "runwayml/stable-diffusion-v1-5" \
     --train_batch_size 2 \
