@@ -1,6 +1,6 @@
 import os
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "6"
 import torch
 import sys
 sys.path.append("/data3/chenweiyan/notebook/fine-tune-diffusion/spo_gitee/DiffusionNFT")
@@ -10,6 +10,9 @@ from flow_grpo.rewards import multi_score
 from PIL import Image
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM
+
+reward_model_name = "pickscore"
+output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/ava_dataset/{reward_model_name}/{reward_model_name}_score.csv"
 
 # csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_train.csv"
 # df = pd.read_csv(csv_file_path)
@@ -24,18 +27,22 @@ from transformers import AutoModelForCausalLM
 # real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/chameleon_real-random_add_noise_step/real"
 # fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/chameleon_real-random_add_noise_step/fake"
 
-reward_model_name = "pickscore"
-output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/chameleon_real/{reward_model_name}/{reward_model_name}_score.csv"
-csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/qwen_3_caption-general_append/chameleon_real_qwen3_caption_results.csv"
-df = pd.read_csv(csv_file_path)
-real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/chameleon_real/real"
-fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/chameleon_real/fake"
-
-# csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/ava_dataset/ava_dataset_qwen3_caption_results.csv"
+# reward_model_name = "pickscore"
+# output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/chameleon_real/{reward_model_name}/{reward_model_name}_score.csv"
+# csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/qwen_3_caption-general_append/chameleon_real_qwen3_caption_results.csv"
 # df = pd.read_csv(csv_file_path)
-# real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/ava_dataset/real"
-# fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/ava_dataset/fake"
+# real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/chameleon_real/real"
+# fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/chameleon_real/fake"
 
+csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/ava_dataset/ava_dataset_qwen3_caption_results.csv"
+df = pd.read_csv(csv_file_path)
+real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/ava_dataset/real"
+fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/ava_dataset/fake"
+
+# csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_train.csv"
+# df = pd.read_csv(csv_file_path)
+# real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/general_1/real"
+# fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/general_1/fake"
 
 ext_list = [".png", ".jpg", ".jpeg"]
 
@@ -50,6 +57,7 @@ if reward_model_name in ["imagereward", "pickscore", "clipscore" ]:
     scoring_fn, reward_models = multi_score(device, all_reward_scorers)
     for reward_model in reward_models.values(): reward_model.to(device)
     print(f"Initializing reward models {reward_model_name} from DiffusionNFT...")
+    
 elif reward_model_name == "deqa":
     reward_model = AutoModelForCausalLM.from_pretrained(
         "zhiyuanyou/DeQA-Score-Mix3",
@@ -66,6 +74,21 @@ elif reward_model_name == "deqa":
         score_list = reward_model.score(images).tolist()
         
         score_details = { reward_model_name: score_list}
+        return score_details, {}
+
+elif reward_model_name == "hpsv3":
+    from hpsv3 import HPSv3RewardInferencer
+    inferencer = HPSv3RewardInferencer(device='cuda')
+    # inferencer.model = inferencer.model.to(device).to(torch.float16) 
+    def scoring_fn(images, prompts, metadata, only_strict=False):
+        ### images is image_paths #### 
+        assert type(images[0]) == str
+        image_paths = images
+        with torch.no_grad():
+            rewards = inferencer.reward(prompts=prompts, image_paths=image_paths)
+            score_list = [reward[0].item() for reward in rewards]
+        
+        score_details = { reward_model_name: score_list }
         return score_details, {}
 
 real_image_score_list, fake_image_score_list = [], []
@@ -88,7 +111,7 @@ for i in tqdm(range(len(df))):
     if reward_model_name in ["imagereward", "pickscore"]:
         scores, _ = scoring_fn([real_image, fake_image], [prompt, prompt], None)
         
-    elif reward_model_name == "deqa":
+    elif reward_model_name in ["deqa", "hpsv3"]:
         scores, _ = scoring_fn([real_image_path, fake_image_path], [prompt, prompt], None)
             
     elif reward_model_name in ["clipscore"]:
@@ -101,7 +124,7 @@ for i in tqdm(range(len(df))):
     if reward_model_name in ["imagereward", "pickscore", "clipscore"]:
         real_score = scores[reward_model_name][0].detach().cpu().item()
         fake_score = scores[reward_model_name][1].detach().cpu().item()
-    elif reward_model_name == "deqa":
+    elif reward_model_name in ["deqa", "hpsv3"]:
         real_score = scores[reward_model_name][0]
         fake_score = scores[reward_model_name][1]
     

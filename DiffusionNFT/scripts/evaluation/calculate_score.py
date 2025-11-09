@@ -204,7 +204,7 @@ def main(args):
         def scoring_fn(images, prompts, metadata, only_strict=False):
             ### images is image_paths #### 
             assert type(images[0]) == str
-            
+            image_paths = images
             with torch.no_grad():
                 rewards = inferencer.reward(prompts=prompts, image_paths=image_paths)
                 score_list = [reward[0].item() for reward in rewards]

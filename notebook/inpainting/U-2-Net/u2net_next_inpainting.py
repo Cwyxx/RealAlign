@@ -150,7 +150,7 @@ def main(args):
         try:
             real_image = resize_512_center_crop(Image.open(image_path).convert("RGB"))
             saliency_mask = get_saliency_mask(real_image, net, device=device)
-            fake_image = pipeline(prompt=prompt, image=real_image, mask_image=saliency_mask, num_inference_steps=args.num_inference_steps).images[0]
+            fake_image = pipeline(prompt=prompt, image=real_image, mask_image=saliency_mask).images[0]
             
             real_image_output_path = os.path.join(real_image_output_dir, f"{uid}.png")
             fake_image_output_path = os.path.join(fake_image_output_dir, f"{uid}.png")

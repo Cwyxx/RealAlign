@@ -27,7 +27,7 @@ def compressibility():
     return config
 
 
-def paired_real_generated_dataset_sd3():
+def paired_real_fake_dataset_sd3():
     config = compressibility()
 
     # sd3.5 medium
@@ -52,33 +52,33 @@ def paired_real_generated_dataset_sd3():
     config.train.beta = 100
     config.sample.global_std=True
     config.train.ema=True
-    config.save_freq = 40 # epoch
-    config.eval_freq = 40
+    config.save_freq = 50 # epoch
+    config.eval_freq = 50
     config.save_dir = 'logs/geneval/sd3.5-M-dpo'
     config.reward_fn = {
         "geneval": 1.0,
     }
     
     #### DPO parameters ####
+    config.train.learning_rate = 2.56e-6
     config.dpo = ml_collections.ConfigDict()
-    config.dpo.project_name = "online-dpo"
+    config.dpo.project_name = "diffusion-dpo-sd-3-5-medium"
     config.dpo.batch_size = 1
-    config.dpo.max_train_steps = 2000
-    config.dpo.dataset_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset"
+    config.train.beta = 100
+    config.dpo.max_train_steps = 5000
     config.dpo.dataset = {
-        "train": "train_real_better_3_5",
+        "train": "pickscore_002_general_inpainting",
         "val": "high_quality_val"
     }
     ### ToDo ####
     config.dpo.csv_file_path = {
-        "train_real_better_3_5": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/train_real_better_3.5.csv",
+        "pickscore_002_general_inpainting": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/general_1/pickscore_0.02_uids.csv",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
     }
     ### ToDo ####
-    config.prompt_fn = "paired_real_generated_dataset"
-    config.run_name = f"{config.prompt_fn}/add_noise-denoise-random-real_better_3_5-multi_step"
-    config.save_dir = f"/data_center/data2/dataset/chenwy/21164-data/online-dpo/model-ckpt/{config.run_name}"
-    config.train.gradient_accumulation_steps = 6
+    config.run_name = "pickscore-0.02-general-inpainting"
+    config.save_dir = f"/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/{config.run_name}"
+    config.train.gradient_accumulation_steps = 64
     
     # ### Resume from DiffusionNFT ###
     # config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusionnft/model-ckpt/sd3/SD3.5M-DiffusionNFT-MultiReward/checkpoints/checkpoint-0/lora"

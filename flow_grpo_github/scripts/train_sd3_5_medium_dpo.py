@@ -309,6 +309,9 @@ def main(_):
         else:
             pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config, adapter_name="learner")
             pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config, adapter_name="ref")
+            # Initialize ref adapter by copying from learner adapter
+            # This ensures ref and learner start from the same state, which is critical for DPO training
+            copy_learner_to_ref(pipeline.transformer)
             pipeline.transformer.set_adapter("learner")
         
         logger.info(f"type(pipeline.transformer) {type(pipeline.transformer)}")
@@ -348,24 +351,23 @@ def main(_):
     )
     #### image_transform, copy from dive-into-sd-3-5-medium ####
     
-    if config.prompt_fn == "paired_real_generated_dataset":
-        train_dataset = Paired_Real_Fake_Dataset(config, image_transform, split=config.dpo.dataset["train"])
-        val_dataset = Paired_Real_Fake_Dataset(config, image_transform, split=config.dpo.dataset["val"])
-        
-        train_dataloader = torch.utils.data.DataLoader(
-            train_dataset,
-            batch_size=config.dpo.batch_size,
-            shuffle=True,
-            collate_fn=Paired_Real_Fake_Dataset.collate_fn,
-            num_workers=config.dpo.batch_size
-        )
-        val_dataloader = torch.utils.data.DataLoader(
-            val_dataset,
-            batch_size=config.dpo.batch_size,
-            shuffle=False,
-            collate_fn=Paired_Real_Fake_Dataset.collate_fn,
-            num_workers=config.dpo.batch_size
-        )
+    train_dataset = Paired_Real_Fake_Dataset(config, image_transform, split=config.dpo.dataset["train"])
+    val_dataset = Paired_Real_Fake_Dataset(config, image_transform, split=config.dpo.dataset["val"])
+    
+    train_dataloader = torch.utils.data.DataLoader(
+        train_dataset,
+        batch_size=config.dpo.batch_size,
+        shuffle=True,
+        collate_fn=Paired_Real_Fake_Dataset.collate_fn,
+        num_workers=config.dpo.batch_size
+    )
+    val_dataloader = torch.utils.data.DataLoader(
+        val_dataset,
+        batch_size=config.dpo.batch_size,
+        shuffle=False,
+        collate_fn=Paired_Real_Fake_Dataset.collate_fn,
+        num_workers=config.dpo.batch_size
+    )
     
     # for some reason, autocast is necessary for non-lora training but for lora training it isn't necessary and it uses more memory
     autocast = contextlib.nullcontext if config.use_lora else accelerator.autocast
@@ -387,145 +389,151 @@ def main(_):
     
     eval_and_save_indicator = True
     info = defaultdict(list)
-    train_iter = iter(train_dataloader)
     while True:
-        #################### EVAL ####################
-        pipeline.transformer.eval()
-            
-        if eval_and_save_indicator:
-            eval_and_save_indicator = False
-            eval(pipeline, val_dataloader, text_encoders, tokenizers, config, accelerator, global_step, None, None, autocast, None, ema, transformer_trainable_parameters)
-            if accelerator.is_main_process:
-                save_ckpt(config.save_dir, transformer, global_step, accelerator, ema, transformer_trainable_parameters, config)
-        
-        if global_step >= config.dpo.max_train_steps:
-            break
-        
-        #################### TRAINING ####################
-        pipeline.transformer.set_adapter("learner")
-        pipeline.transformer.train()
-        try:
-            prompts, pixel_values = next(train_iter)
-        except StopIteration:
-            # Note: If there are incomplete gradient accumulations when dataloader ends,
-            # they will be discarded. This is acceptable for large datasets where the impact
-            # of losing a few batches is negligible. The dataloader will restart seamlessly.
-            train_iter = iter(train_dataloader)
-            prompts, pixel_values = next(train_iter)
-            
-        with torch.no_grad():
-            # y_w and y_l were concatenated along channel dimension
-            feed_pixel_values = torch.cat(pixel_values.chunk(2, dim=1)).to(device=accelerator.device, dtype=pipeline.vae.dtype) # pixel [batch_size, 6, H, W] -> [ batch_size, 3, H, W]*2 -> [batch_size*2, 3, H, W]
-            model_input = pipeline.vae.encode(feed_pixel_values).latent_dist.sample()
-            model_input = (model_input - pipeline.vae.config.shift_factor) * pipeline.vae.config.scaling_factor
-
-            prompt_embeds, pooled_prompt_embds = compute_text_embeddings(
-                prompts,
-                text_encoders,
-                tokenizers,
-                max_sequence_length=128,
-                device=accelerator.device
-            )
-            prompt_embeds = prompt_embeds.repeat(2, 1, 1)
-            pooled_prompt_embds = pooled_prompt_embds.repeat(2, 1)
-            
-            
-        with accelerator.accumulate(transformer):
-            bsz = model_input.shape[0] // 2
-            # chosen and rejected using same noise as in Diffusion-DPO
-            noise = torch.randn_like(model_input)
-            noise = torch.cat([noise[:bsz], noise[:bsz]], dim=0)
-            
-            # Sample a random timestep for each image for weighting schemes where we sample timesteps non-uniformly
-            u = compute_density_for_timestep_sampling(
-                weighting_scheme='logit_normal',
-                batch_size=bsz,
-                logit_mean=0,
-                logit_std=1,
-                mode_scale=1.29,
-            )
-            indices = (u * noise_scheduler.config.num_train_timesteps).long()
-            timesteps = noise_scheduler.timesteps[indices].to(device=model_input.device)
-            timesteps = torch.cat([timesteps, timesteps], dim=0)
-            
-            # Add noise according to flow matching.
-            # zt = (1 - texp) * x + texp * z1
-            sigmas = get_sigmas(noise_scheduler, timesteps, accelerator, n_dim=model_input.ndim, dtype=model_input.dtype)
-            noisy_model_input = (1.0 - sigmas) * model_input + sigmas * noise
-            
-            with autocast():
-                pipeline.transformer.set_adapter("learner")
-                model_pred = transformer(
-                    hidden_states=noisy_model_input,
-                    timestep=timesteps,
-                    encoder_hidden_states=prompt_embeds,
-                    pooled_projections=pooled_prompt_embds,
-                    return_dict=False,
-                )[0]
+        for step, (prompts, pixel_values) in enumerate(train_dataloader):
+            #################### EVAL ####################
+            pipeline.transformer.eval()
                 
-                with torch.no_grad():
-                    pipeline.transformer.set_adapter("ref")
-                    model_pred_ref = transformer(
+            if eval_and_save_indicator:
+                eval_and_save_indicator = False
+                eval(pipeline, val_dataloader, text_encoders, tokenizers, config, accelerator, global_step, None, None, autocast, None, ema, transformer_trainable_parameters)
+                if accelerator.is_main_process:
+                    save_ckpt(config.save_dir, transformer, global_step, accelerator, ema, transformer_trainable_parameters, config)
+            
+            if global_step >= config.dpo.max_train_steps:
+                break
+            
+            #################### TRAINING ####################
+            pipeline.transformer.set_adapter("learner")
+            pipeline.transformer.train()
+                
+            with torch.no_grad():
+                # y_w and y_l were concatenated along channel dimension
+                feed_pixel_values = torch.cat(pixel_values.chunk(2, dim=1)).to(device=accelerator.device, dtype=pipeline.vae.dtype) # pixel [batch_size, 6, H, W] -> [ batch_size, 3, H, W]*2 -> [batch_size*2, 3, H, W]
+                model_input = pipeline.vae.encode(feed_pixel_values).latent_dist.sample()
+                model_input = (model_input - pipeline.vae.config.shift_factor) * pipeline.vae.config.scaling_factor
+
+                prompt_embeds, pooled_prompt_embds = compute_text_embeddings(
+                    prompts,
+                    text_encoders,
+                    tokenizers,
+                    max_sequence_length=128,
+                    device=accelerator.device
+                )
+                prompt_embeds = prompt_embeds.repeat(2, 1, 1)
+                pooled_prompt_embds = pooled_prompt_embds.repeat(2, 1)
+                
+                
+            with accelerator.accumulate(transformer):
+                bsz = model_input.shape[0] // 2
+                # chosen and rejected using same noise as in Diffusion-DPO
+                noise = torch.randn_like(model_input)
+                noise = torch.cat([noise[:bsz], noise[:bsz]], dim=0)
+                
+                # Sample a random timestep for each image for weighting schemes where we sample timesteps non-uniformly
+                u = compute_density_for_timestep_sampling(
+                    weighting_scheme='logit_normal',
+                    batch_size=bsz,
+                    logit_mean=0,
+                    logit_std=1,
+                    mode_scale=1.29,
+                )
+                indices = (u * noise_scheduler.config.num_train_timesteps).long()
+                timesteps = noise_scheduler.timesteps[indices].to(device=model_input.device)
+                timesteps = torch.cat([timesteps, timesteps], dim=0)
+                
+                # Add noise according to flow matching.
+                # zt = (1 - texp) * x + texp * z1
+                sigmas = get_sigmas(noise_scheduler, timesteps, accelerator, n_dim=model_input.ndim, dtype=model_input.dtype)
+                noisy_model_input = (1.0 - sigmas) * model_input + sigmas * noise
+                
+                with autocast():
+                    pipeline.transformer.set_adapter("learner")
+                    model_pred = transformer(
                         hidden_states=noisy_model_input,
                         timestep=timesteps,
                         encoder_hidden_states=prompt_embeds,
                         pooled_projections=pooled_prompt_embds,
                         return_dict=False,
                     )[0]
-                    model_pred_ref = model_pred_ref.detach()
-                    pipeline.transformer.set_adapter("learner")
-            target = noise - model_input
-    
-            theta_mse = ((model_pred.float() - target.float()) ** 2).reshape(target.shape[0], -1).mean(dim=1)
-            ref_mse = ((model_pred_ref.float() - target.float()) ** 2).reshape(target.shape[0], -1).mean(dim=1)
-    
-            model_w_err = theta_mse[:bsz]
-            model_l_err = theta_mse[bsz:]
-            ref_w_err = ref_mse[:bsz]
-            ref_l_err = ref_mse[bsz:]
-            w_diff = model_w_err - ref_w_err
-            l_diff = model_l_err - ref_l_err
-            w_l_diff = w_diff - l_diff
-            inside_term = -0.5 * config.train.beta * w_l_diff
-            loss = -F.logsigmoid(inside_term)
-            
-            loss = torch.mean(loss)
-            info["loss"].append(loss)
-            info["model_w_err"].append(torch.mean(model_w_err))
-            info["model_l_err"].append(torch.mean(model_l_err))
-            info["ref_w_err"].append(torch.mean(ref_w_err))
-            info["ref_l_err"].append(torch.mean(ref_l_err))
-            info["w_diff"].append(torch.mean(w_diff))
-            info["l_diff"].append(torch.mean(l_diff))
-            info["w_l_diff"].append(torch.mean(w_l_diff))
-            info["inside_term"].append(torch.mean(inside_term))
-            implicit_acc = (inside_term > 0).sum().float() / inside_term.size(0)
-            info["implicit_acc"].append(torch.mean(implicit_acc))
-            # backward pass
-            accelerator.backward(loss)
+                    
+                    with torch.no_grad():
+                        pipeline.transformer.set_adapter("ref")
+                        model_pred_ref = transformer(
+                            hidden_states=noisy_model_input,
+                            timestep=timesteps,
+                            encoder_hidden_states=prompt_embeds,
+                            pooled_projections=pooled_prompt_embds,
+                            return_dict=False,
+                        )[0]
+                        model_pred_ref = model_pred_ref.detach()
+                        pipeline.transformer.set_adapter("learner")
+                target = noise - model_input
+        
+                theta_mse = ((model_pred.float() - target.float()) ** 2).reshape(target.shape[0], -1).mean(dim=1)
+                ref_mse = ((model_pred_ref.float() - target.float()) ** 2).reshape(target.shape[0], -1).mean(dim=1)
+        
+                model_w_err = theta_mse[:bsz]
+                model_l_err = theta_mse[bsz:]
+                ref_w_err = ref_mse[:bsz]
+                ref_l_err = ref_mse[bsz:]
+                w_diff = model_w_err - ref_w_err
+                l_diff = model_l_err - ref_l_err
+                w_l_diff = w_diff - l_diff
+                
+                # Clamp w_l_diff to prevent numerical instability when beta is large
+                # This helps prevent loss saturation and gradient explosion
+                w_l_diff_clamped = torch.clamp(w_l_diff, min=-10.0, max=10.0)
+                inside_term = -0.5 * config.train.beta * w_l_diff_clamped
+                loss = -F.logsigmoid(inside_term)
+                
+                loss = torch.mean(loss)
+                info["loss"].append(loss)
+                info["model_w_err"].append(torch.mean(model_w_err))
+                info["model_l_err"].append(torch.mean(model_l_err))
+                info["ref_w_err"].append(torch.mean(ref_w_err))
+                info["ref_l_err"].append(torch.mean(ref_l_err))
+                info["w_diff"].append(torch.mean(w_diff))
+                info["l_diff"].append(torch.mean(l_diff))
+                info["w_l_diff"].append(torch.mean(w_l_diff))
+                info["w_l_diff_clamped"].append(torch.mean(w_l_diff_clamped))
+                info["inside_term"].append(torch.mean(inside_term))
+                implicit_acc = (inside_term > 0).sum().float() / inside_term.size(0)
+                info["implicit_acc"].append(torch.mean(implicit_acc))
+                # backward pass
+                accelerator.backward(loss)
+                if accelerator.sync_gradients:
+                    accelerator.clip_grad_norm_(
+                        transformer.parameters(), config.train.max_grad_norm
+                    )
+                optimizer.step()
+                optimizer.zero_grad()
+
+
+            # Checks if the accelerator has performed an optimization step behind the scenes
             if accelerator.sync_gradients:
-                accelerator.clip_grad_norm_(
-                    transformer.parameters(), config.train.max_grad_norm
-                )
-            optimizer.step()
-            optimizer.zero_grad()
-
-
-        # Checks if the accelerator has performed an optimization step behind the scenes
-        if accelerator.sync_gradients:
-            info = {k: torch.mean(torch.stack(v)) for k, v in info.items()}
-            info = accelerator.reduce(info, reduction="mean")
-            if accelerator.is_main_process: 
-                swanlab.log(info, step=global_step)
-            info = defaultdict(list)
-            progress_bar.update(1)
-            global_step += 1
-            if global_step % config.save_freq == 0:
-                eval_and_save_indicator = True
+                info = {k: torch.mean(torch.stack(v)) for k, v in info.items()}
+                info = accelerator.reduce(info, reduction="mean")
+                if accelerator.is_main_process: 
+                    swanlab.log(info, step=global_step)
+                info = defaultdict(list)
+                progress_bar.update(1)
+                global_step += 1
                 
-            if config.train.ema:
-                ema.step(transformer_trainable_parameters, global_step)
+                # Update reference model periodically (Online DPO)
+                if global_step > 0 and global_step % config.train.ref_update_step == 0:
+                    copy_learner_to_ref(transformer)
+                    if accelerator.is_main_process:
+                        logger.info(f"Updated reference model at step {global_step}")
                 
+                if global_step % config.save_freq == 0:
+                    eval_and_save_indicator = True
+                    
+                if config.train.ema:
+                    ema.step(transformer_trainable_parameters, global_step)
+        
+        if global_step >= config.dpo.max_train_steps:
+                break         
 
 if __name__ == "__main__":
     app.run(main)
