@@ -12,37 +12,12 @@ from tqdm import tqdm
 from transformers import AutoModelForCausalLM
 
 reward_model_name = "pickscore"
-output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/ava_dataset/{reward_model_name}/{reward_model_name}_score.csv"
+output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/Diffusion-DRO/{reward_model_name}/{reward_model_name}_score.csv"
 
-# csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_train.csv"
-# df = pd.read_csv(csv_file_path)
-# real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/real"
-# fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/fake"
-# ext_list = [".png", ".jpg", ".jpeg"]
-# device = torch.device("cuda")
-
-
-# csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/qwen_3_caption/chameleon_real_qwen3_caption_results.csv"
-# df = pd.read_csv(csv_file_path)
-# real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/chameleon_real-random_add_noise_step/real"
-# fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/chameleon_real-random_add_noise_step/fake"
-
-# reward_model_name = "pickscore"
-# output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/chameleon_real/{reward_model_name}/{reward_model_name}_score.csv"
-# csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/qwen_3_caption-general_append/chameleon_real_qwen3_caption_results.csv"
-# df = pd.read_csv(csv_file_path)
-# real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/chameleon_real/real"
-# fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/chameleon_real/fake"
-
-csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/ava_dataset/ava_dataset_qwen3_caption_results.csv"
-df = pd.read_csv(csv_file_path)
-real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/ava_dataset/real"
-fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/ava_dataset/fake"
-
-# csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_train.csv"
-# df = pd.read_csv(csv_file_path)
-# real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/general_1/real"
-# fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/general_1/fake"
+csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/Diffusion-DRO/top_500_images.csv"
+df = pd.read_csv(csv_file_path, dtype=str)
+real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/Diffusion-DRO/real"
+fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/Diffusion-DRO/fake"
 
 ext_list = [".png", ".jpg", ".jpeg"]
 

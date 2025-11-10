@@ -1,4 +1,3 @@
-import copy
 import io
 import json
 import os
@@ -7,11 +6,9 @@ from functools import partial
 from time import time
 from typing import Callable, Dict
 
-import accelerate
 import click
 import torch
 from datasets import load_dataset
-from datasets.utils.logging import disable_progress_bar
 from PIL import Image
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -63,25 +60,22 @@ def main(**kwargs):
     score_cache_path = os.path.join(
         args.cache, f"pickapic{args.version}_{args.split}_{args.score}.jsonl")
 
-    calc_scores(args, score_cache_path)
+    # calc_scores(args, score_cache_path)
     save_expert(args, score_cache_path)
 
 
 def calc_scores(args: EasyDict, score_cache_path: str):
-    accelerator = accelerate.Accelerator()
-    device = accelerator.device
-
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    compute_score, processor = get_score(args.score, device)
+    
     # Create the cache directory
-    if accelerator.is_main_process:
-        cache_dir = os.path.dirname(score_cache_path)
-        os.makedirs(cache_dir, exist_ok=True)
-    else:
-        disable_progress_bar()
+    cache_dir = os.path.dirname(score_cache_path)
+    os.makedirs(cache_dir, exist_ok=True)
 
     # Load the already done captions
     uid2caption2score = defaultdict(dict)
     if os.path.exists(score_cache_path):
-        accelerator.print(f"Loading cached scores from {score_cache_path} ... ", end="")
+        print(f"Loading cached scores from {score_cache_path} ... ", end="")
         start_time = time()
         with open(score_cache_path) as f:
             for line in f:
@@ -89,7 +83,7 @@ def calc_scores(args: EasyDict, score_cache_path: str):
                 for uid in uid2caption2score_single:
                     uid2caption2score[uid].update(uid2caption2score_single[uid])
         elapsed_time = time() - start_time
-        accelerator.print(f"{elapsed_time:.2f}s")
+        print(f"{elapsed_time:.2f}s")
 
     # Count the number of done uid-caption pairs
     done_uid_caption = 0
@@ -103,25 +97,11 @@ def calc_scores(args: EasyDict, score_cache_path: str):
 
     # Count the unique uid-caption pairs
     unique_uid_caption = set()
-    # for caption, uid0, uid1 in zip(
-    #     dataset['caption'], dataset['image_0_uid'], dataset['image_1_uid']
-    # ):
-    #     unique_uid_caption.add((uid0, caption))
-    #     unique_uid_caption.add((uid1, caption))
     for row in tqdm(dataset, desc="Counting Unique UID-Caption Pairs"):
         caption, uid0, uid1 = row['caption'], row['image_0_uid'], row['image_1_uid']
         unique_uid_caption.add((uid0, caption))
         unique_uid_caption.add((uid1, caption))
     num_total = len(unique_uid_caption)
-
-    print("Adding Indices")
-    # Add index to dataset for subset selection
-    dataset = dataset.map(
-        lambda examples, indices: {"index": indices},
-        with_indices=True,
-        batched=True,
-        batch_size=args.batch_size,
-    )
 
     # Filter the dataset index to read as few rows as possible
     def filter_fn(examples):
@@ -136,46 +116,21 @@ def calc_scores(args: EasyDict, score_cache_path: str):
                 keep_example = True
             keep.append(keep_example)
         return keep
-    
-    print("Filtering Indices")
-    dataset = dataset.filter(
+
+    # Load the full dataset with streaming to avoid caching
+    pickapic = load_dataset(
+        f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/pick-a-pic-v2",
+        split=args.split,
+        streaming=True)
+    # Select only the necessary columns
+    pickapic = pickapic.select_columns(
+        ['caption', 'image_0_uid', 'image_1_uid', 'jpg_0', 'jpg_1'])
+    pickapic = pickapic.filter(
         filter_fn,
         batched=True,
         batch_size=args.batch_size,
     )
-    # Collect the indices that contains the remaining captions
-    indices = sorted( row['index'] for row in dataset)
-
-    # Exit if there are no more captions to process
-    if len(indices) == 0:
-        if not accelerator.is_main_process:
-            accelerator.end_training()
-            exit(0)
-        else:
-            accelerator.end_training()
-            return
-
-    # Load the score model and image processor
-    compute_score, processor = get_score(args.score, device)
-
-    # Load the full dataset
-    pickapic = load_dataset(
-        f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/pick-a-pic-v2",
-        split=args.split, streaming=True)
-    # Add index to dataset for filtering
-    pickapic = pickapic.map(
-        lambda examples, indices: {"index": indices},
-        with_indices=True,
-        batched=True,
-        batch_size=args.batch_size,
-    )
-    # Filter to only keep the remaining indices
-    indices_set = set(indices)
-    pickapic = pickapic.filter(lambda x: x['index'] in indices_set)
-    # Select only the necessary columns
-    pickapic = pickapic.select_columns(
-        ['caption', 'image_0_uid', 'image_1_uid', 'jpg_0', 'jpg_1'])
-
+    
     # Transform jpg bytes to PIL.Image and then to torch.Tensor in collat_fn
     def collat_fn(items):
         # List of dictionaries to dictionary of lists
@@ -201,15 +156,13 @@ def calc_scores(args: EasyDict, score_cache_path: str):
             if isinstance(batch[key][0], torch.Tensor):
                 batch[key] = torch.stack(batch[key])
         return batch
+    
     loader = DataLoader(
         pickapic,
         batch_size=args.batch_size,
         num_workers=args.num_proc,
         collate_fn=collat_fn,
     )
-
-    # Let the accelerator handle the last batch
-    loader = accelerator.prepare(loader)
 
     # Run inference on the Pickapic dataset
     rel_err_pass = 0
@@ -218,67 +171,54 @@ def calc_scores(args: EasyDict, score_cache_path: str):
     progress_bar = tqdm(
         loader,
         desc=args.score,
-        disable=not accelerator.is_main_process,
     )
     for batch in progress_bar:
         captions = batch['caption']
-        scores_0 = compute_score(batch['image_0'], captions)
-        scores_1 = compute_score(batch['image_1'], captions)
+        scores_0 = compute_score(batch['image_0'].to(device), captions)
+        scores_1 = compute_score(batch['image_1'].to(device), captions)
 
-        # Gather the results
-        captions = accelerator.gather_for_metrics(captions, use_gather_object=True)
-        captions = captions + captions
-        scores_0 = accelerator.gather_for_metrics(scores_0)
-        scores_1 = accelerator.gather_for_metrics(scores_1)
+        # Process the results (no need to gather in single process)
+        captions = list(captions) + list(captions)  # Duplicate for image_0 and image_1
         scores = torch.cat([scores_0, scores_1])
-        uids0 = accelerator.gather_for_metrics(batch['image_0_uid'], use_gather_object=True)
-        uids1 = accelerator.gather_for_metrics(batch['image_1_uid'], use_gather_object=True)
-        uids = uids0 + uids1
+        uids = list(batch['image_0_uid']) + list(batch['image_1_uid'])
 
         # Update uid2caption2score
-        if accelerator.is_main_process:
-            for caption, score, uid in zip(captions, scores, uids):
-                if uid not in uid2caption2score or caption not in uid2caption2score[uid]:
-                    uid2caption2score[uid][caption] = score.item()
-                    # Save the score to the cache file
-                    line = json.dumps({
-                        uid: {
-                            caption: score.item()
-                        }
-                    })
-                    with open(score_cache_path, 'a') as f:
-                        f.write(line + '\n')
-                    done_uid_caption += 1
+        for caption, score, uid in zip(captions, scores, uids):
+            if uid not in uid2caption2score or caption not in uid2caption2score[uid]:
+                uid2caption2score[uid][caption] = score.item()
+                # Save the score to the cache file
+                line = json.dumps({
+                    uid: {
+                        caption: score.item()
+                    }
+                })
+                with open(score_cache_path, 'a') as f:
+                    f.write(line + '\n')
+                done_uid_caption += 1
+            else:
+                # Sanity check - the score should be the same
+                err = abs(uid2caption2score[uid][caption] - score.item())
+                rel_err = err / uid2caption2score[uid][caption]
+                if rel_err > 0.01:
+                    progress_bar.write(
+                        f"Large Relative Error: {rel_err:.4f}. "
+                        f"UID: {uid}. Caption: {caption}")
+                    rel_err_fail += 1
                 else:
-                    # Sanity check - the score should be the same
-                    err = abs(uid2caption2score[uid][caption] - score.item())
-                    rel_err = err / uid2caption2score[uid][caption]
-                    if rel_err > 0.01:
-                        progress_bar.write(
-                            f"Large Relative Error: {rel_err:.4f}. "
-                            f"UID: {uid}. Caption: {caption}")
-                        rel_err_fail += 1
-                    else:
-                        rel_err_pass += 1
-                    if rel_err_fail + rel_err_pass > 0:
-                        rel_err_pass_rate = rel_err_pass / (rel_err_pass + rel_err_fail)
-                progress_bar.set_postfix_str(
-                    f"Finished captions: {done_uid_caption}/{num_total} ({done_uid_caption / num_total:.2%}). "
-                    f"Relative Error Pass Rate: {rel_err_pass_rate:.2%}.")
-        accelerator.wait_for_everyone()
+                    rel_err_pass += 1
+                if rel_err_fail + rel_err_pass > 0:
+                    rel_err_pass_rate = rel_err_pass / (rel_err_pass + rel_err_fail)
+            progress_bar.set_postfix_str(
+                f"Finished captions: {done_uid_caption}/{num_total} ({done_uid_caption / num_total:.2%}). "
+                f"Relative Error Pass Rate: {rel_err_pass_rate:.2%}.")
 
     progress_bar.close()
-
-    if not accelerator.is_main_process:
-        accelerator.end_training()
-        exit(0)
-    else:
-        accelerator.end_training()
-        torch.cuda.empty_cache()
-        return
+    torch.cuda.empty_cache()
+    return
 
 
 def save_expert(args, score_cache_path):
+    print("Saving Expert")
     print(f"Loading cached scores from {score_cache_path} ... ", end="")
     start_time = time()
     uid2caption2score = defaultdict(dict)  # Target caption and its uids
@@ -291,81 +231,69 @@ def save_expert(args, score_cache_path):
     print(f"{elapsed_time:.2f}s")
 
     # Sort uid-caption pairs by scores
+    # First, ensure each (uid, caption) pair has only one score (take the maximum if duplicates exist)
+    uid_caption_to_score = {}
+    for uid, caption2score in uid2caption2score.items():
+        for caption, score in caption2score.items():
+            key = (uid, caption)
+            if key not in uid_caption_to_score or score > uid_caption_to_score[key]:
+                uid_caption_to_score[key] = score
+    
     all_items = [(score, uid, caption)
-                 for uid, caption2score in uid2caption2score.items()
-                 for caption, score in caption2score.items()]
+                 for (uid, caption), score in uid_caption_to_score.items()]
+    
     all_items = sorted(all_items, reverse=True)
-
+    print(f"Total unique uid-caption pairs: {len(all_items)}")
     # Top K scoring images
     num_images = max(min(args.top, len(all_items)), 1)
     top_images = all_items[:num_images]
+    
+    # Verify we have exactly num_images unique pairs
+    if len(top_images) < num_images:
+        print(f"Warning: Only {len(top_images)} unique pairs available, requested {num_images}")
+        num_images = len(top_images)
+    
     uid2caption2score = defaultdict(dict)
     score_sum = 0
     for score, uid, caption in top_images:
         uid2caption2score[uid][caption] = score
         score_sum += score
     print(f"Average score for top {num_images} images: {score_sum / num_images:.4f}")
+    
+    # Verify the count
+    actual_count = sum(len(caption2score) for caption2score in uid2caption2score.values())
+    assert actual_count == num_images, f"Expected {num_images} pairs, but got {actual_count}"
 
-    # Load the dataset without images to speed up the sampling process
-    dataset = load_dataset(
-        f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/pick-a-pic-v2", split=args.split, streaming=True)
-    dataset = dataset.select_columns(['caption', 'image_0_uid', 'image_1_uid'])
-    dataset = dataset.map(
-        lambda examples, indices: {"index": indices},
-        with_indices=True,
-        batched=True,
-        batch_size=args.batch_size,
-        desc="Adding Indices",
-    )
+    target_pairs = set()
+    for uid, caption2score in uid2caption2score.items():
+        for caption in caption2score.keys():
+            target_pairs.add((uid, caption))
+    print(f"Target (uid, caption) pairs to save: {len(target_pairs)}")
 
-    # Filter the dataset index to read as few rows as possible
-    def filter_fn(examples, uid2caption2score):
+    pickapic = load_dataset(
+        f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/pick-a-pic-v2",
+        split=args.split,
+        streaming=True)
+    
+    def filter_fn_target(examples, target_pairs):
         keep = []
         for caption, uid0, uid1 in zip(
             examples['caption'], examples['image_0_uid'], examples['image_1_uid']
         ):
             keep_example = False
-            if uid0 in uid2caption2score and caption in uid2caption2score[uid0]:
+            if (uid0, caption) in target_pairs:
                 keep_example = True
-                del uid2caption2score[uid0][caption]
-                if len(uid2caption2score[uid0]) == 0:
-                    del uid2caption2score[uid0]
-            if uid1 in uid2caption2score and caption in uid2caption2score[uid1]:
+            if (uid1, caption) in target_pairs:
                 keep_example = True
-                del uid2caption2score[uid1][caption]
-                if len(uid2caption2score[uid1]) == 0:
-                    del uid2caption2score[uid1]
             keep.append(keep_example)
         return keep
-    uid2caption2score_copy = copy.deepcopy(uid2caption2score)
-    dataset = dataset.filter(
-        partial(filter_fn, uid2caption2score=uid2caption2score_copy),
-        batched=True,
-        batch_size=args.batch_size,
-        load_from_cache_file=False,
-        desc="Filtering Indices",
-    )
-    # Collect the indices that contains the remaining captions
-    indices = sorted( row['index'] for row in dataset)
-    # Sanity check
-    assert len(uid2caption2score_copy) == 0, f"Remaining captions: {len(uid2caption2score_copy)}"
-
-    # Load the full dataset
-    pickapic = load_dataset(
-        f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/pick-a-pic-v2",
-        split=args.split,
-        streaming=True)
-    # Add index to dataset for filtering
-    pickapic = pickapic.map(
-        lambda examples, indices: {"index": indices},
-        with_indices=True,
+    
+    print("\tFiltering dataset to find target images")
+    pickapic = pickapic.filter(
+        partial(filter_fn_target, target_pairs=target_pairs),
         batched=True,
         batch_size=args.batch_size,
     )
-    # Filter to only keep the remaining indices
-    indices_set = set(indices)
-    pickapic = pickapic.filter(lambda x: x['index'] in indices_set)
-    # Select only the necessary columns
     pickapic = pickapic.select_columns(
         ['caption', 'image_0_uid', 'image_1_uid', 'jpg_0', 'jpg_1'])
     loader = DataLoader(
@@ -375,7 +303,9 @@ def save_expert(args, score_cache_path):
     )
 
     num_digits = len(str(num_images))
-
+    actual_count = sum(len(caption2score) for caption2score in uid2caption2score.values())
+    print(f"uid2caption2score: {len(uid2caption2score)} unique UIDs, {actual_count} total (uid, caption) pairs")
+    assert actual_count == num_images, f"Expected {num_images} pairs, but got {actual_count}"
     # Save the images
     with tqdm(loader, desc="Saving Subset Images") as pbar:
         saving_counter = 0

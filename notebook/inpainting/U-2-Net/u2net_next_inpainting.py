@@ -116,7 +116,7 @@ def main(args):
     
     print(f"Found {len(processed_uids)} already processed UIDs")
     
-    df = pd.read_csv(args.prompt_file)
+    df = pd.read_csv(args.prompt_file, dtype=str)
     total_uids = len(df)
     print(f"Total UIDs in prompt file: {total_uids}")
     

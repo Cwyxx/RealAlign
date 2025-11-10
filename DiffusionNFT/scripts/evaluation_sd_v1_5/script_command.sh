@@ -14,7 +14,7 @@ rl_framework="diffusion-dpo"
 export CUDA_VISIBLE_DEVICES=${cuda_device}
 
 base_ckpt_dir="/data_center/data2/dataset/chenwy/21164-data/${rl_framework}/model-ckpt"
-base_image_dir="/data_center/data2/dataset/chenwy/21164-data/${rl_framework}/generate_images/${dataset}"
+base_image_dir="/data_center/data2/dataset/chenwy/21164-data/${rl_framework}/sd-v1-5/generate_images/${dataset}"
 
 ckpt_dir="${base_ckpt_dir}/${method}/checkpoints/checkpoint-${ckpt}"
 image_dir="${base_image_dir}/${method}/ckpt-${ckpt}"
@@ -23,14 +23,12 @@ echo "dataset: ${dataset}"
 echo "ckpt_dir: ${ckpt_dir}"
 echo "image_dir: ${image_dir}"
 
-# sleep 21600
-# python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
-#      --output_dir ${image_dir} \
-#      --save_images
+python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
+     --output_dir ${image_dir} \
+     --save_images
 
 cd ../evaluation
-# reward_model_list=("pickscore" "imagereward" "deqa" "aesthetic_v2_5" "dinov2")
-reward_model_list=("hpsv3")
+reward_model_list=("pickscore" "imagereward" "hpsv3" "deqa" "aesthetic_v2_5" "dinov2")
 for reward_model in "${reward_model_list[@]}"; do
     echo "********************************************"
     echo "reward_model: ${reward_model}"
