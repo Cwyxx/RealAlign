@@ -1,6 +1,6 @@
 import os
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-os.environ["CUDA_VISIBLE_DEVICES"] = "6"
+os.environ["CUDA_VISIBLE_DEVICES"] = "7"
 import torch
 import sys
 sys.path.append("/data3/chenweiyan/notebook/fine-tune-diffusion/spo_gitee/DiffusionNFT")
@@ -11,15 +11,15 @@ from PIL import Image
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM
 
-reward_model_name = "pickscore"
-output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/Diffusion-DRO/{reward_model_name}/{reward_model_name}_score.csv"
+reward_model_name = "code"
+output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/{reward_model_name}/{reward_model_name}_score.csv"
 
-csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/Diffusion-DRO/top_500_images.csv"
+csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/HPDv3/real_images_uid_prompt.csv"
 df = pd.read_csv(csv_file_path, dtype=str)
-real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/Diffusion-DRO/real"
-fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/Diffusion-DRO/fake"
+real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/real"
+fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/fake"
 
-ext_list = [".png", ".jpg", ".jpeg"]
+ext_list = [".png", ".jpg", ".jpeg", ".PNG", ".JPG", ".JPEG"]
 
 print(f"csv file path: {csv_file_path}")
 print(f"real image dir: {real_image_dir}")
@@ -27,7 +27,7 @@ print(f"fake image dir: {fake_image_dir}")
 print(f"output csv path: {output_csv_path}")
 
 device = torch.device("cuda")
-if reward_model_name in ["imagereward", "pickscore", "clipscore" ]:
+if reward_model_name in ["imagereward", "pickscore", "clipscore", "code" ]:
     all_reward_scorers = { reward_model_name: 1.0 }
     scoring_fn, reward_models = multi_score(device, all_reward_scorers)
     for reward_model in reward_models.values(): reward_model.to(device)
@@ -83,7 +83,7 @@ for i in tqdm(range(len(df))):
     real_image = Image.open(real_image_path).convert("RGB")
     fake_image = Image.open(fake_image_path).convert("RGB")
     
-    if reward_model_name in ["imagereward", "pickscore"]:
+    if reward_model_name in ["imagereward", "pickscore", "code"]:
         scores, _ = scoring_fn([real_image, fake_image], [prompt, prompt], None)
         
     elif reward_model_name in ["deqa", "hpsv3"]:
@@ -96,7 +96,7 @@ for i in tqdm(range(len(df))):
         images = torch.tensor(images, dtype=torch.uint8) / 255.0
         scores, _ = scoring_fn(images, [prompt, prompt], None)
     
-    if reward_model_name in ["imagereward", "pickscore", "clipscore"]:
+    if reward_model_name in ["imagereward", "pickscore", "clipscore", "code"]:
         real_score = scores[reward_model_name][0].detach().cpu().item()
         fake_score = scores[reward_model_name][1].detach().cpu().item()
     elif reward_model_name in ["deqa", "hpsv3"]:
