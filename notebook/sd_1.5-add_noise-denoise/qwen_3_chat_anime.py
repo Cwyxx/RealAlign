@@ -1,4 +1,6 @@
 import os
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+os.environ["CUDA_VISIBLE_DEVICES"] = "7"
 import csv
 from pathlib import Path
 from transformers import Qwen3VLForConditionalGeneration, AutoProcessor

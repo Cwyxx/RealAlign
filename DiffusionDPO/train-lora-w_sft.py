@@ -881,7 +881,7 @@ def main():
                                   added_cond_kwargs = added_cond_kwargs
                                  ).sample
                 #### SFT Loss Computation on y_w ####
-                loss_sft = F.mse_loss(model_pred[:bsz].float(), target[:bsz].float(), reduction="mean")
+                loss_sft = F.mse_loss(model_pred[:bsz // 2].float(), target[:bsz // 2].float(), reduction="mean")
                 
                 #### DPO Loss Computation ####
                 # model_pred and ref_pred will be (2 * LBS) x 4 x latent_spatial_dim x latent_spatial_dim

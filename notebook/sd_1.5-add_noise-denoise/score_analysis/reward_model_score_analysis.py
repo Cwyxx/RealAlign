@@ -5,13 +5,14 @@ import torch
 import sys
 sys.path.append("/data3/chenweiyan/notebook/fine-tune-diffusion/spo_gitee/DiffusionNFT")
 import pandas as pd
+import cv2
 import numpy as np
 from flow_grpo.rewards import multi_score
 from PIL import Image
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM
 
-reward_model_name = "code"
+reward_model_name = "saturation"
 output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/{reward_model_name}/{reward_model_name}_score.csv"
 
 csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/HPDv3/real_images_uid_prompt.csv"
@@ -65,6 +66,33 @@ elif reward_model_name == "hpsv3":
         
         score_details = { reward_model_name: score_list }
         return score_details, {}
+    
+elif reward_model_name == "brightness":
+    def calculate_average_brightness(image_path):
+        image = Image.open(image_path)
+        gray_image = image.convert('L')
+        gray_array = np.array(gray_image)
+        return np.mean(gray_array)
+    
+    def scoring_fn(images, prompts, metadata, only_strict=False):
+        #### images is image_paths ####
+        image_paths = images
+        score_list = [calculate_average_brightness(image_path) for image_path in image_paths]
+        score_details = { reward_model_name: score_list }
+        return score_details, {}
+    
+elif reward_model_name == "saturation":
+    def calculate_saturation(image_path):
+        img = Image.open(image_path).convert("HSV")
+        s_channel = np.array(img)[:, :, 1]
+        return s_channel.mean()
+    
+    def scoring_fn(images, prompts, metadata, only_strict=False):
+        #### images is image_paths ####
+        image_paths = images
+        score_list = [calculate_saturation(image_path) for image_path in image_paths]
+        score_details = { reward_model_name: score_list }
+        return score_details, {}
 
 real_image_score_list, fake_image_score_list = [], []
 uid_list = []
@@ -86,7 +114,7 @@ for i in tqdm(range(len(df))):
     if reward_model_name in ["imagereward", "pickscore", "code"]:
         scores, _ = scoring_fn([real_image, fake_image], [prompt, prompt], None)
         
-    elif reward_model_name in ["deqa", "hpsv3"]:
+    elif reward_model_name in ["deqa", "hpsv3", "brightness", "saturation"]:
         scores, _ = scoring_fn([real_image_path, fake_image_path], [prompt, prompt], None)
             
     elif reward_model_name in ["clipscore"]:
@@ -99,7 +127,7 @@ for i in tqdm(range(len(df))):
     if reward_model_name in ["imagereward", "pickscore", "clipscore", "code"]:
         real_score = scores[reward_model_name][0].detach().cpu().item()
         fake_score = scores[reward_model_name][1].detach().cpu().item()
-    elif reward_model_name in ["deqa", "hpsv3"]:
+    elif reward_model_name in ["deqa", "hpsv3", "brightness", "saturation"]:
         real_score = scores[reward_model_name][0]
         fake_score = scores[reward_model_name][1]
     
