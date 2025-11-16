@@ -42,6 +42,7 @@ logger = get_logger(__name__)
 
 class Paired_Real_Fake_Dataset(Dataset):
     def __init__(self, config, image_transform, split="train"):
+        self.precomputed_embeddings_dir = config.dpo.precomputed_embeddings_dir
         self.image_transform = image_transform
         self.csv_file_path = config.dpo.csv_file_path[split]
         
@@ -66,9 +67,14 @@ class Paired_Real_Fake_Dataset(Dataset):
         win_pixel_values = self.image_transform(Image.open(win_image_path).convert("RGB"))
         lose_pixel_values = self.image_transform(Image.open(lose_image_path).convert("RGB"))
         pixel_values = torch.cat([win_pixel_values, lose_pixel_values], dim=0) # torch.cat [3, 512, 512] -> [6, 512, 512]
-        
+        prompt_embed_path = os.path.join(self.precomputed_embeddings_dir, f"{uid}.pt")
+        pooled_prompt_embed_path = os.path.join(self.precomputed_embeddings_dir, f"{uid}_pooled.pt")
+        prompt_embed = torch.load(prompt_embed_path)
+        pooled_prompt_embed = torch.load(pooled_prompt_embed_path)
         return {
             "prompt": prompt,
+            "prompt_embed": prompt_embed,
+            "pooled_prompt_embed": pooled_prompt_embed,
             "pixel_values": pixel_values
         }
         
@@ -77,7 +83,11 @@ class Paired_Real_Fake_Dataset(Dataset):
         prompts = [ example["prompt"] for example in examples ]
         pixel_values = [ example["pixel_values"] for example in examples ]
         pixel_values = torch.stack(pixel_values, dim=0).to(memory_format=torch.contiguous_format).float()  # torch.stack [6, 512, 512] -> [batch_size, 6, 512, 512]
-        return prompts, pixel_values
+        prompt_embeds = [ example["prompt_embed"] for example in examples ]
+        pooled_prompt_embeds = [ example["pooled_prompt_embed"] for example in examples ]
+        prompt_embeds = torch.cat(prompt_embeds, dim=0).to(memory_format=torch.contiguous_format).float()  # torch.stack [205, 4096] -> [batch_size, 205, 4096]
+        pooled_prompt_embeds = torch.cat(pooled_prompt_embeds, dim=0).to(memory_format=torch.contiguous_format).float()  # torch.stack [2048] -> [batch_size, 2048]
+        return prompts, pixel_values, prompt_embeds, pooled_prompt_embeds
         
 def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerator, global_step, reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters):
     pipeline.transformer.set_adapter("learner")
@@ -238,8 +248,13 @@ def main(_):
     set_seed(config.seed, device_specific=True)
     
     #### Load Scheduler, Tokenizer and Model. ####
+    ## Disable all text_encoder and tokenizer, only use transformer. ##
     pipeline = StableDiffusion3Pipeline.from_pretrained(
         config.pretrained.model, 
+        text_encoder=None,
+        tokenizer=None,
+        text_encoder_2=None,
+        tokenizer_2=None,
         text_encoder_3=None, 
         tokenizer_3=None
     )
@@ -256,13 +271,6 @@ def main(_):
     
     # freeze parameters of models to save more memory
     pipeline.transformer.requires_grad_(not config.use_lora)
-    pipeline.vae.requires_grad_(False)
-    pipeline.text_encoder.requires_grad_(False)
-    pipeline.text_encoder_2.requires_grad_(False)
-    if pipeline.text_encoder_3 is not None: pipeline.text_encoder_3.requires_grad_(False)
-
-    text_encoders = [pipeline.text_encoder, pipeline.text_encoder_2, pipeline.text_encoder_3]
-    tokenizers = [pipeline.tokenizer, pipeline.tokenizer_2, pipeline.tokenizer_3]
 
     #### Load Scheduler, Tokenizer and Model. ####
     
@@ -278,9 +286,6 @@ def main(_):
     # Move vae and text_encoder to device and cast to inference_dtype
     pipeline.transformer.to(accelerator.device)
     pipeline.vae.to(accelerator.device, dtype=torch.float32)
-    pipeline.text_encoder.to(accelerator.device, dtype=inference_dtype)
-    pipeline.text_encoder_2.to(accelerator.device, dtype=inference_dtype)
-    if pipeline.text_encoder_3 is not None: pipeline.text_encoder_3.to(accelerator.device, dtype=inference_dtype)
     #### Mixed Precision Training ####
     
     #### Use LoRA to fine-tune SD-3-5-Medium ####
@@ -393,7 +398,7 @@ def main(_):
                 
             if eval_and_save_indicator:
                 eval_and_save_indicator = False
-                eval(pipeline, val_dataloader, text_encoders, tokenizers, config, accelerator, global_step, None, None, autocast, None, ema, transformer_trainable_parameters)
+                eval(pipeline, val_dataloader, config, accelerator, global_step, None, None, autocast, None, ema, transformer_trainable_parameters)
                 if accelerator.is_main_process:
                     save_ckpt(config.save_dir, transformer, global_step, accelerator, ema, transformer_trainable_parameters, config)
             
