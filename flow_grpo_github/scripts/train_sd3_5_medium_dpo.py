@@ -309,9 +309,6 @@ def main(_):
         else:
             pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config, adapter_name="learner")
             pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config, adapter_name="ref")
-            # Initialize ref adapter by copying from learner adapter
-            # This ensures ref and learner start from the same state, which is critical for DPO training
-            copy_learner_to_ref(pipeline.transformer)
             pipeline.transformer.set_adapter("learner")
         
         logger.info(f"type(pipeline.transformer) {type(pipeline.transformer)}")
@@ -480,11 +477,7 @@ def main(_):
                 w_diff = model_w_err - ref_w_err
                 l_diff = model_l_err - ref_l_err
                 w_l_diff = w_diff - l_diff
-                
-                # Clamp w_l_diff to prevent numerical instability when beta is large
-                # This helps prevent loss saturation and gradient explosion
-                w_l_diff_clamped = torch.clamp(w_l_diff, min=-10.0, max=10.0)
-                inside_term = -0.5 * config.train.beta * w_l_diff_clamped
+                inside_term = -0.5 * config.train.beta * w_l_diff
                 loss = -F.logsigmoid(inside_term)
                 
                 loss = torch.mean(loss)
@@ -496,7 +489,6 @@ def main(_):
                 info["w_diff"].append(torch.mean(w_diff))
                 info["l_diff"].append(torch.mean(l_diff))
                 info["w_l_diff"].append(torch.mean(w_l_diff))
-                info["w_l_diff_clamped"].append(torch.mean(w_l_diff_clamped))
                 info["inside_term"].append(torch.mean(inside_term))
                 implicit_acc = (inside_term > 0).sum().float() / inside_term.size(0)
                 info["implicit_acc"].append(torch.mean(implicit_acc))
@@ -519,13 +511,6 @@ def main(_):
                 info = defaultdict(list)
                 progress_bar.update(1)
                 global_step += 1
-                
-                # Update reference model periodically (Online DPO)
-                if global_step > 0 and global_step % config.train.ref_update_step == 0:
-                    copy_learner_to_ref(transformer)
-                    if accelerator.is_main_process:
-                        logger.info(f"Updated reference model at step {global_step}")
-                
                 if global_step % config.save_freq == 0:
                     eval_and_save_indicator = True
                     

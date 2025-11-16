@@ -3,11 +3,11 @@ source /data3/chenweiyan/miniconda3/etc/profile.d/conda.sh
 conda activate alignprop
 
 export HF_ENDPOINT=https://hf-mirror.com 
-export CUDA_VISIBLE_DEVICES=0,1
+export CUDA_VISIBLE_DEVICES=2,3
 
-run_name="top_512_images_no_anime_colorfulness_pickscore_003-hpdv3_all-inpainting"
+run_name="top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting-only_sft"
 output_dir="/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-v1-5/model-ckpt/${run_name}"
-accelerate launch --mixed_precision="fp16"  train-lora.py --pretrained_model_name_or_path "runwayml/stable-diffusion-v1-5" \
+accelerate launch --mixed_precision="fp16"  train-lora-only_sft.py --pretrained_model_name_or_path "runwayml/stable-diffusion-v1-5" \
     --train_batch_size 2 \
     --dataloader_num_workers 2 \
     --gradient_accumulation_steps 64 \

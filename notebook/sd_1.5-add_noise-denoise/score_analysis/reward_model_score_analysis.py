@@ -1,6 +1,6 @@
 import os
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-os.environ["CUDA_VISIBLE_DEVICES"] = "7"
+os.environ["CUDA_VISIBLE_DEVICES"] = "6"
 import torch
 import sys
 sys.path.append("/data3/chenweiyan/notebook/fine-tune-diffusion/spo_gitee/DiffusionNFT")
@@ -12,10 +12,11 @@ from PIL import Image
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM
 
-reward_model_name = "colorfulness"
-output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/{reward_model_name}/{reward_model_name}_score.csv"
+reward_model_name = "imagereward"
+output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/{reward_model_name}/{reward_model_name}_score_tmp.csv"
 
-csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/HPDv3/real_images_uid_prompt.csv"
+# csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/HPDv3/real_images_uid_prompt.csv"
+csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/top_512_images_no_anime_colorfulness_pickscore_0.04-hpdv3_all-uids.csv"
 df = pd.read_csv(csv_file_path, dtype=str)
 real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/real"
 fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/fake"

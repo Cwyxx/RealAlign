@@ -60,7 +60,7 @@ def main(**kwargs):
     score_cache_path = os.path.join(
         args.cache, f"pickapic{args.version}_{args.split}_{args.score}.jsonl")
 
-    # calc_scores(args, score_cache_path)
+    calc_scores(args, score_cache_path)
     save_expert(args, score_cache_path)
 
 

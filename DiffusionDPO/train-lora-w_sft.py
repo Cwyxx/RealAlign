@@ -328,6 +328,9 @@ def parse_args():
     parser.add_argument(
         "--run_name"
     )
+    parser.add_argument(
+        "--sft_weight", type=float, default=None
+    )
     
     args = parser.parse_args()
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
@@ -453,11 +456,11 @@ def main():
     config = ml_collections.ConfigDict()
     config.dpo = ml_collections.ConfigDict()
     config.dpo.dataset = {
-        "train" : "top_1024_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting",
+        "train" : "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting",
         "val": "high_quality_val"
     }
     config.dpo.csv_file_path = {
-        "top_1024_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/top_1024_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
+        "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
     }
     args = parse_args()
@@ -881,7 +884,7 @@ def main():
                                   added_cond_kwargs = added_cond_kwargs
                                  ).sample
                 #### SFT Loss Computation on y_w ####
-                loss_sft = F.mse_loss(model_pred[:bsz // 2].float(), target[:bsz // 2].float(), reduction="mean")
+                loss_sft = args.sft_weight * F.mse_loss(model_pred[:bsz // 2].float(), target[:bsz // 2].float(), reduction="mean")
                 
                 #### DPO Loss Computation ####
                 # model_pred and ref_pred will be (2 * LBS) x 4 x latent_spatial_dim x latent_spatial_dim
