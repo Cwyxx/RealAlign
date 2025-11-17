@@ -3,11 +3,11 @@ source /data3/chenweiyan/miniconda3/etc/profile.d/conda.sh
 conda activate alignprop
 
 export HF_ENDPOINT=https://hf-mirror.com 
-export CUDA_VISIBLE_DEVICES=0,1
+export CUDA_VISIBLE_DEVICES=5,6
 
-run_name="dpo-next-top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting-w_sft"
+run_name="spo-next-top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting-w_sft"
 output_dir="/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-v1-5/model-ckpt/${run_name}"
-accelerate launch --mixed_precision="fp16"  train-lora-w_sft-dpo_next.py --pretrained_model_name_or_path "runwayml/stable-diffusion-v1-5" \
+accelerate launch --mixed_precision="fp16"  train-lora-w_sft.py --pretrained_model_name_or_path "runwayml/stable-diffusion-v1-5" \
     --train_batch_size 2 \
     --dataloader_num_workers 2 \
     --gradient_accumulation_steps 64 \
@@ -18,4 +18,5 @@ accelerate launch --mixed_precision="fp16"  train-lora-w_sft-dpo_next.py --pretr
     --checkpointing_steps 50 \
     --beta_dpo 5000 \
     --output_dir ${output_dir} \
-    --run_name ${run_name}
+    --run_name ${run_name} \
+    --pretrained_lora_path "/data_center/data2/dataset/chenwy/21164-data/stable_diffusion/stable_diffusion_v1_5/spo_4k/spo-sdv1-5/spo_official/checkpoint_0_0"

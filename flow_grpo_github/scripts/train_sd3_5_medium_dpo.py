@@ -42,7 +42,7 @@ logger = get_logger(__name__)
 
 class Paired_Real_Fake_Dataset(Dataset):
     def __init__(self, config, image_transform, split="train"):
-        self.precomputed_embeddings_dir = config.dpo.precomputed_embeddings_dir
+        self.precomputed_embeddings_dir = config.dpo.precomputed_embeddings_dir[split]
         self.image_transform = image_transform
         self.csv_file_path = config.dpo.csv_file_path[split]
         
@@ -93,10 +93,6 @@ def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerat
     pipeline.transformer.set_adapter("learner")
     if config.train.ema:
         ema.copy_ema_to(transformer_trainable_parameters, store_temp=True)
-    neg_prompt_embed, neg_pooled_prompt_embed = compute_text_embeddings([""], text_encoders, tokenizers, max_sequence_length=128, device=accelerator.device)
-
-    sample_neg_prompt_embeds = neg_prompt_embed.repeat(config.sample.test_batch_size, 1, 1)
-    sample_neg_pooled_prompt_embeds = neg_pooled_prompt_embed.repeat(config.sample.test_batch_size, 1)
 
     # test_dataloader = itertools.islice(test_dataloader, 2)
     for test_batch in tqdm(
@@ -105,26 +101,13 @@ def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerat
             disable=not accelerator.is_local_main_process,
             position=0,
         ):
-        prompts, pixel_values = test_batch
-        prompt_embeds, pooled_prompt_embeds = compute_text_embeddings(
-            prompts, 
-            text_encoders, 
-            tokenizers, 
-            max_sequence_length=128, 
-            device=accelerator.device
-        )
-        # The last batch may not be full batch_size
-        if len(prompt_embeds)<len(sample_neg_prompt_embeds):
-            sample_neg_prompt_embeds = sample_neg_prompt_embeds[:len(prompt_embeds)]
-            sample_neg_pooled_prompt_embeds = sample_neg_pooled_prompt_embeds[:len(prompt_embeds)]
+        prompts, pixel_values, prompt_embeds, pooled_prompt_embeds = test_batch
         with autocast():
             with torch.no_grad():
                 images, _, _ = pipeline_with_logprob(
                     pipeline,
                     prompt_embeds=prompt_embeds,
                     pooled_prompt_embeds=pooled_prompt_embeds,
-                    negative_prompt_embeds=sample_neg_prompt_embeds,
-                    negative_pooled_prompt_embeds=sample_neg_pooled_prompt_embeds,
                     num_inference_steps=config.sample.eval_num_steps,
                     guidance_scale=config.sample.guidance_scale,
                     output_type="pt",
@@ -392,7 +375,7 @@ def main(_):
     eval_and_save_indicator = True
     info = defaultdict(list)
     while True:
-        for step, (prompts, pixel_values) in enumerate(train_dataloader):
+        for step, (prompts, pixel_values, prompt_embeds, pooled_prompt_embds) in enumerate(train_dataloader):
             #################### EVAL ####################
             pipeline.transformer.eval()
                 
@@ -415,16 +398,8 @@ def main(_):
                 model_input = pipeline.vae.encode(feed_pixel_values).latent_dist.sample()
                 model_input = (model_input - pipeline.vae.config.shift_factor) * pipeline.vae.config.scaling_factor
 
-                prompt_embeds, pooled_prompt_embds = compute_text_embeddings(
-                    prompts,
-                    text_encoders,
-                    tokenizers,
-                    max_sequence_length=128,
-                    device=accelerator.device
-                )
                 prompt_embeds = prompt_embeds.repeat(2, 1, 1)
                 pooled_prompt_embds = pooled_prompt_embds.repeat(2, 1)
-                
                 
             with accelerator.accumulate(transformer):
                 bsz = model_input.shape[0] // 2

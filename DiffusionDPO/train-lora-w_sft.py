@@ -51,7 +51,8 @@ from diffusers.optimization import get_scheduler
 from diffusers.utils import check_min_version, deprecate, is_wandb_available, make_image_grid
 from diffusers.utils.import_utils import is_xformers_available
 from diffusers.utils.torch_utils import is_compiled_module
-
+from diffusers.utils import convert_state_dict_to_diffusers, convert_unet_state_dict_to_peft
+import copy
 import pandas as pd
 import swanlab
 from peft import LoraConfig
@@ -328,8 +329,9 @@ def parse_args():
     parser.add_argument(
         "--run_name"
     )
+    
     parser.add_argument(
-        "--sft_weight", type=float, default=None
+        "--pretrained_lora_path", type=str, default=None, help="Path to pretrained LoRA weights"
     )
     
     args = parser.parse_args()
@@ -605,6 +607,35 @@ def main():
         target_modules=["to_k", "to_q", "to_v", "to_out.0"],
     )
     unet.add_adapter(unet_lora_config)
+    
+    #### Loading pretrained LoRA weights ####
+    if args.pretrained_lora_path is not None:
+        lora_state_dict, network_alphas = StableDiffusionPipeline.lora_state_dict(
+            args.pretrained_lora_path,          
+            weight_name="pytorch_lora_weights.safetensors"
+        )
+        unet_state_dict = {
+            k.replace("unet.", ""): v
+            for k, v in lora_state_dict.items()
+            if k.startswith("unet.")
+        }
+        unet_state_dict = convert_unet_state_dict_to_peft(unet_state_dict)
+        incompatible_keys = set_peft_model_state_dict(unet, unet_state_dict, adapter_name="default")
+        if incompatible_keys is not None:
+            # check only for unexpected keys
+            unexpected_keys = getattr(incompatible_keys, "unexpected_keys", None)
+            if unexpected_keys:
+                logger.warning(
+                    f"Loading adapter weights from state_dict led to unexpected keys not found in the model: "
+                    f" {unexpected_keys}. "
+                )
+            logger.info(f"Reuse lora weights from {args.pretrained_lora_path}")
+            
+        del ref_unet
+        ref_unet = copy.deepcopy(unet)
+        ref_unet.to(accelerator.device)
+        ref_unet.requires_grad_(False)
+    
     if accelerator.mixed_precision == "fp16":
         # only upcast trainable parameters (LoRA) into fp32
         cast_training_params(unet, dtype=torch.float32)
@@ -884,7 +915,7 @@ def main():
                                   added_cond_kwargs = added_cond_kwargs
                                  ).sample
                 #### SFT Loss Computation on y_w ####
-                loss_sft = args.sft_weight * F.mse_loss(model_pred[:bsz // 2].float(), target[:bsz // 2].float(), reduction="mean")
+                loss_sft = F.mse_loss(model_pred[:bsz // 2].float(), target[:bsz // 2].float(), reduction="mean")
                 
                 #### DPO Loss Computation ####
                 # model_pred and ref_pred will be (2 * LBS) x 4 x latent_spatial_dim x latent_spatial_dim

@@ -23,7 +23,7 @@ echo "dataset: ${dataset}"
 echo "ckpt_dir: ${ckpt_dir}"
 echo "image_dir: ${image_dir}"
 
-python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
+python generate_image-dpo_next.py --seed 42 --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
      --output_dir ${image_dir} \
      --save_images
 
