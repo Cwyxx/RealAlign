@@ -89,7 +89,7 @@ class Paired_Real_Fake_Dataset(Dataset):
         pooled_prompt_embeds = torch.cat(pooled_prompt_embeds, dim=0).to(memory_format=torch.contiguous_format).float()  # torch.stack [2048] -> [batch_size, 2048]
         return prompts, pixel_values, prompt_embeds, pooled_prompt_embeds
         
-def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerator, global_step, reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters):
+def eval(pipeline, test_dataloader, config, accelerator, global_step, reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters):
     pipeline.transformer.set_adapter("learner")
     if config.train.ema:
         ema.copy_ema_to(transformer_trainable_parameters, store_temp=True)
@@ -118,18 +118,7 @@ def eval(pipeline, test_dataloader, text_encoders, tokenizers, config, accelerat
                 )
     
     last_batch_images_gather = accelerator.gather(torch.as_tensor(images, device=accelerator.device)).cpu().numpy()
-    last_batch_prompt_ids = tokenizers[0](
-        prompts,
-        padding="max_length",
-        max_length=256,
-        truncation=True,
-        return_tensors="pt",
-    ).input_ids.to(accelerator.device)
-    last_batch_prompt_ids_gather = accelerator.gather(last_batch_prompt_ids).cpu().numpy()
-    last_batch_prompts_gather = pipeline.tokenizer.batch_decode(
-        last_batch_prompt_ids_gather, skip_special_tokens=True
-    )
-
+    last_batch_prompts_gather = accelerator.gather_for_metrics(prompts)
     if accelerator.is_main_process:
         with tempfile.TemporaryDirectory() as tmpdir:
             num_samples = min(8, len(last_batch_images_gather))
@@ -311,6 +300,7 @@ def main(_):
             transformer_trainable_parameters.append(param)
             
     logger.info(f"trainable_parameters_num: {len(transformer_trainable_parameters)}")
+    copy_learner_to_ref(transformer)
     
     # This ema setting affects the previous 20 × 8 = 160 steps on average.
     ema = EMAModuleWrapper(transformer_trainable_parameters, decay=0.9, update_step_interval=8, device=accelerator.device)

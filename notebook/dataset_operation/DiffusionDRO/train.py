@@ -23,7 +23,8 @@ from misc.patch import (
     DDIMScheduler, DDPMScheduler, DPMSolverMultistepScheduler,
     StableDiffusionPipeline, StableDiffusionXLPipeline)
 from misc.utils import CommandAwareConfig, EasyDict
-
+from peft import LoraConfig
+from peft.utils import get_peft_model_state_dict
 
 @click.command(cls=CommandAwareConfig, context_settings={'show_default': True})
 @click.option(
@@ -46,7 +47,7 @@ from misc.utils import CommandAwareConfig, EasyDict
 )
 @click.option(
     "--pretrained_model_name_or_path",
-    default="stable-diffusion-v1-5/stable-diffusion-v1-5", type=str,
+    default="runwayml/stable-diffusion-v1-5", type=str,
     help="Path to pretrained model or model identifier.",
 )
 @click.option(
@@ -382,15 +383,26 @@ def main(**kwargs):
         subfolder="unet",
         device_map={"": str(device)},
         torch_dtype=dtype)
-    unet.requires_grad_(True)
-
+    unet.requires_grad_(False)
+    
+    unet_lora_config = LoraConfig(
+        r=4,
+        lora_alpha=4,
+        init_lora_weights="gaussian",
+        target_modules=["to_k", "to_q", "to_v", "to_out.0"],
+    )
+    unet.add_adapter(unet_lora_config)
+    unet_policy.add_adapter(unet_lora_config)
+    unet_policy.requires_grad_(False)
+    
+    unet_trainable_parameters = list(filter(lambda p: p.requires_grad, unet.parameters()))
     # Cast the trainable parameters to the desired dtype
-    if dtype == torch.float16:
-        diffusers.training_utils.cast_training_params(unet, dtype=torch.float32)
-
+    if dtype == torch.float16: diffusers.training_utils.cast_training_params(unet, dtype=torch.float32)
+    accelerator.print(f"trainable_para_num: {sum([ 1 for p in unet.parameters() if p.requires_grad ])}")
+    
     if args.use_ema:
         unet_ema = diffusers.training_utils.EMAModel(
-            unet.parameters(), foreach=True)
+            unet_trainable_parameters, foreach=True)
 
         if args.offload_ema:
             unet_ema.to('cpu')
@@ -406,59 +418,36 @@ def main(**kwargs):
     if args.allow_tf32:
         torch.backends.cuda.matmul.allow_tf32 = True
 
-    # create custom saving & loading hooks so that
-    # `accelerator.save_state(...)` serializes in a nice format
-    def save_model_hook(models, weights, output_dir):
-        if accelerator.is_main_process:
-            if len(models) != 1:
-                raise AssertionError("Only one model is supported for now.")
-            unet = accelerator.unwrap_model(models[0])
-            if not isinstance(unet, UNet2DConditionModel):
-                raise AssertionError(
-                    "Only UNet model is supported for now, got {unet.__class__.__name__}.")
+    # # create custom saving & loading hooks so that
+    # # `accelerator.save_state(...)` serializes in a nice format
+    # def save_model_hook(models, weights, output_dir):
+    #     if accelerator.is_main_process:
+    #         if len(models) != 1:
+    #             raise AssertionError("Only one model is supported for now.")
+    #         unwrapped_unet = accelerator.unwrap_model(models[0])
+    #         if not isinstance(unet, UNet2DConditionModel):
+    #             raise AssertionError(
+    #                 "Only UNet model is supported for now, got {unet.__class__.__name__}.")
 
-            if args.use_ema:
-                torch.save(unet_ema.state_dict(), os.path.join(output_dir, "ema.pt"))
-            unet.save_pretrained(os.path.join(output_dir, "unet"))
+    #         if args.use_ema:
+    #             torch.save(unet_ema.state_dict(), os.path.join(output_dir, "ema.pt"))
+    #         # unet.save_pretrained(os.path.join(output_dir, "unet"))
+    #         unet_lora_state_dict = get_peft_model_state_dict(unwrapped_unet)
+    #         StableDiffusionPipeline.save_lora_weights(
+    #             save_directory=output_dir,
+    #             unet_lora_layers=unet_lora_state_dict,
+    #         )
+    #         if weights:
+    #             weights.pop()
 
-            if weights:
-                weights.pop()
-
-    def load_model_hook(models, input_dir):
-        if len(models) != 1:
-            raise AssertionError("Only one model is supported for now.")
-        unet = accelerator.unwrap_model(models[0])
-        if not isinstance(unet, UNet2DConditionModel):
-            raise AssertionError(
-                "Only UNet model is supported for now, got {unet.__class__.__name__}.")
-
-        if args.use_ema:
-            state_dict = torch.load(
-                os.path.join(input_dir, "ema.pt"), map_location="cpu")
-            unet_ema.load_state_dict(state_dict)
-            if args.offload_ema:
-                unet_ema.to('cpu')
-                unet_ema.pin_memory()
-            else:
-                unet_ema.to(device)
-            del state_dict
-        load_model = UNet2DConditionModel.from_pretrained(os.path.join(input_dir, "unet"))
-        unet.register_to_config(**load_model.config)
-        unet.load_state_dict(load_model.state_dict())
-        del load_model
-
-        models.pop()
-
-    accelerator.register_save_state_pre_hook(save_model_hook)
-    accelerator.register_load_state_pre_hook(load_model_hook)
+    # accelerator.register_save_state_pre_hook(save_model_hook)
 
     if args.scale_lr:
         args.learning_rate = (
             args.learning_rate * args.gradient_accumulation_steps * args.batch_size * accelerator.num_processes
         )
 
-    parameters = filter(lambda p: p.requires_grad, unet.parameters())
-    optimizer = torch.optim.AdamW(parameters, lr=args.learning_rate)
+    optimizer = torch.optim.AdamW(unet_trainable_parameters, lr=args.learning_rate)
 
     lr_scheduler = diffusers.optimization.get_scheduler(
         args.lr_scheduler,
@@ -778,7 +767,7 @@ def main(**kwargs):
             step_loss.policy_diff += accelerator.gather(loss_policy_diff.detach()).cpu().mean()
 
             if accelerator.sync_gradients and args.max_grad_norm > 0:
-                accelerator.clip_grad_norm_(parameters, args.max_grad_norm)
+                accelerator.clip_grad_norm_(unet_trainable_parameters, args.max_grad_norm)
             optimizer.step()
             lr_scheduler.step()
             optimizer.zero_grad()
@@ -808,10 +797,10 @@ def main(**kwargs):
 
         # Save the training state and a checkpoint of the model
         if step % args.checkpointing_steps == 0:
-            # State path
-            state_path = os.path.join(args.logdir, "state")
-            # Save and overwrite the training state
-            accelerator.save_state(state_path)
+            # # State path
+            # state_path = os.path.join(args.logdir, "state")
+            # # Save and overwrite the training state
+            # accelerator.save_state(state_path)
             # Save ReplayBuffer
             replay_buffer.save(state_path, accelerator)
             # Checkpoint path
@@ -823,16 +812,24 @@ def main(**kwargs):
                     os.path.join(state_path, "training_state.pt"),
                 )
                 # Save unet weights
-                unwrapped_unet: UNet2DConditionModel = accelerator.unwrap_model(unet)
+                unwrapped_unet = accelerator.unwrap_model(unet)
                 # Save the EMA model
                 if args.use_ema:
-                    unet_ema.store(unwrapped_unet.parameters())
-                    unet_ema.copy_to(unwrapped_unet.parameters())
-                    unwrapped_unet.save_pretrained(ckpt_path)
-                    unet_ema.restore(unwrapped_unet.parameters())
+                    unet_ema.store(unet_trainable_parameters)
+                    unet_ema.copy_to(unet_trainable_parameters)
+                    unet_lora_state_dict = get_peft_model_state_dict(unwrapped_unet)
+                    StableDiffusionPipeline.save_lora_weights(
+                        save_directory=ckpt_path,
+                        unet_lora_layers=unet_lora_state_dict,
+                    )
+                    unet_ema.restore(unet_trainable_parameters)
                     progress_bar.write(f"Saved EMA weights to {ckpt_path}")
                 else:
-                    unwrapped_unet.save_pretrained(ckpt_path)
+                    unet_lora_state_dict = get_peft_model_state_dict(unwrapped_unet)
+                    StableDiffusionPipeline.save_lora_weights(
+                        save_directory=ckpt_path,
+                        unet_lora_layers=unet_lora_state_dict,
+                    )
                     progress_bar.write(f"Saved weights to {ckpt_path}")
 
             if args.score is not None:

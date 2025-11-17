@@ -637,7 +637,7 @@ def main():
             args.learning_rate * args.gradient_accumulation_steps * args.train_batch_size * accelerator.num_processes
         )
 
-    trainable_para = filter(lambda p: p.requires_grad, unet.parameters())
+    trainable_para = list(filter(lambda p: p.requires_grad, unet.parameters()))
     trainable_count = sum([ 1 for p in unet.parameters() if p.requires_grad ])
     accelerator.print(f"trainable_para_num: {trainable_count}")
     if args.use_adafactor or args.sdxl:
