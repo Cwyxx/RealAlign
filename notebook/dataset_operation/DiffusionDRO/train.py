@@ -5,7 +5,7 @@ from typing import Callable
 
 import accelerate
 import click
-import deepspeed
+# import deepspeed
 import diffusers
 import torch
 from diffusers import AutoencoderKL, UNet2DConditionModel
@@ -25,6 +25,7 @@ from misc.patch import (
 from misc.utils import CommandAwareConfig, EasyDict
 from peft import LoraConfig
 from peft.utils import get_peft_model_state_dict
+import swanlab
 
 @click.command(cls=CommandAwareConfig, context_settings={'show_default': True})
 @click.option(
@@ -271,10 +272,14 @@ from peft.utils import get_peft_model_state_dict
     "--resume/--no-resume", default=False,
     help="Whether to resume training from the state."
 )
+@click.option(
+    "--run_name", required=True, type=str,
+    help="The name of the run."
+)
 def main(**kwargs):
     """Fine-tune a Stable Diffusion model with Diffusion-DRO."""
 
-    deepspeed.utils.logger.setLevel("WARNING")
+    # deepspeed.utils.logger.setLevel("WARNING")
 
     args = EasyDict(kwargs)
     gradient_accumulation_plugin = accelerate.utils.GradientAccumulationPlugin(
@@ -286,6 +291,8 @@ def main(**kwargs):
         gradient_accumulation_plugin=gradient_accumulation_plugin,
     )
     device = accelerator.device
+    if accelerator.is_main_process:
+        swanlab.init(project="diffusion-dro", name=args.run_name, config=dict(args))
 
     # Set the random seed for reproducibility
     accelerate.utils.set_seed(args.seed, device_specific=True)
@@ -643,7 +650,7 @@ def main(**kwargs):
         desc="Steps",
         disable=not accelerator.is_main_process,
     )
-    evaluation_indicator = False
+    evaluation_indicator = True
     step = init_step
     unet.train()
     while step < args.num_steps:
@@ -792,6 +799,7 @@ def main(**kwargs):
             writer.add_scalar("params/lr", lr_scheduler.get_last_lr()[0], step)
             progress_bar.set_postfix_str(
                 f"loss: {step_loss['loss']: .3E}, lr: {lr_scheduler.get_last_lr()[0]: .3E}")
+            swanlab.log({"loss": step_loss["loss"], "lr": lr_scheduler.get_last_lr()[0]}, step=step)
             for tag in step_loss.keys():
                 step_loss[tag] = 0
 
@@ -811,19 +819,22 @@ def main(**kwargs):
         if step % args.checkpointing_steps == 0 and evaluation_indicator:
             evaluation_indicator = False
             # # State path
+            os.makedirs(args.logdir, exist_ok=True)
             state_path = os.path.join(args.logdir, "state")
+            # os.makedirs(state_path, exist_ok=True)
             # # Save and overwrite the training state
             # accelerator.save_state(state_path)
             # Save ReplayBuffer
             replay_buffer.save(state_path, accelerator)
             # Checkpoint path
             ckpt_path = os.path.join(args.logdir, "checkpoints", f"checkpoint-{step}")
+            os.makedirs(ckpt_path, exist_ok=True)
             if accelerator.is_main_process:
-                # Save the training state
-                torch.save(
-                    {'step': step},
-                    os.path.join(state_path, "training_state.pt"),
-                )
+                # # Save the training state
+                # torch.save(
+                #     {'step': step},
+                #     os.path.join(state_path, "training_state.pt"),
+                # )
                 # Save unet weights
                 unwrapped_unet = accelerator.unwrap_model(unet)
                 # Save the EMA model
@@ -850,6 +861,7 @@ def main(**kwargs):
                     unet_ema.store(unet_trainable_parameters)
                     unet_ema.copy_to(unet_trainable_parameters)
                 output_dir = os.path.join(args.logdir, "images", f"checkpoint-{step}")
+                os.makedirs(output_dir, exist_ok=True)
                 validation_pipeline.unet = accelerator.unwrap_model(unet)
                 score = log_score(
                     accelerator=accelerator,
@@ -993,6 +1005,9 @@ def log_score(
                     # Save the prompt
                     with open(prompt_path, "w") as f:
                         f.write(prompts[prompt_index])
+                        
+                    if accelerator.is_main_process:
+                        swanlab.log({"image": swanlab.Image(image, caption=prompts[prompt_index])}, step=step)
 
                 done_images = min(
                     done_images + len(seeds_batch) * accelerator.num_processes,
