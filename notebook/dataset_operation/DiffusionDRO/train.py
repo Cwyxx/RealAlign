@@ -42,7 +42,7 @@ from peft.utils import get_peft_model_state_dict
     )
 )
 @click.option(
-    "--seed", default=0, type=int,
+    "--seed", default=42, type=int,
     help="A seed for reproducible training."
 )
 @click.option(
@@ -130,21 +130,21 @@ from peft.utils import get_peft_model_state_dict
     )
 )
 @click.option(
-    "--score_batch_size", default=4, type=int,
+    "--score_batch_size", default=2, type=int,
 )
 @click.option(
     "--score_num_images_per_prompt", default=1, type=int,
 )
 @click.option(
-    "--batch_size", default=4, type=int,
+    "--batch_size", default=2, type=int,
     help="Batch size (per device) for each forward and backward step."
 )
 @click.option(
-    "--num_steps", default=25600, type=int,
+    "--num_steps", default=1000, type=int,
     help="Number of forward and backward steps to take."
 )
 @click.option(
-    "--gradient_accumulation_steps", default=16, type=int,
+    "--gradient_accumulation_steps", default=64, type=int,
     help="Number of gradient accumulations steps per update."
 )
 @click.option(
@@ -155,18 +155,18 @@ from peft.utils import get_peft_model_state_dict
     )
 )
 @click.option(
-    "--learning_rate", default=1e-4, type=float,
+    "--learning_rate", default=1e-8, type=float,
     help="Initial learning rate (after the potential warmup period).",
 )
 @click.option(
-    "--scale_lr/--no-scale_lr", default=False,
+    "--scale_lr/--no-scale_lr", default=True,
     help=(
         "Scale the learning rate by the gradient accumulation steps, batch "
         "size and number of GPUs."
     )
 )
 @click.option(
-    "--lr_scheduler", default="constant",
+    "--lr_scheduler", default="constant_with_warmup",
     type=click.Choice([
         "linear", "cosine", "cosine_with_restarts", "polynomial",
         "constant", "constant_with_warmup"
@@ -174,7 +174,7 @@ from peft.utils import get_peft_model_state_dict
     help='The scheduler type to use.',
 )
 @click.option(
-    "--lr_warmup_steps", default=0, type=int,
+    "--lr_warmup_steps", default=125, type=int,
     help="Number of steps for the warmup in the lr scheduler."
 )
 @click.option(
@@ -182,7 +182,7 @@ from peft.utils import get_peft_model_state_dict
     help="Max gradient norm. Set to 0 to disable gradient clipping."
 )
 @click.option(
-    "--buffer_size", default=4, type=int,
+    "--buffer_size", default=2, type=int,
     help=(
         "Size of the replay buffer. Each timestep takes up one slot in the "
         "replay buffer."
@@ -194,7 +194,7 @@ from peft.utils import get_peft_model_state_dict
     help="The scheduler to use for the replay buffer."
 )
 @click.option(
-    "--buffer_batch_size", default=4, type=int,
+    "--buffer_batch_size", default=2, type=int,
     help="Batch size (per device) for updating the replay buffer."
 )
 @click.option(
@@ -217,7 +217,7 @@ from peft.utils import get_peft_model_state_dict
     help="Append new online samples to the buffer every these many steps."
 )
 @click.option(
-    "--buffer_update_steps", default=16, type=int,
+    "--buffer_update_steps", default=64, type=int,
     help="The unet in the buffer is updated every these many steps."
 )
 @click.option(
@@ -247,12 +247,12 @@ from peft.utils import get_peft_model_state_dict
     ),
 )
 @click.option(
-    "--mixed_precision", default='bf16',
+    "--mixed_precision", default='fp16',
     type=click.Choice(["no", "fp16", "bf16"]),
     help="Whether to use mixed precision training."
 )
 @click.option(
-    "--use_ema/--no-use_ema", default=True,
+    "--use_ema/--no-use_ema", default=False,
     help="Whether to use exponential moving average for the policy network."
 )
 @click.option(
@@ -260,7 +260,7 @@ from peft.utils import get_peft_model_state_dict
     help="Whether to offload the EMA model to CPU."
 )
 @click.option(
-    "--checkpointing_steps", default=1280, type=int,
+    "--checkpointing_steps", default=50, type=int,
     help=(
         "Save a checkpoint of the training state every these many steps."
         "These checkpoints are only suitable for resuming training using "
@@ -452,8 +452,8 @@ def main(**kwargs):
     lr_scheduler = diffusers.optimization.get_scheduler(
         args.lr_scheduler,
         optimizer=optimizer,
-        num_warmup_steps=args.lr_warmup_steps // args.gradient_accumulation_steps * accelerator.num_processes,
-        num_training_steps=args.num_steps // args.gradient_accumulation_steps * accelerator.num_processes,
+        num_warmup_steps=args.lr_warmup_steps * accelerator.num_processes,
+        num_training_steps=args.num_steps * accelerator.num_processes,
     )
 
     if args.sdxl:
@@ -558,7 +558,7 @@ def main(**kwargs):
     def collate_fn(batch_list):
         batch = dict()
         for key in batch_list[0].keys():
-            batch[key] = [batch[key] for batch in batch_list]
+            batch[key] = [item[key] for item in batch_list]
             if isinstance(batch[key][0], torch.Tensor):
                 batch[key] = torch.stack(batch[key], dim=0)
         return batch
@@ -617,6 +617,12 @@ def main(**kwargs):
         f"- Resuming from states    : {resume_path}\n"
         f"- Mixed Precision         : {accelerator.mixed_precision}\n"
         f"- Training Configurations : {os.path.join(args.logdir, 'training_config.json')}"
+        f"- Learning Rate           : {args.learning_rate}\n"
+        f"- Warmup Steps            : {args.lr_warmup_steps}\n"
+        f"- Scheduler               : {args.lr_scheduler}\n"
+        f"- Max Grad Norm           : {args.max_grad_norm}\n"
+        f"- Use EMA                 : {args.use_ema}\n"
+        f"- Scale LR                : {args.scale_lr}\n"
     )
 
     step_loss = EasyDict()
@@ -630,16 +636,17 @@ def main(**kwargs):
     step_loss.policy_diff = 0
 
     progress_bar = tqdm(
-        range(init_step + 1, args.num_steps + 1),
+        range(init_step, args.num_steps),
         total=args.num_steps,
         initial=init_step,
         ncols=0,
         desc="Steps",
         disable=not accelerator.is_main_process,
     )
-
+    evaluation_indicator = False
+    step = init_step
     unet.train()
-    for step in progress_bar:
+    while step < args.num_steps:
         # Update the replay buffer
         if len(replay_buffer) == 0 or (step % args.buffer_sample_steps == 0):
             if len(replay_buffer) == 0:
@@ -771,7 +778,12 @@ def main(**kwargs):
             optimizer.step()
             lr_scheduler.step()
             optimizer.zero_grad()
-
+            
+        if accelerator.sync_gradients:
+            evaluation_indicator = True
+            step += 1
+            progress_bar.update(1)
+            
         # Log the training loss
         if accelerator.sync_gradients and accelerator.is_main_process:
             for tag in step_loss.keys():
@@ -792,19 +804,20 @@ def main(**kwargs):
                 unet_ema.to("cpu", non_blocking=True)
 
         # Update the buffer unet
-        if step % args.buffer_update_steps == 0:
+        if step % args.buffer_update_steps == 0 and evaluation_indicator:
             unet_policy.load_state_dict(accelerator.unwrap_model(unet).state_dict())
 
         # Save the training state and a checkpoint of the model
-        if step % args.checkpointing_steps == 0:
+        if step % args.checkpointing_steps == 0 and evaluation_indicator:
+            evaluation_indicator = False
             # # State path
-            # state_path = os.path.join(args.logdir, "state")
+            state_path = os.path.join(args.logdir, "state")
             # # Save and overwrite the training state
             # accelerator.save_state(state_path)
             # Save ReplayBuffer
             replay_buffer.save(state_path, accelerator)
             # Checkpoint path
-            ckpt_path = os.path.join(args.logdir, f"ckpt-{step}", "unet")
+            ckpt_path = os.path.join(args.logdir, "checkpoints", f"checkpoint-{step}")
             if accelerator.is_main_process:
                 # Save the training state
                 torch.save(
@@ -834,9 +847,9 @@ def main(**kwargs):
 
             if args.score is not None:
                 if args.use_ema:
-                    unet_ema.store(unet.parameters())
-                    unet_ema.copy_to(unet.parameters())
-                output_dir = os.path.join(args.logdir, "images", f"ckpt-{step}")
+                    unet_ema.store(unet_trainable_parameters)
+                    unet_ema.copy_to(unet_trainable_parameters)
+                output_dir = os.path.join(args.logdir, "images", f"checkpoint-{step}")
                 validation_pipeline.unet = accelerator.unwrap_model(unet)
                 score = log_score(
                     accelerator=accelerator,
@@ -855,7 +868,7 @@ def main(**kwargs):
                     sdxl=args.sdxl,
                 )
                 if args.use_ema:
-                    unet_ema.restore(unet.parameters())
+                    unet_ema.restore(unet_trainable_parameters)
                 if accelerator.is_main_process:
                     progress_bar.write(f"Step: {step:5d}, {args.score}: {score:.6f}")
 
