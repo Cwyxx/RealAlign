@@ -12,14 +12,14 @@ from PIL import Image
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM
 
-reward_model_name = "imagereward"
-output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/{reward_model_name}/{reward_model_name}_score_tmp.csv"
+reward_model_name = "pickscore"
+output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/pick-a-pic-v2-top_500_images/{reward_model_name}/{reward_model_name}_score_tmp.csv"
 
 # csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/HPDv3/real_images_uid_prompt.csv"
-csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/top_512_images_no_anime_colorfulness_pickscore_0.04-hpdv3_all-uids.csv"
+csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/pick-a-pic-v2-top_500_images/top_500_images.csv"
 df = pd.read_csv(csv_file_path, dtype=str)
-real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/real"
-fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/fake"
+real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/pick-a-pic-v2-top_500_images/real"
+fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/pick-a-pic-v2-top_500_images/fake"
 
 ext_list = [".png", ".jpg", ".jpeg", ".PNG", ".JPG", ".JPEG"]
 

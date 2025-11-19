@@ -9,7 +9,7 @@ cuda_device=$1 # 0
 method=$2 # "sd-3-5-medium"
 ckpt=$3 # 0
 dataset="pick_a_pic_v2"
-rl_framework="diffusion-dpo"
+rl_framework="diffusion-dro"
 
 export CUDA_VISIBLE_DEVICES=${cuda_device}
 
@@ -23,7 +23,6 @@ echo "dataset: ${dataset}"
 echo "ckpt_dir: ${ckpt_dir}"
 echo "image_dir: ${image_dir}"
 
-sleep 7200
 python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
      --output_dir ${image_dir} \
      --save_images
