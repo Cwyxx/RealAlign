@@ -8,14 +8,13 @@ export TOKENIZERS_PARALLELISM=False
 cuda_device=$1 # 0
 method=$2 # "sd-3-5-medium"
 ckpt=$3 # 0
-cfg_guidance=$4
-dataset="drawbench"
-rl_framework="flow-grpo"
+dataset="pick_a_pic_v2"
+rl_framework="diffusion-dpo"
 
 export CUDA_VISIBLE_DEVICES=${cuda_device}
 
-base_ckpt_dir="/data_center/data2/dataset/chenwy/21164-data/${rl_framework}/model-ckpt"
-base_image_dir="/data_center/data2/dataset/chenwy/21164-data/${rl_framework}/generate_images/sd3_textencoder_3_none_cfg_${cfg_guidance}/${dataset}"
+base_ckpt_dir="/data_center/data2/dataset/chenwy/21164-data/${rl_framework}/sd-3-5-medium/model-ckpt"
+base_image_dir="/data_center/data2/dataset/chenwy/21164-data/${rl_framework}/sd-3-5-medium/generate_images/${dataset}"
 
 ckpt_dir="${base_ckpt_dir}/${method}/checkpoints/checkpoint-${ckpt}"
 image_dir="${base_image_dir}/${method}/ckpt-${ckpt}"
@@ -24,17 +23,11 @@ echo "dataset: ${dataset}"
 echo "ckpt_dir: ${ckpt_dir}"
 echo "image_dir: ${image_dir}"
 
-# python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --model_type sd3 --dataset ${dataset} \
-#      --output_dir ${image_dir} \
-#      --guidance_scale ${cfg_guidance} \
-#      --save_images
+python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --model_type sd3 --dataset ${dataset} \
+     --output_dir ${image_dir} \
+     --save_images
 
-# reward_model_list=("unifiedreward")
-# reward_model_list=("code" "dinov2")
-# reward_model_list=("aesthetic_v2_5")
-# reward_model_list=("aesthetic_v2_5" "unifiedreward")
-# reward_model_list=("pickscore" "imagereward" "clip_iqa" "aesthetic" "aesthetic_v2_5")
-reward_model_list=("dinov2")
+reward_model_list=("pickscore" "imagereward" "hpsv3" "deqa" "aesthetic_v2_5" "dinov2")
 for reward_model in "${reward_model_list[@]}"; do
     echo "********************************************"
     echo "reward_model: ${reward_model}"

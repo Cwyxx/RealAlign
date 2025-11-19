@@ -97,8 +97,8 @@ def main(args):
     print("Loading model and pipeline (stabilityai/stable-diffusion-3.5-medium)...")
 
     if args.model_type == "sd3":
-        pipeline = StableDiffusion3Pipeline.from_pretrained("stabilityai/stable-diffusion-3.5-medium", text_encoder_3=None, tokenizer_3=None)
-        # pipeline = StableDiffusion3Pipeline.from_pretrained("stabilityai/stable-diffusion-3.5-medium")
+        # pipeline = StableDiffusion3Pipeline.from_pretrained("stabilityai/stable-diffusion-3.5-medium", text_encoder_3=None, tokenizer_3=None)
+        pipeline = StableDiffusion3Pipeline.from_pretrained("stabilityai/stable-diffusion-3.5-medium")
         target_modules = [
             "attn.add_k_proj",
             "attn.add_q_proj",
@@ -141,7 +141,7 @@ def main(args):
     pipeline.vae.to(device, dtype=torch.float32)  # VAE usually fp32
     pipeline.text_encoder.to(device, dtype=text_encoder_dtype)
     pipeline.text_encoder_2.to(device, dtype=text_encoder_dtype)
-    # pipeline.text_encoder_3.to(device, dtype=text_encoder_dtype)
+    pipeline.text_encoder_3.to(device, dtype=text_encoder_dtype)
 
     pipeline.safety_checker = None
     pipeline.set_progress_bar_config(
@@ -173,6 +173,10 @@ def main(args):
     elif args.dataset == "pickscore_train":
         dataset_path = f"../dataset/pickscore"
         dataset = TextPromptDataset(dataset_path, split="train")
+        
+    elif args.dataset == "pick_a_pic_v2":
+        dataset = TextPromptDataset(dataset_path, split="test")
+        
     eval_batch_size = 1
 
     dataloader = DataLoader(
@@ -255,7 +259,7 @@ if __name__ == "__main__":
         help="Type of the base model ('sd3').",
     )
     parser.add_argument(
-        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "pickscore_train"], help="Dataset type."
+        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "pickscore_train", "pick_a_pic_v2"], help="Dataset type."
     )
     parser.add_argument(
         "--output_dir",
@@ -266,7 +270,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--num_inference_steps", type=int, default=40, help="Number of inference steps for the diffusion pipeline."
     )
-    parser.add_argument("--guidance_scale", type=float, default=1.0, help="Classifier-free guidance scale.")
+    parser.add_argument("--guidance_scale", type=float, default=4.5, help="Classifier-free guidance scale.")
     parser.add_argument("--resolution", type=int, default=512, help="Resolution of the generated images.")
     parser.add_argument(
         "--save_images", action="store_true", help="Include this flag to save generated images to the output directory."
