@@ -42,7 +42,7 @@ logger = get_logger(__name__)
 
 class Paired_Real_Fake_Dataset(Dataset):
     def __init__(self, config, image_transform, split="train"):
-        self.precomputed_embeddings_dir = config.dpo.precomputed_embeddings_dir[split]
+        self.precomputed_embeddings_dir = config.dpo.precomputed_embeddings_dir_dict[split]
         self.image_transform = image_transform
         self.csv_file_path = config.dpo.csv_file_path[split]
         
@@ -69,8 +69,8 @@ class Paired_Real_Fake_Dataset(Dataset):
         pixel_values = torch.cat([win_pixel_values, lose_pixel_values], dim=0) # torch.cat [3, 512, 512] -> [6, 512, 512]
         prompt_embed_path = os.path.join(self.precomputed_embeddings_dir, f"{uid}.pt")
         pooled_prompt_embed_path = os.path.join(self.precomputed_embeddings_dir, f"{uid}_pooled.pt")
-        prompt_embed = torch.load(prompt_embed_path)
-        pooled_prompt_embed = torch.load(pooled_prompt_embed_path)
+        prompt_embed = torch.load(prompt_embed_path, map_location="cpu")
+        pooled_prompt_embed = torch.load(pooled_prompt_embed_path, map_location="cpu")
         return {
             "prompt": prompt,
             "prompt_embed": prompt_embed,
@@ -85,8 +85,8 @@ class Paired_Real_Fake_Dataset(Dataset):
         pixel_values = torch.stack(pixel_values, dim=0).to(memory_format=torch.contiguous_format).float()  # torch.stack [6, 512, 512] -> [batch_size, 6, 512, 512]
         prompt_embeds = [ example["prompt_embed"] for example in examples ]
         pooled_prompt_embeds = [ example["pooled_prompt_embed"] for example in examples ]
-        prompt_embeds = torch.cat(prompt_embeds, dim=0).to(memory_format=torch.contiguous_format).float()  # torch.stack [205, 4096] -> [batch_size, 205, 4096]
-        pooled_prompt_embeds = torch.cat(pooled_prompt_embeds, dim=0).to(memory_format=torch.contiguous_format).float()  # torch.stack [2048] -> [batch_size, 2048]
+        prompt_embeds = torch.stack(prompt_embeds, dim=0).to(memory_format=torch.contiguous_format).float()  # torch.stack [205, 4096] -> [batch_size, 205, 4096]
+        pooled_prompt_embeds = torch.stack(pooled_prompt_embeds, dim=0).to(memory_format=torch.contiguous_format).float()  # torch.stack [2048] -> [batch_size, 2048]
         return prompts, pixel_values, prompt_embeds, pooled_prompt_embeds
         
 def eval(pipeline, test_dataloader, config, accelerator, global_step, reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters):
@@ -102,6 +102,7 @@ def eval(pipeline, test_dataloader, config, accelerator, global_step, reward_fn,
             position=0,
         ):
         prompts, pixel_values, prompt_embeds, pooled_prompt_embeds = test_batch
+
         with autocast():
             with torch.no_grad():
                 images, _, _ = pipeline_with_logprob(
@@ -280,9 +281,10 @@ def main(_):
             target_modules=target_modules,
         )
         if config.train.lora_path:
-            pipeline.transformer = PeftModel.from_pretrained(pipeline.transformer, config.train.lora_path)
+            pipeline.transformer = PeftModel.from_pretrained(pipeline.transformer, config.train.lora_path, adapter_name="learner", is_trainable=True)
+            pipeline.transformer.load_adapter(config.train.lora_path, adapter_name="ref", is_trainable=False)
             # After loading with PeftModel.from_pretrained, all parameters have requires_grad set to False. You need to call set_adapter to enable gradients for the adapter parameters.
-            pipeline.transformer.set_adapter("default")
+            pipeline.transformer.set_adapter("learner")
         else:
             pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config, adapter_name="learner")
             pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config, adapter_name="ref")
@@ -291,7 +293,14 @@ def main(_):
         logger.info(f"type(pipeline.transformer) {type(pipeline.transformer)}")
         logger.info(f"LoRA adapter names {pipeline.transformer.peft_config.keys()}")
     #### Use LoRA to fine-tune SD-3-5-Medium ####
-        
+    
+    ### set requires_grad for LoRA adapter parameters ###
+    for name, param in pipeline.transformer.named_parameters():
+        if "learner" in name:
+            param.requires_grad = True
+        else:
+            param.requires_grad = False
+            
     transformer = pipeline.transformer
     transformer_trainable_parameters = []
     for name, param in transformer.named_parameters():

@@ -76,29 +76,38 @@ def pipeline_with_logprob(
     lora_scale = (
         self.joint_attention_kwargs.get("scale", None) if self.joint_attention_kwargs is not None else None
     )
-    (
-        prompt_embeds,
-        negative_prompt_embeds,
-        pooled_prompt_embeds,
-        negative_pooled_prompt_embeds,
-    ) = self.encode_prompt(
-        prompt=prompt,
-        prompt_2=prompt_2,
-        prompt_3=prompt_3,
-        negative_prompt=negative_prompt,
-        negative_prompt_2=negative_prompt_2,
-        negative_prompt_3=negative_prompt_3,
-        do_classifier_free_guidance=self.do_classifier_free_guidance,
-        prompt_embeds=prompt_embeds,
-        negative_prompt_embeds=negative_prompt_embeds,
-        pooled_prompt_embeds=pooled_prompt_embeds,
-        negative_pooled_prompt_embeds=negative_pooled_prompt_embeds,
-        device=device,
-        clip_skip=self.clip_skip,
-        num_images_per_prompt=num_images_per_prompt,
-        max_sequence_length=max_sequence_length,
-        lora_scale=lora_scale,
-    )
+    # Skip encode_prompt if prompt_embeds and pooled_prompt_embeds are already provided
+    if prompt_embeds is not None and pooled_prompt_embeds is not None:
+        # Use provided embeddings directly
+        if negative_prompt_embeds is None:
+            negative_prompt_embeds = torch.zeros_like(prompt_embeds)
+        if negative_pooled_prompt_embeds is None:
+            negative_pooled_prompt_embeds = torch.zeros_like(pooled_prompt_embeds)
+    else:
+        (
+            prompt_embeds,
+            negative_prompt_embeds,
+            pooled_prompt_embeds,
+            negative_pooled_prompt_embeds,
+        ) = self.encode_prompt(
+            prompt=prompt,
+            prompt_2=prompt_2,
+            prompt_3=prompt_3,
+            negative_prompt=negative_prompt,
+            negative_prompt_2=negative_prompt_2,
+            negative_prompt_3=negative_prompt_3,
+            do_classifier_free_guidance=self.do_classifier_free_guidance,
+            prompt_embeds=prompt_embeds,
+            negative_prompt_embeds=negative_prompt_embeds,
+            pooled_prompt_embeds=pooled_prompt_embeds,
+            negative_pooled_prompt_embeds=negative_pooled_prompt_embeds,
+            device=device,
+            clip_skip=self.clip_skip,
+            num_images_per_prompt=num_images_per_prompt,
+            max_sequence_length=max_sequence_length,
+            lora_scale=lora_scale,
+        )
+        
     if self.do_classifier_free_guidance:
         prompt_embeds = torch.cat([negative_prompt_embeds, prompt_embeds], dim=0)
         pooled_prompt_embeds = torch.cat([negative_pooled_prompt_embeds, pooled_prompt_embeds], dim=0)

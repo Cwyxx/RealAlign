@@ -45,8 +45,9 @@ def paired_real_fake_dataset_sd3():
     config.train.algorithm = 'dpo'
     # Change ref_update_step to a small number, e.g., 40, to switch to OnlineDPO.
     config.train.ref_update_step=10000000
+    
     config.train.batch_size = config.sample.train_batch_size
-    config.train.gradient_accumulation_steps = 1
+    config.train.gradient_accumulation_steps = 32
     config.train.num_inner_epochs = 1
     config.train.timestep_fraction = 0.99
     config.train.beta = 100
@@ -54,16 +55,16 @@ def paired_real_fake_dataset_sd3():
     config.train.ema=True
     config.save_freq = 50 # epoch
     config.eval_freq = 50
-    config.save_dir = 'logs/geneval/sd3.5-M-dpo'
+    config.save_dir = 'logs/pickscore/sd3.5-M-dpo'
     config.reward_fn = {
-        "geneval": 1.0,
+        "pickscore": 1.0,
     }
     
     #### DPO parameters ####
     config.train.learning_rate = 2.56e-6
     config.dpo = ml_collections.ConfigDict()
     config.dpo.project_name = "diffusion-dpo-sd-3-5-medium"
-    config.dpo.batch_size = 1
+    config.dpo.batch_size = 2
     config.train.beta = 100
     config.dpo.max_train_steps = 5000
     config.dpo.dataset = {
@@ -82,7 +83,7 @@ def paired_real_fake_dataset_sd3():
     ### ToDo ####
     config.run_name = "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting"
     config.save_dir = f"/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/{config.run_name}"
-    config.train.gradient_accumulation_steps = 64
+    config.train.gradient_accumulation_steps = 32
     
     # ### Resume from DiffusionNFT ###
     # config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusionnft/model-ckpt/sd3/SD3.5M-DiffusionNFT-MultiReward/checkpoints/checkpoint-0/lora"
