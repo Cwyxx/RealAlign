@@ -117,14 +117,9 @@ def main(args):
 
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
-
-    if args.lora_hf_path is not None and args.lora_hf_path:
-        pipeline.transformer = PeftModel.from_pretrained(pipeline.transformer, args.lora_hf_path)
-        pipeline.transformer = pipeline.transformer.merge_and_unload()
-        print(f"Loading LoRA weights from HuggingFace: {args.lora_hf_path}.")
-        
-    elif args.checkpoint_path is not None and args.checkpoint_path and os.path.exists(os.path.join(args.checkpoint_path, "lora")):
-        lora_path = os.path.join(args.checkpoint_path, "lora")
+   
+    if args.checkpoint_path is not None and args.checkpoint_path and os.path.exists(os.path.join(args.checkpoint_path, "lora", "learner")):
+        lora_path = os.path.join(args.checkpoint_path, "lora", "learner")
         print(f"Loading LoRA weights from: {lora_path}")
         if not os.path.exists(lora_path):
             raise FileNotFoundError(
@@ -132,7 +127,9 @@ def main(args):
             )
 
         pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config)
-        pipeline.transformer.load_adapter(lora_path, adapter_name="default", is_trainable=False)
+        pipeline.transformer.load_adapter(lora_path, adapter_name="learner", is_trainable=False)
+        pipeline.transformer.set_adapter("learner")
+        print(f"pipeline.transformer.active_adapter: {pipeline.transformer.active_adapter}")
 
     pipeline.transformer.eval()
     text_encoder_dtype = mixed_precision_dtype if enable_amp else torch.float32
@@ -238,12 +235,6 @@ if __name__ == "__main__":
         type=int,
         default=42,
         help="Random seed for reproducibility. Setting this ensures consistent results across runs."
-    )
-    parser.add_argument(
-        "--lora_hf_path",
-        type=str,
-        default=None,
-        help="Huggingface path for LoRA.",
     )
     parser.add_argument(
         "--checkpoint_path",

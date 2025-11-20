@@ -66,7 +66,7 @@ def paired_real_fake_dataset_sd3():
     config.dpo.project_name = "diffusion-dpo-sd-3-5-medium"
     config.dpo.batch_size = 2
     config.train.beta = 100
-    config.dpo.max_train_steps = 5000
+    config.dpo.max_train_steps = 1000
     config.dpo.dataset = {
         "train": "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting",
         "val": "high_quality_val"

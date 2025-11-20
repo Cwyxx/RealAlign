@@ -152,8 +152,7 @@ def unwrap_model(model, accelerator):
     model = model._orig_mod if is_compiled_module(model) else model
     return model
 
-def save_ckpt(save_dir, pipeline, global_step, accelerator, ema, transformer_trainable_parameters, config):
-    pipeline.transformer.set_adapter("learner")
+def save_ckpt(save_dir, transformer, global_step, accelerator, ema, transformer_trainable_parameters, config):
     save_root = os.path.join(save_dir, "checkpoints", f"checkpoint-{global_step}")
     save_root_lora = os.path.join(save_root, "lora")
     os.makedirs(save_root_lora, exist_ok=True)
@@ -161,7 +160,7 @@ def save_ckpt(save_dir, pipeline, global_step, accelerator, ema, transformer_tra
     if accelerator.is_main_process:
         if config.train.ema:
             ema.copy_ema_to(transformer_trainable_parameters, store_temp=True)
-        pipeline.transformer.save_pretrained(save_root_lora, selected_adapters=["learner"])
+        unwrap_model(transformer, accelerator).save_pretrained(save_root_lora)
         if config.train.ema:
             ema.copy_temp_to(transformer_trainable_parameters)
 
@@ -288,7 +287,7 @@ def main(_):
             pipeline.transformer.set_adapter("learner")
         else:
             pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config, adapter_name="learner")
-            pipeline.transformer.add_adapter("ref", transformer_lora_config)
+            pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config, adapter_name="ref")
             pipeline.transformer.set_adapter("learner")
         
         logger.info(f"type(pipeline.transformer) {type(pipeline.transformer)}")
@@ -383,7 +382,7 @@ def main(_):
                 eval_and_save_indicator = False
                 eval(pipeline, val_dataloader, config, accelerator, global_step, None, None, autocast, None, ema, transformer_trainable_parameters)
                 if accelerator.is_main_process:
-                    save_ckpt(config.save_dir, pipeline, global_step, accelerator, ema, transformer_trainable_parameters, config)
+                    save_ckpt(config.save_dir, transformer, global_step, accelerator, ema, transformer_trainable_parameters, config)
             
             if global_step >= config.dpo.max_train_steps:
                 break
@@ -445,11 +444,16 @@ def main(_):
                         )[0]
                         model_pred_ref = model_pred_ref.detach()
                         pipeline.transformer.set_adapter("learner")
-                target = noise - model_input
-        
+                target = noise - model_input # batch_size
+
+                ### sft ###
+                sft_loss = ((model_pred.float() - target.float()) ** 2).mean(dim=(1, 2, 3))
+                sft_loss = sft_loss[:bsz]
+                sft_loss = torch.mean(sft_loss)
+                
                 theta_mse = ((model_pred.float() - target.float()) ** 2).reshape(target.shape[0], -1).mean(dim=1)
                 ref_mse = ((model_pred_ref.float() - target.float()) ** 2).reshape(target.shape[0], -1).mean(dim=1)
-        
+
                 model_w_err = theta_mse[:bsz]
                 model_l_err = theta_mse[bsz:]
                 ref_w_err = ref_mse[:bsz]
@@ -458,10 +462,13 @@ def main(_):
                 l_diff = model_l_err - ref_l_err
                 w_l_diff = w_diff - l_diff
                 inside_term = -0.5 * config.train.beta * w_l_diff
-                loss = -F.logsigmoid(inside_term)
+                dpo_loss = -F.logsigmoid(inside_term)
+                dpo_loss = torch.mean(dpo_loss)
                 
-                loss = torch.mean(loss)
+                loss = sft_loss + dpo_loss
                 info["loss"].append(loss)
+                info["sft_loss"].append(sft_loss)
+                info["dpo_loss"].append(dpo_loss)
                 info["model_w_err"].append(torch.mean(model_w_err))
                 info["model_l_err"].append(torch.mean(model_l_err))
                 info["ref_w_err"].append(torch.mean(ref_w_err))
@@ -481,13 +488,15 @@ def main(_):
                 optimizer.step()
                 optimizer.zero_grad()
 
-                progress_bar.set_postfix(timesteps=timesteps.cpu().tolist(), loss=loss.item())
+
             # Checks if the accelerator has performed an optimization step behind the scenes
             if accelerator.sync_gradients:
                 info = {k: torch.mean(torch.stack(v)) for k, v in info.items()}
                 info = accelerator.reduce(info, reduction="mean")
                 if accelerator.is_main_process: 
                     swanlab.log(info, step=global_step)
+                    
+                progress_bar.set_postfix(f"timesteps: {timesteps}, sft_loss: {info['sft_loss']:.4f}, dpo_loss: {info['dpo_loss']:.4f}")
                 info = defaultdict(list)
                 progress_bar.update(1)
                 global_step += 1
