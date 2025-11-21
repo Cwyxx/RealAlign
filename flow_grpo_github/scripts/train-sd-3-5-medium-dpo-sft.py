@@ -152,7 +152,8 @@ def unwrap_model(model, accelerator):
     model = model._orig_mod if is_compiled_module(model) else model
     return model
 
-def save_ckpt(save_dir, transformer, global_step, accelerator, ema, transformer_trainable_parameters, config):
+def save_ckpt(save_dir, pipeline, global_step, accelerator, ema, transformer_trainable_parameters, config):
+    pipeline.transformer.set_adapter("learner")
     save_root = os.path.join(save_dir, "checkpoints", f"checkpoint-{global_step}")
     save_root_lora = os.path.join(save_root, "lora")
     os.makedirs(save_root_lora, exist_ok=True)
@@ -160,7 +161,7 @@ def save_ckpt(save_dir, transformer, global_step, accelerator, ema, transformer_
     if accelerator.is_main_process:
         if config.train.ema:
             ema.copy_ema_to(transformer_trainable_parameters, store_temp=True)
-        unwrap_model(transformer, accelerator).save_pretrained(save_root_lora)
+        pipeline.transformer.save_pretrained(save_root_lora, selected_adapters=["learner"])
         if config.train.ema:
             ema.copy_temp_to(transformer_trainable_parameters)
 
@@ -382,7 +383,7 @@ def main(_):
                 eval_and_save_indicator = False
                 eval(pipeline, val_dataloader, config, accelerator, global_step, None, None, autocast, None, ema, transformer_trainable_parameters)
                 if accelerator.is_main_process:
-                    save_ckpt(config.save_dir, transformer, global_step, accelerator, ema, transformer_trainable_parameters, config)
+                    save_ckpt(config.save_dir, pipeline, global_step, accelerator, ema, transformer_trainable_parameters, config)
             
             if global_step >= config.dpo.max_train_steps:
                 break
@@ -448,7 +449,7 @@ def main(_):
 
                 ### sft ###
                 sft_loss = ((model_pred.float() - target.float()) ** 2).mean(dim=(1, 2, 3))
-                sft_loss = sft_loss[:bsz]
+                sft_loss = sft_loss[:bsz] # [win_image]
                 sft_loss = torch.mean(sft_loss)
                 
                 theta_mse = ((model_pred.float() - target.float()) ** 2).reshape(target.shape[0], -1).mean(dim=1)
@@ -488,7 +489,7 @@ def main(_):
                 optimizer.step()
                 optimizer.zero_grad()
 
-
+                progress_bar.set_postfix(timesteps=timesteps.cpu().tolist(), dpo_loss=dpo_loss.item(), sft_loss=sft_loss.item())
             # Checks if the accelerator has performed an optimization step behind the scenes
             if accelerator.sync_gradients:
                 info = {k: torch.mean(torch.stack(v)) for k, v in info.items()}
@@ -496,7 +497,6 @@ def main(_):
                 if accelerator.is_main_process: 
                     swanlab.log(info, step=global_step)
                     
-                progress_bar.set_postfix(f"timesteps: {timesteps}, sft_loss: {info['sft_loss']:.4f}, dpo_loss: {info['dpo_loss']:.4f}")
                 info = defaultdict(list)
                 progress_bar.update(1)
                 global_step += 1
