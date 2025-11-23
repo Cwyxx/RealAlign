@@ -286,9 +286,10 @@ def main(_):
             pipeline.transformer.load_adapter(config.train.lora_path, adapter_name="ref", is_trainable=False)
             # After loading with PeftModel.from_pretrained, all parameters have requires_grad set to False. You need to call set_adapter to enable gradients for the adapter parameters.
             pipeline.transformer.set_adapter("learner")
+            logger.info(f"Loaded LoRA from {config.train.lora_path}")
         else:
             pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config, adapter_name="learner")
-            pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config, adapter_name="ref")
+            pipeline.transformer.add_adapter("ref", transformer_lora_config)
             pipeline.transformer.set_adapter("learner")
         
         logger.info(f"type(pipeline.transformer) {type(pipeline.transformer)}")

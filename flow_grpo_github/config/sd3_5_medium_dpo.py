@@ -44,7 +44,7 @@ def paired_real_fake_dataset_sd3():
 
     config.train.algorithm = 'dpo'
     # Change ref_update_step to a small number, e.g., 40, to switch to OnlineDPO.
-    config.train.ref_update_step=10000000
+    config.train.ref_update_step=False # True for OnlineDPO, False for OfflineDPO
     
     config.train.batch_size = config.sample.train_batch_size
     config.train.gradient_accumulation_steps = 32
@@ -64,14 +64,15 @@ def paired_real_fake_dataset_sd3():
     config.train.learning_rate = 2.56e-6
     config.dpo = ml_collections.ConfigDict()
     config.dpo.project_name = "diffusion-dpo-sd-3-5-medium"
-    config.dpo.batch_size = 2
+    config.dpo.batch_size = 1
     config.train.beta = 100
+    config.train.ref_update_step = False # True for OnlineDPO, False for OfflineDPO
     config.dpo.max_train_steps = 1000
     config.dpo.dataset = {
         "train": "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting",
         "val": "high_quality_val"
     }
-    ### ToDo ####
+
     config.dpo.csv_file_path = {
         "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
@@ -80,10 +81,20 @@ def paired_real_fake_dataset_sd3():
         "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/HPDv3/top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting/",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/general_1/high_quality_val/",
         }
-    ### ToDo ####
-    config.run_name = "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting-w_sft"
+    
+    ### DiffusionNFT parameters ###
+    config.sample.guidance_scale = 1.0
+    config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/DiffusionNFT/checkpoints/checkpoint-0/lora/learner"
+    config.run_name = f"DiffusionNFT-next-top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting-w_sft"
+    ### DiffusionNFT parameters ###
+    
+    # #### Flow-GRPO parameters ####
+    # config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/FlowGRPO-PickScore/checkpoints/checkpoint-0/lora/learner"
+    # config.run_name = f"FlowGRPO-PickScore-next-top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting"
+    # #### Flow-GRPO parameters ####
+    
     config.save_dir = f"/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/{config.run_name}"
-    config.train.gradient_accumulation_steps = 32
+    config.train.gradient_accumulation_steps = 64
     
     # ### Resume from DiffusionNFT ###
     # config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusionnft/model-ckpt/sd3/SD3.5M-DiffusionNFT-MultiReward/checkpoints/checkpoint-0/lora"
