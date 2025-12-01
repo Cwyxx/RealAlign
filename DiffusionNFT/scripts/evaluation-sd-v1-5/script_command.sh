@@ -9,7 +9,7 @@ cuda_device=$1 # 0
 method=$2 # "sd-3-5-medium"
 ckpt=$3 # 0
 dataset="drawbench"
-rl_framework="diffusion-dro"
+rl_framework="diffusion-dpo"
 
 export CUDA_VISIBLE_DEVICES=${cuda_device}
 
@@ -23,12 +23,12 @@ echo "dataset: ${dataset}"
 echo "ckpt_dir: ${ckpt_dir}"
 echo "image_dir: ${image_dir}"
 
-python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
+python generate_image-dpo_next.py --seed 42 --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
      --output_dir ${image_dir} \
      --save_images
 
 cd ../evaluation-sd-3-5-medium
-reward_model_list=("pickscore" "imagereward" "hpsv3" "deqa" "aesthetic_v2_5" "dinov2")
+reward_model_list=("pickscore" "imagereward" "hpsv3" "deqa" "aesthetic" "aesthetic_v2_5" "dinov2")
 for reward_model in "${reward_model_list[@]}"; do
     echo "********************************************"
     echo "reward_model: ${reward_model}"
@@ -64,12 +64,12 @@ cd ../evaluation-sd-v1-5
 
 # # cd ../DiffusionNFT/scripts/evaluation
 
-# # echo "********************************************"
-# # echo "reward_model: MA-AGIQA"
-# # conda activate mplug_owl2
-# # cd ../../../evaluate_metric/MA-AGIQA
-# # python inference_diffusionnft.py --config configs/AGIQA_3k/MA_AGIQA.yaml --dataset ${dataset} --output_dir ${image_dir}
-# # cd ../../DiffusionNFT/scripts/evaluation
+echo "********************************************"
+echo "reward_model: MA-AGIQA"
+conda activate mplug_owl2
+cd ../../../evaluate_metric/MA-AGIQA
+python inference_diffusionnft.py --config configs/AGIQA_3k/MA_AGIQA.yaml --dataset ${dataset} --output_dir ${image_dir}
+cd ../../DiffusionNFT/scripts/evaluation-sd-v1-5
 
 # # echo "********************************************"
 # # echo "reward_model: PKU-AIGIQA"

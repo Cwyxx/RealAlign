@@ -351,7 +351,7 @@ def parse_args():
     #### LoRA config ####
     return args
 
-class X_AIGD_Dataset(Dataset):
+class Paired_Real_Fake_Dataset(Dataset):
     def __init__(self, config, tokenize_caption, image_transform, split):
         self.tokenize_caption = tokenize_caption
         self.image_transform = image_transform
@@ -454,11 +454,11 @@ def main():
     config = ml_collections.ConfigDict()
     config.dpo = ml_collections.ConfigDict()
     config.dpo.dataset = {
-        "train" : "pickscore_002-general_all",
+        "train" : "dpo-next-random_9984_images_no_anime_pickscore_002-hpdv3_all-t2i",
         "val": "high_quality_val"
     }
     config.dpo.csv_file_path = {
-        "pickscore_002-general_all": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/random_add_noise_step/pickscore_0.02_uids-general_all.csv",
+        "dpo-next-random_9984_images_no_anime_pickscore_002-hpdv3_all-t2i": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/text-to-image/HPDv3/no_anime-hpdv3_all/random_9984_images_no_anime_pickscore_0.02-hpdv3_all-uids.csv",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
     }
     args = parse_args()
@@ -677,12 +677,12 @@ def main():
         ]
     )
     
-    train_dataset = X_AIGD_Dataset(config, tokenize_captions, train_transforms, config.dpo.dataset["train"])
-    val_dataset = X_AIGD_Dataset(config, tokenize_captions, train_transforms, config.dpo.dataset["val"])
+    train_dataset = Paired_Real_Fake_Dataset(config, tokenize_captions, train_transforms, config.dpo.dataset["train"])
+    val_dataset = Paired_Real_Fake_Dataset(config, tokenize_captions, train_transforms, config.dpo.dataset["val"])
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
         shuffle=True,
-        collate_fn=X_AIGD_Dataset.collate_fn,
+        collate_fn=Paired_Real_Fake_Dataset.collate_fn,
         batch_size=args.train_batch_size,
         num_workers=args.dataloader_num_workers,
         drop_last=True
@@ -690,7 +690,7 @@ def main():
     val_dataloader = torch.utils.data.DataLoader(
         val_dataset,
         shuffle=False,
-        collate_fn=X_AIGD_Dataset.collate_fn,
+        collate_fn=Paired_Real_Fake_Dataset.collate_fn,
         batch_size=2,
         num_workers=args.dataloader_num_workers,
         drop_last=True

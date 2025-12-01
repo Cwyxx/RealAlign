@@ -110,7 +110,7 @@ def main(_):
         ]
     )
     #### image_transform, copy from dive-into-sd-3-5-medium ####
-    train_dataset = Paired_Real_Fake_Dataset(config, image_transform, split=config.dpo.dataset["val"])
+    train_dataset = Paired_Real_Fake_Dataset(config, image_transform, split=config.dpo.dataset["train"])
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=2,
@@ -119,7 +119,7 @@ def main(_):
         num_workers=1
     )
     
-    precomputed_embeddings_dir = config.dpo.precomputed_embeddings_dir_dict[config.dpo.dataset["val"]]
+    precomputed_embeddings_dir = config.dpo.precomputed_embeddings_dir_dict[config.dpo.dataset["train"]]
     os.makedirs(precomputed_embeddings_dir, exist_ok=True)
     for uids, prompts, pixel_values in tqdm(train_dataloader):
         prompt_embeds, pooled_prompt_embeds = compute_text_embeddings(

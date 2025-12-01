@@ -47,7 +47,7 @@ def paired_real_fake_dataset_sd3():
     config.train.ref_update_step=False # True for OnlineDPO, False for OfflineDPO
     
     config.train.batch_size = config.sample.train_batch_size
-    config.train.gradient_accumulation_steps = 32
+    config.train.gradient_accumulation_steps = 64
     config.train.num_inner_epochs = 1
     config.train.timestep_fraction = 0.99
     config.train.beta = 100
@@ -67,34 +67,37 @@ def paired_real_fake_dataset_sd3():
     config.dpo.batch_size = 1
     config.train.beta = 100
     config.train.ref_update_step = False # True for OnlineDPO, False for OfflineDPO
-    config.dpo.max_train_steps = 1000
+    config.dpo.max_train_steps = 2000
     config.dpo.dataset = {
-        "train": "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting",
+        "train": "top_2048_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting",
         "val": "high_quality_val"
     }
 
     config.dpo.csv_file_path = {
-        "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
+        "top_2048_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/top_2048_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
     }
     config.dpo.precomputed_embeddings_dir_dict = {
-        "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/HPDv3/top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting/",
+        "top_2048_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/HPDv3/accumulate/",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/general_1/high_quality_val/",
         }
     
-    ### DiffusionNFT parameters ###
-    config.sample.guidance_scale = 1.0
-    config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/DiffusionNFT/checkpoints/checkpoint-0/lora/learner"
-    config.run_name = f"DiffusionNFT-next-top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting-w_sft"
-    ### DiffusionNFT parameters ###
+    # ### DiffusionNFT parameters ###
+    # config.sample.guidance_scale = 1.0
+    # config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/DiffusionNFT/checkpoints/checkpoint-0/lora/learner"
+    # config.run_name = f"DiffusionNFT-next-top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting-lr_{config.train.learning_rate}"
+    # ### DiffusionNFT parameters ###
     
-    # #### Flow-GRPO parameters ####
-    # config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/FlowGRPO-PickScore/checkpoints/checkpoint-0/lora/learner"
-    # config.run_name = f"FlowGRPO-PickScore-next-top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting"
-    # #### Flow-GRPO parameters ####
+    #### Flow-GRPO parameters ####
+    config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/FlowGRPO-PickScore/checkpoints/checkpoint-0/lora/learner"
+    config.run_name = f"FlowGRPO-PickScore-next-top_2048_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting"
+    #### Flow-GRPO parameters ####
+    
+    # #### GRPO-Guard Parameters ####
+    # config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/GRPO-Guard/checkpoints/checkpoint-0/lora/learner"
+    # config.run_name = f"GRPO-Guard-next-top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting-w_sft"
     
     config.save_dir = f"/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/{config.run_name}"
-    config.train.gradient_accumulation_steps = 64
     
     # ### Resume from DiffusionNFT ###
     # config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusionnft/model-ckpt/sd3/SD3.5M-DiffusionNFT-MultiReward/checkpoints/checkpoint-0/lora"

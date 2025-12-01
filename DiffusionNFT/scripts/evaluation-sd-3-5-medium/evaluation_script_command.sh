@@ -27,7 +27,8 @@ python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --model_type sd
      --output_dir ${image_dir} \
      --save_images
 
-reward_model_list=("pickscore" "imagereward" "hpsv3" "deqa" "aesthetic_v2_5" "dinov2")
+reward_model_list=("pickscore" "imagereward" "hpsv3" "deqa" "aesthetic" "aesthetic_v2_5")
+# reward_model_list=("imagedoctor" "diffdoctor")
 for reward_model in "${reward_model_list[@]}"; do
     echo "********************************************"
     echo "reward_model: ${reward_model}"
@@ -60,14 +61,14 @@ done
 #     --spm_model_path "/data_center/data2/dataset/chenwy/21164-data/model-ckpt/vila/spm_model/spm.model" \
 #     --dataset "${dataset}"
 
-# cd ../DiffusionNFT/scripts/evaluation
+# cd ../DiffusionNFT/scripts/evaluation-sd-3-5-medium
 
-# echo "********************************************"
-# echo "reward_model: MA-AGIQA"
-# conda activate mplug_owl2
-# cd ../../../evaluate_metric/MA-AGIQA
-# python inference_diffusionnft.py --config configs/AGIQA_3k/MA_AGIQA.yaml --dataset ${dataset} --output_dir ${image_dir}
-# cd ../../DiffusionNFT/scripts/evaluation
+echo "********************************************"
+echo "reward_model: MA-AGIQA"
+conda activate mplug_owl2
+cd ../../../evaluate_metric/MA-AGIQA
+python inference_diffusionnft.py --config configs/AGIQA_3k/MA_AGIQA.yaml --dataset ${dataset} --output_dir ${image_dir}
+cd ../../DiffusionNFT/scripts/evaluation-sd-3-5-medium
 
 # echo "********************************************"
 # echo "reward_model: PKU-AIGIQA"

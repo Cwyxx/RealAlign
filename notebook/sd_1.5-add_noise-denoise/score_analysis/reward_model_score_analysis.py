@@ -1,6 +1,7 @@
 import os
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-os.environ["CUDA_VISIBLE_DEVICES"] = "6"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ["TOKENIZERS_PARALLELISM"] = "False"
 import torch
 import sys
 sys.path.append("/data3/chenweiyan/notebook/fine-tune-diffusion/spo_gitee/DiffusionNFT")
@@ -12,15 +13,19 @@ from PIL import Image
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM
 
-reward_model_name = "pickscore"
-output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/pick-a-pic-v2-top_500_images/{reward_model_name}/{reward_model_name}_score_tmp.csv"
+reward_model_name = "aesthetic"
+# output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/{reward_model_name}/{reward_model_name}.csv"
 
 # csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/HPDv3/real_images_uid_prompt.csv"
-csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/pick-a-pic-v2-top_500_images/top_500_images.csv"
-df = pd.read_csv(csv_file_path, dtype=str)
-real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/pick-a-pic-v2-top_500_images/real"
-fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/pick-a-pic-v2-top_500_images/fake"
+# df = pd.read_csv(csv_file_path, dtype=str)
+# real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/real"
+# fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/fake"
 
+output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/text-to-image/HPDv3/no_anime-hpdv3_all/{reward_model_name}/{reward_model_name}_score.csv"
+csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/no_anime_all_images.csv"
+df = pd.read_csv(csv_file_path, dtype=str)
+real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/text-to-image/HPDv3/no_anime-hpdv3_all/real"
+fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/text-to-image/HPDv3/no_anime-hpdv3_all/fake"
 ext_list = [".png", ".jpg", ".jpeg", ".PNG", ".JPG", ".JPEG"]
 
 print(f"csv file path: {csv_file_path}")
@@ -29,7 +34,7 @@ print(f"fake image dir: {fake_image_dir}")
 print(f"output csv path: {output_csv_path}")
 
 device = torch.device("cuda")
-if reward_model_name in ["imagereward", "pickscore", "clipscore", "code" ]:
+if reward_model_name in ["imagereward", "pickscore", "clipscore", "code", "aesthetic" ]:
     all_reward_scorers = { reward_model_name: 1.0 }
     scoring_fn, reward_models = multi_score(device, all_reward_scorers)
     for reward_model in reward_models.values(): reward_model.to(device)
@@ -121,7 +126,7 @@ uid_list = []
 real_win_count = 0
 total_pairs = 0
 
-for i in tqdm(range(len(df))):
+for i in tqdm(range(len(df)), dynamic_ncols=True):
     uid = df.iloc[i]["uid"]
     prompt = df.iloc[i]["prompt"]
     real_image_path = os.path.join(real_image_dir, f"{uid}.png")
@@ -145,8 +150,15 @@ for i in tqdm(range(len(df))):
         images = images.transpose(0, 3, 1, 2)  # NHWC -> NCHW
         images = torch.tensor(images, dtype=torch.uint8) / 255.0
         scores, _ = scoring_fn(images, [prompt, prompt], None)
+        
+    elif reward_model_name in [ "aesthetic" ]:
+        pil_images = [ real_image, fake_image ]
+        pil_images = np.stack([np.array(img) for img in pil_images])
+        images = pil_images.transpose(0, 3, 1, 2)
+        images = torch.tensor(images, dtype=torch.uint8)
+        scores, _ = scoring_fn(images, [prompt, prompt], None)
     
-    if reward_model_name in ["imagereward", "pickscore", "clipscore", "code"]:
+    if reward_model_name in ["imagereward", "pickscore", "clipscore", "code", "aesthetic" ]:
         real_score = scores[reward_model_name][0].detach().cpu().item()
         fake_score = scores[reward_model_name][1].detach().cpu().item()
     elif reward_model_name in ["deqa", "hpsv3", "brightness", "saturation", "colorfulness"]:

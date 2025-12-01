@@ -914,8 +914,8 @@ def main():
                                 *model_batch_args,
                                   added_cond_kwargs = added_cond_kwargs
                                  ).sample
-                #### SFT Loss Computation on y_w ####
-                loss_sft = F.mse_loss(model_pred[:bsz // 2].float(), target[:bsz // 2].float(), reduction="mean")
+                # #### SFT Loss Computation on y_w ####
+                # loss_sft = F.mse_loss(model_pred[:bsz // 2].float(), target[:bsz // 2].float(), reduction="mean")
                 
                 #### DPO Loss Computation ####
                 # model_pred and ref_pred will be (2 * LBS) x 4 x latent_spatial_dim x latent_spatial_dim
@@ -944,12 +944,13 @@ def main():
                 loss_dpo = -1 * F.logsigmoid(inside_term).mean()
                 #### END LOSS COMPUTATION ###
                 
-                loss = loss_sft + loss_dpo
+                # loss = loss_sft + loss_dpo
+                loss = loss_dpo
                 # Gather the losses across all processes for logging 
                 avg_loss = accelerator.gather(loss.repeat(args.train_batch_size)).mean()
                 train_loss += avg_loss.item() / args.gradient_accumulation_steps
-                avg_sft_loss = accelerator.gather(loss_sft.repeat(args.train_batch_size)).mean()
-                train_sft_loss += avg_sft_loss.item() / args.gradient_accumulation_steps
+                # avg_sft_loss = accelerator.gather(loss_sft.repeat(args.train_batch_size)).mean()
+                # train_sft_loss += avg_sft_loss.item() / args.gradient_accumulation_steps
                 avg_dpo_loss = accelerator.gather(loss_dpo.repeat(args.train_batch_size)).mean()
                 train_dpo_loss += avg_dpo_loss.item() / args.gradient_accumulation_steps
                 
@@ -977,7 +978,8 @@ def main():
                 global_step += 1
                 
                 if accelerator.is_main_process:
-                    swanlab.log({"train_loss": train_loss, "train_sft_loss": train_sft_loss, "train_dpo_loss": train_dpo_loss}, step=global_step)   
+                    # swanlab.log({"train_loss": train_loss, "train_sft_loss": train_sft_loss, "train_dpo_loss": train_dpo_loss}, step=global_step)  
+                    swanlab.log({"train_loss": train_loss, "train_dpo_loss": train_dpo_loss}, step=global_step)  
                 if args.train_method == 'dpo':
                     accelerator.log({"model_mse_unaccumulated": avg_model_mse}, step=global_step)
                     accelerator.log({"ref_mse_unaccumulated": avg_ref_mse}, step=global_step)
@@ -993,7 +995,8 @@ def main():
                         # logger.info(f"Saved state to {save_path}")
                         # logger.info("Pretty sure saving/loading is fixed but proceed cautiously")
 
-            logs = {"step_loss": loss.detach().item(), "step_sft_loss": loss_sft.detach().item(), "step_dpo_loss": loss_dpo.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
+            # logs = {"step_loss": loss.detach().item(), "step_sft_loss": loss_sft.detach().item(), "step_dpo_loss": loss_dpo.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
+            logs = {"step_loss": loss.detach().item(), "step_dpo_loss": loss_dpo.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
             if args.train_method == 'dpo':
                 logs["implicit_acc"] = avg_acc
             progress_bar.set_postfix(**logs)
