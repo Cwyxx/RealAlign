@@ -1,6 +1,6 @@
 import os
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 os.environ["TOKENIZERS_PARALLELISM"] = "False"
 import torch
 import sys
@@ -21,11 +21,11 @@ reward_model_name = "aesthetic"
 # real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/real"
 # fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/fake"
 
-output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/text-to-image/HPDv3/no_anime-hpdv3_all/{reward_model_name}/{reward_model_name}_score.csv"
+output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/sam_next_inpainting/random_top_5_mask/{reward_model_name}/{reward_model_name}_score.csv"
 csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/no_anime_all_images.csv"
 df = pd.read_csv(csv_file_path, dtype=str)
-real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/text-to-image/HPDv3/no_anime-hpdv3_all/real"
-fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/text-to-image/HPDv3/no_anime-hpdv3_all/fake"
+real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/sam_next_inpainting/random_top_5_mask/real"
+fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/sam_next_inpainting/random_top_5_mask/fake"
 ext_list = [".png", ".jpg", ".jpeg", ".PNG", ".JPG", ".JPEG"]
 
 print(f"csv file path: {csv_file_path}")

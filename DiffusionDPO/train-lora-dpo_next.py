@@ -454,11 +454,11 @@ def main():
     config = ml_collections.ConfigDict()
     config.dpo = ml_collections.ConfigDict()
     config.dpo.dataset = {
-        "train" : "dpo-next-random_9984_images_no_anime_pickscore_002-hpdv3_all-t2i",
+        "train" : "random_9984_images_no_anime_pickscore_002-hpdv3_all-inpainting",
         "val": "high_quality_val"
     }
     config.dpo.csv_file_path = {
-        "dpo-next-random_9984_images_no_anime_pickscore_002-hpdv3_all-t2i": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/text-to-image/HPDv3/no_anime-hpdv3_all/random_9984_images_no_anime_pickscore_0.02-hpdv3_all-uids.csv",
+        "random_9984_images_no_anime_pickscore_002-hpdv3_all-inpainting": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/random_9984_images_no_anime_pickscore_0.02-hpdv3_all-uids.csv",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
     }
     args = parse_args()

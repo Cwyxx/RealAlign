@@ -1,4 +1,6 @@
 import os
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+os.environ["TOKENIZERS_PARALLELISM"] = "False"
 from PIL import Image
 import torch
 from diffusers import StableDiffusionInpaintPipeline
@@ -87,14 +89,14 @@ def parse_args():
     parser.add_argument(
         "--input_dir",
         type=str,
-        required="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/real",
+        default="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/real",
         help="Directory containing real images",
     )
     parser.add_argument(
         "--output_dir",
         type=str,
-        required="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/sam_next_inpainting/random_top_5_mask",
-        help="Directory to save real-fake pairs",
+        default="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/sam_next_inpainting/random_top_5_mask",
+        help="Directory to save real-fake pairs and masks",
     )
     parser.add_argument(
         "--prompt_file",
@@ -202,7 +204,7 @@ def main(args):
         transforms.CenterCrop(512),
     ])
     
-    for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing images"):
+    for idx, row in tqdm(df.iterrows(), total=len(df), dynamic_ncols=True, desc="Processing images"):
         uid = row['uid']
         prompt = row['prompt']
         
