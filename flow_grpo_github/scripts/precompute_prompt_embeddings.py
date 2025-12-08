@@ -1,6 +1,6 @@
 import os
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-os.environ["CUDA_VISIBLE_DEVICES"] = "7"
+os.environ["CUDA_VISIBLE_DEVICES"] = "6"
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import torch

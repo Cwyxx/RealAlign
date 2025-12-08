@@ -1,4 +1,5 @@
 import os
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 from PIL import Image
 import torch
 from diffusers import StableDiffusionInpaintPipeline
@@ -46,19 +47,19 @@ def parse_args():
     parser.add_argument(
         "--input_dir",
         type=str,
-        required=True,
+        default="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/civitai-top-sfw-images-with-metadata/images",
         help="Directory containing real images",
     )
     parser.add_argument(
         "--output_dir",
         type=str,
-        required=True,
+        default="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/civitai-top-sfw-images-with-metadata",
         help="Directory to save real-fake pairs",
     )
     parser.add_argument(
         "--prompt_file",
         type=str,
-        default=None,
+        default="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/civitai-top-sfw-images-with-metadata/uid_prompt.csv",
         help="CSV file stores the uid and corresponding prompt.",
     )
     parser.add_argument(
@@ -66,6 +67,18 @@ def parse_args():
         type=int,
         default=50,
         help="Number of inference steps for StableDiffusionInpaintPipeline.",
+    )
+    parser.add_argument(
+        "--start_index",
+        type=int,
+        default=None,
+        help="Start index for processing (0-based). If not specified, starts from the beginning.",
+    )
+    parser.add_argument(
+        "--end_index",
+        type=int,
+        default=None,
+        help="End index for processing (exclusive). If not specified, processes until the end.",
     )
     
     return parser.parse_args()
@@ -116,9 +129,18 @@ def main(args):
     
     print(f"Found {len(processed_uids)} already processed UIDs")
     
-    df = pd.read_csv(args.prompt_file, dtype=str)
+    df = pd.read_csv(args.prompt_file, dtype={'uid': str})
     total_uids = len(df)
-    print(f"Total UIDs in prompt file: {total_uids}")
+    
+    # Apply start_index and end_index if provided
+    if args.start_index is not None or args.end_index is not None:
+        start_idx = args.start_index if args.start_index is not None else 0
+        end_idx = args.end_index if args.end_index is not None else total_uids
+        df = df.iloc[start_idx:end_idx]
+        print(f"Processing range: [{start_idx}:{end_idx}] (total: {total_uids})")
+        print(f"Actual processing: {len(df)} items")
+    else:
+        print(f"Total UIDs in prompt file: {total_uids}")
     
     processed_count = 0
     skipped_count = 0
@@ -127,7 +149,7 @@ def main(args):
         transforms.CenterCrop(512),
     ])
     
-    for idx, row in tqdm(df.iterrows(), total=total_uids, desc="Processing images"):
+    for idx, row in tqdm(df.iterrows(), total=len(df), desc="Processing images"):
         uid = row['uid']
         prompt = row['prompt']
         

@@ -345,7 +345,8 @@ def parse_args():
             
     args.train_method = 'sft' if args.sft else 'dpo'
     
-    args.unet_init = "mhdang/dpo-sd1.5-text2image-v1"
+    # args.unet_init = "mhdang/dpo-sd1.5-text2image-v1"
+    args.unet_init = "jacklishufan/diffusion-kto"
     #### LoRA config ####
     args.lora_rank = 4
     #### LoRA config ####

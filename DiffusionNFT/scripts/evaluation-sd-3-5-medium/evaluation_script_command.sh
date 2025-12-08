@@ -16,6 +16,7 @@ export CUDA_VISIBLE_DEVICES=${cuda_device}
 base_ckpt_dir="/data_center/data2/dataset/chenwy/21164-data/${rl_framework}/sd-3-5-medium/model-ckpt"
 base_image_dir="/data_center/data2/dataset/chenwy/21164-data/${rl_framework}/sd-3-5-medium/generate_images/${dataset}"
 
+seed=42
 ckpt_dir="${base_ckpt_dir}/${method}/checkpoints/checkpoint-${ckpt}"
 image_dir="${base_image_dir}/${method}/ckpt-${ckpt}"
 echo "********************************************"
@@ -23,12 +24,11 @@ echo "dataset: ${dataset}"
 echo "ckpt_dir: ${ckpt_dir}"
 echo "image_dir: ${image_dir}"
 
-python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --model_type sd3 --dataset ${dataset} \
+python generate_image.py --seed ${seed} --checkpoint_path ${ckpt_dir} --model_type sd3 --dataset ${dataset} \
      --output_dir ${image_dir} \
      --save_images
 
-reward_model_list=("pickscore" "imagereward" "hpsv3" "deqa" "aesthetic" "aesthetic_v2_5")
-# reward_model_list=("imagedoctor" "diffdoctor")
+reward_model_list=("pickscore" "imagereward" "hpsv3" "aesthetic" "deqa")
 for reward_model in "${reward_model_list[@]}"; do
     echo "********************************************"
     echo "reward_model: ${reward_model}"

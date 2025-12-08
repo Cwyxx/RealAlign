@@ -22,7 +22,7 @@ class DiffDoctor(nn.Module):
         method = os.path.basename(os.path.dirname(image_dir))
         dataset = os.path.basename(os.path.dirname(os.path.dirname(image_dir)))
         self.output_dir = f"/data_center/data2/dataset/chenwy/21164-data/Artifact_Segmentor_Tmp/visualization/DiffDoctor/{dataset}/{method}"
-        os.makedirs(self.output_dir)
+        os.makedirs(self.output_dir, exist_ok=True)
         
         self.device = torch.device("cuda")
         self.seg_preprocessor, self.artifact_detector = get_segformer("nvidia/mit-b5", out_channels=1)
