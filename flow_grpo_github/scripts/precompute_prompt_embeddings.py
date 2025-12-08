@@ -24,7 +24,7 @@ logger = get_logger(__name__)
 class Paired_Real_Fake_Dataset(Dataset):
     def __init__(self, config, image_transform, split="train"):
         self.image_transform = image_transform
-        self.csv_file_path = config.dpo.csv_file_path[split]
+        self.csv_file_path = config.irl.csv_file_path[split]
         
         self.ext_list = [ ".png", ".PNG", ".jpg", ".JPG", ".jpeg", ".JPEG" ]
         self.df = pd.read_csv(self.csv_file_path)
@@ -110,7 +110,7 @@ def main(_):
         ]
     )
     #### image_transform, copy from dive-into-sd-3-5-medium ####
-    train_dataset = Paired_Real_Fake_Dataset(config, image_transform, split=config.dpo.dataset["train"])
+    train_dataset = Paired_Real_Fake_Dataset(config, image_transform, split=config.irl.dataset["train"])
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=2,
@@ -119,7 +119,7 @@ def main(_):
         num_workers=1
     )
     
-    precomputed_embeddings_dir = config.dpo.precomputed_embeddings_dir_dict[config.dpo.dataset["train"]]
+    precomputed_embeddings_dir = config.irl.precomputed_embeddings_dir_dict[config.irl.dataset["train"]]
     os.makedirs(precomputed_embeddings_dir, exist_ok=True)
     for uids, prompts, pixel_values in tqdm(train_dataloader):
         prompt_embeds, pooled_prompt_embeds = compute_text_embeddings(
@@ -135,6 +135,20 @@ def main(_):
             pooled_prompt_embed_path = os.path.join(precomputed_embeddings_dir, f"{uid}_pooled.pt")
             torch.save(pooled_prompt_embed, pooled_prompt_embed_path)
 
-# python scripts/precompute_prompt_embeddings.py --config config/sd3_5_medium_dpo.py:paired_real_fake_dataset_sd3
+    prompt_embeds, pooled_prompt_embeds = compute_text_embeddings(
+        [""],
+        text_encoders,
+        tokenizers,
+        max_sequence_length=128,
+        device=device
+    )
+    prompt_embed = prompt_embeds[0]
+    pooled_prompt_embed = pooled_prompt_embeds[0]
+    prompt_embed_path = os.path.join(precomputed_embeddings_dir, f"empty_prompt.pt")
+    torch.save(prompt_embed, prompt_embed_path)
+    pooled_prompt_embed_path = os.path.join(precomputed_embeddings_dir, f"empty_prompt_pooled.pt")
+    torch.save(pooled_prompt_embed, pooled_prompt_embed_path)
+    
+# python scripts/precompute_prompt_embeddings.py --config config/sd3_5_medium_irl.py:paired_real_fake_dataset_sd3
 if __name__ == "__main__":
     app.run(main)

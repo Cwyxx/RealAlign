@@ -5,7 +5,6 @@ conda activate alignprop
 export HF_ENDPOINT=https://hf-mirror.com 
 export CUDA_VISIBLE_DEVICES=0,1
 
-sleep 3600
 unet_init="mhdang/dpo-sd1.5-text2image-v1"
 run_name="dpo-next-irl_top_500_pickscore_images_hpdv3_all-next-random_9984_images_no_anime_pickscore_002-hpdv3_all-inpainting"
 pretrained_lora_path="/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-v1-5/model-ckpt/dpo-next-irl_top_500_pickscore_images_hpdv3_all/checkpoints/checkpoint-800"
