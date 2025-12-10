@@ -521,6 +521,10 @@ def main(_):
                         pooled_projections=pooled_prompt_embeds,
                         return_dict=False,
                     )[0]
+                    
+                    pred_eps_ref = pred_eps_ref.detach()
+            pipeline.transformer.set_adapter("learner")
+                    
             losses0 = (pred_eps_ref - eps).square().mean(dim=[1, 2, 3])
             loss_expert0, loss_policy0 = losses0.chunk(2)
             
