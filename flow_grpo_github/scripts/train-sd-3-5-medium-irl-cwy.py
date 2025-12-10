@@ -34,8 +34,8 @@ import random
 from torch.utils.data import Dataset, DataLoader, Sampler
 from flow_grpo.ema import EMAModuleWrapper
 import swanlab
-from scripts.irl_tools import ReplayBuffer, EasyDict, StableDiffusion3Pipeline
-# from diffusers import StableDiffusion3Pipeline
+from scripts.irl_tools import ReplayBuffer, EasyDict
+from diffusers import StableDiffusion3Pipeline
 
 tqdm = partial(tqdm.tqdm, dynamic_ncols=True)
 FLAGS = flags.FLAGS
@@ -384,7 +384,6 @@ def main(_):
                 yield batch
     train_dataloader = infinite_loop(train_dataloader)
     
-    replay_buffer = ReplayBuffer(config.irl.buffer_size, time_key="t")
     step_loss = EasyDict()
     step_loss.loss = 0
     step_loss.diff = 0
@@ -405,59 +404,57 @@ def main(_):
     negative_pooled_prompt_embeds = negative_pooled_prompt_embeds.repeat(config.irl.batch_size, 1).to(accelerator.device, dtype=inference_dtype)
     
     while global_step <= config.irl.max_train_steps:
-        # Update the replay buffer
-        if len(replay_buffer) == 0 or (global_step % config.irl.buffer_sample_steps == 0):
-            batch = next(train_dataloader)
-            prompts, pixel_values, prompt_embeds, pooled_prompt_embeds = batch
-            replay_buffer.push("prompt_embeds", prompt_embeds)
-            replay_buffer.push("pooled_prompt_embeds", pooled_prompt_embeds)
-
+        batch = next(train_dataloader)
+        prompts, pixel_values, prompt_embeds, pooled_prompt_embeds = batch
+        bsz = config.irl.batch_size
+        with torch.no_grad():
             pixel_values = pixel_values.chunk(2, dim=1)[0] # [batch_size, 6, 512, 512] -> [batch_size, 3, 512, 512]
             x0 = pipeline.vae.encode(pixel_values).latent_dist.sample()
-            x0 = (x0 - pipeline.vae.config.shift_factor) * pipeline.vae.config.scaling_factor
-            replay_buffer.push("x0", x0)
-            
-            # Sample x_T
-            latent_C = pipeline.transformer.config.in_channels
-            latent_H = int(config.resolution) // pipeline.vae_scale_factor
-            latent_W = int(config.resolution) // pipeline.vae_scale_factor
-            xT = torch.randn(config.irl.batch_size, latent_C, latent_H, latent_W, device=accelerator.device, dtype=inference_dtype)
-            replay_buffer.push("xt", xT, is_time_dependent=True)
-
-            # get sigmas with random sampling #
-            steps = config.irl.buffer_num_inference_steps
-            step_ratio = noise_scheduler.config.num_train_timesteps // steps
-            base_step_indices = np.linspace(0, noise_scheduler.config.num_train_timesteps-1, steps+1).astype(int)
-            # Apply perturb to elements from second to second-to-last
-            perturb = np.random.randint(0, step_ratio)  # Random integer perturbation
-            base_step_indices[1:-1] += perturb
-            # Ensure indices stay within valid range [0, num_train_timesteps]
-            base_step_indices[1:-1] = np.clip(base_step_indices[1:-1], 0, noise_scheduler.config.num_train_timesteps-1).astype(int)
-            sigmas = noise_scheduler.sigmas[base_step_indices]
-            
-            # get sigmas with random sampling #
-            with autocast():
-                with torch.no_grad():
-                    pipeline.transformer.set_adapter("learner")
-                    images = pipeline(
-                        sigmas=sigmas,
-                        latents=xT,
-                        prompt_embeds=prompt_embeds,
-                        pooled_prompt_embeds=pooled_prompt_embeds,
-                        negative_prompt_embeds=negative_prompt_embeds,
-                        negative_pooled_prompt_embeds=negative_pooled_prompt_embeds,
-                        num_inference_steps=config.irl.buffer_num_inference_steps,
-                        guidance_scale=config.sample.guidance_scale,
-                        output_type="pil",
-                        height=config.resolution,
-                        width=config.resolution, 
-                        callback_on_step_end=replay_buffer,
-                        callback_on_step_end_tensor_inputs=["latents", "noise_pred"],
-                        return_dict=False,
-                    )[0]
-            replay_buffer.commit()
-            del x0, xT, sigmas, prompt_embeds, pooled_prompt_embeds, pixel_values, images
+            x0_expert = (x0 - pipeline.vae.config.shift_factor) * pipeline.vae.config.scaling_factor
+            accelerator.print(f"x0_expert: {x0_expert.shape}")
+        with autocast():
+            with torch.no_grad():
+                pipeline.transformer.set_adapter("learner")
+                x0_policy_images = pipeline(
+                    prompt_embeds=prompt_embeds,
+                    pooled_prompt_embeds=pooled_prompt_embeds,
+                    negative_prompt_embeds=negative_prompt_embeds,
+                    negative_pooled_prompt_embeds=negative_pooled_prompt_embeds,
+                    num_inference_steps=config.irl.buffer_num_inference_steps,
+                    guidance_scale=config.sample.guidance_scale,
+                    output_type="pil",
+                    height=config.resolution,
+                    width=config.resolution, 
+                    return_dict=False,
+                )[0]
+                x0_policy = pipeline.vae.encode(x0_policy_images).latent_dist.sample()
+                x0_policy = (x0_policy - pipeline.vae.config.shift_factor) * pipeline.vae.config.scaling_factor
         
+        model_input = torch.cat([x0_expert, x0_policy], dim=0)
+        noise = torch.randn_like(model_input)
+        noise = torch.cat([noise[:bsz], noise[:bsz]], dim=0)
+        
+        # Sample a random timestep for each image for weighting schemes where we sample timesteps non-uniformly
+        u = compute_density_for_timestep_sampling(
+            weighting_scheme='logit_normal',
+            batch_size=config.irl.batch_size,
+            logit_mean=0,
+            logit_std=1,
+            mode_scale=1.29,
+        )
+        indices = (u * noise_scheduler.config.num_train_timesteps).long()
+        timesteps = noise_scheduler.timesteps[indices].to(device=model_input.device)
+        timesteps = torch.cat([timesteps, timesteps], dim=0)
+        accelerator.print(f"timesteps: {timesteps.shape}")
+        
+        # Add noise according to flow matching.
+        # zt = (1 - texp) * x + texp * z1
+        sigmas = get_sigmas(noise_scheduler, timesteps, accelerator, n_dim=model_input.ndim, dtype=model_input.dtype)
+        noisy_model_input = (1.0 - sigmas) * model_input + sigmas * noise
+        target = noise - model_input
+        
+        eps_expert = target[:bsz]
+        xt_policy = noisy_model_input[bsz:]
         with accelerator.accumulate(transformer):
             # Variable          Paper
             # -----------------------------
@@ -471,42 +468,26 @@ def main(_):
             # unet           -> $p_{\phi}$
             # unet_ref       -> $p_{\theta_{ref}}$
             # unet_policy    -> $p_{\theta}$
-    
-            # Sample demonstration pairs from the replay buffer
-            samples = replay_buffer.sample(config.irl.batch_size, device=accelerator.device)
-            t = samples.t
-            sigma = samples.sigma
-            prompt_embeds = samples.prompt_embeds
-            pooled_prompt_embeds = samples.pooled_prompt_embeds
+
             
-            x0_expert = samples.x0
-            xt_policy = samples.xt
-            eps_policy = samples.eps
+            with autocast():
+                with torch.no_grad():
+                    pipeline.transformer.set_adapter("learner")
+                    pred_eps_policy = transformer(
+                        hidden_states=xt_policy.to(dtype=inference_dtype),
+                        timestep=timesteps[bsz:],
+                        encoder_hidden_states=prompt_embeds[bsz:],
+                        pooled_projections=pooled_prompt_embeds[bsz:],
+                        return_dict=False,
+                    )[0]
+                    eps_policy = pred_eps_policy.detach()
             
-            # forward diffusion
-            # Add noise according to flow matching.
-            # zt = (1 - texp) * x + texp * z1
-            # Reshape sigma to broadcast correctly with x0_expert [batch_size, channels, height, width]
-            # sigma has shape [batch_size], need to reshape to [batch_size, 1, 1, 1]
-            noise = torch.randn_like(x0_expert)
-            sigma_reshaped = sigma.view(-1, 1, 1, 1)
-            xt_expert = (1.0 - sigma_reshaped) * x0_expert + sigma_reshaped * noise
-            eps_expert = noise - x0_expert
-            
-            t = torch.cat([t, t], dim=0)
-            sigma = torch.cat([sigma, sigma], dim=0)
-            
-            xt = torch.cat([xt_expert, xt_policy], dim=0)
             eps = torch.cat([eps_expert, eps_policy], dim=0)
-            
-            prompt_embeds = torch.cat([prompt_embeds, prompt_embeds], dim=0)
-            pooled_prompt_embeds = torch.cat([pooled_prompt_embeds, pooled_prompt_embeds], dim=0)
-            
             with autocast():
                 pipeline.transformer.set_adapter("learner")
                 pred_eps = transformer(
-                    hidden_states=xt.to(dtype=inference_dtype),
-                    timestep=t,
+                    hidden_states=noisy_model_input.to(dtype=inference_dtype),
+                    timestep=timesteps,
                     encoder_hidden_states=prompt_embeds,
                     pooled_projections=pooled_prompt_embeds,
                     return_dict=False,
@@ -516,8 +497,8 @@ def main(_):
                 with torch.no_grad():
                     pipeline.transformer.set_adapter("ref")
                     pred_eps_ref = transformer(
-                        hidden_states=xt.to(dtype=inference_dtype),
-                        timestep=t,
+                        hidden_states=noisy_model_input.to(dtype=inference_dtype),
+                        timestep=timesteps,
                         encoder_hidden_states=prompt_embeds,
                         pooled_projections=pooled_prompt_embeds,
                         return_dict=False,
