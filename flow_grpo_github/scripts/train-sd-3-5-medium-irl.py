@@ -12,7 +12,7 @@ from accelerate import Accelerator
 from ml_collections import config_flags
 from accelerate.utils import set_seed, ProjectConfiguration
 from accelerate.logging import get_logger
-from diffusers import StableDiffusion3Pipeline, FlowMatchEulerDiscreteScheduler
+from diffusers import FlowMatchEulerDiscreteScheduler
 from diffusers.utils.torch_utils import is_compiled_module
 from diffusers.training_utils import compute_density_for_timestep_sampling
 import numpy as np
@@ -34,7 +34,8 @@ import random
 from torch.utils.data import Dataset, DataLoader, Sampler
 from flow_grpo.ema import EMAModuleWrapper
 import swanlab
-from scripts.irl_tools import ReplayBuffer, EasyDict
+from scripts.irl_tools import ReplayBuffer, EasyDict, StableDiffusion3Pipeline
+# from diffusers import StableDiffusion3Pipeline
 
 tqdm = partial(tqdm.tqdm, dynamic_ncols=True)
 FLAGS = flags.FLAGS
@@ -383,9 +384,6 @@ def main(_):
                 yield batch
     train_dataloader = infinite_loop(train_dataloader)
     
-    eval_and_save_indicator = True
-    info = defaultdict(list)
-    
     replay_buffer = ReplayBuffer(config.irl.buffer_size, time_key="t")
     step_loss = EasyDict()
     step_loss.loss = 0
@@ -397,9 +395,18 @@ def main(_):
     step_loss.expert_diff = 0
     step_loss.policy_diff = 0
 
-    for step in progress_bar:
+    # eval(pipeline, val_dataloader, config, accelerator, global_step, None, None, autocast, None, ema, transformer_trainable_parameters)
+    # if accelerator.is_main_process:
+    #     save_ckpt(config.save_dir, pipeline, global_step, accelerator, ema, transformer_trainable_parameters, config)
+    precomputed_embeddings_dir = config.irl.precomputed_embeddings_dir_dict[config.irl.dataset["train"]]
+    negative_prompt_embeds = torch.load(os.path.join(precomputed_embeddings_dir, "empty_prompt.pt"), map_location="cpu")
+    negative_pooled_prompt_embeds = torch.load(os.path.join(precomputed_embeddings_dir, "empty_prompt_pooled.pt"), map_location="cpu")
+    negative_prompt_embeds = negative_prompt_embeds.repeat(config.irl.batch_size, 1, 1).to(accelerator.device, dtype=inference_dtype)
+    negative_pooled_prompt_embeds = negative_pooled_prompt_embeds.repeat(config.irl.batch_size, 1).to(accelerator.device, dtype=inference_dtype)
+    
+    while global_step <= config.irl.max_train_steps:
         # Update the replay buffer
-        if len(replay_buffer) == 0 or (step % config.irl.buffer_sample_steps == 0):
+        if len(replay_buffer) == 0 or (global_step % config.irl.buffer_sample_steps == 0):
             batch = next(train_dataloader)
             prompts, pixel_values, prompt_embeds, pooled_prompt_embeds = batch
             replay_buffer.push("prompt_embeds", prompt_embeds)
@@ -416,31 +423,159 @@ def main(_):
             latent_W = int(config.resolution) // pipeline.vae_scale_factor
             xT = torch.randn(config.irl.batch_size, latent_C, latent_H, latent_W, device=accelerator.device, dtype=inference_dtype)
             replay_buffer.push("xt", xT, is_time_dependent=True)
+
+            # get sigmas with random sampling #
+            steps = config.irl.buffer_num_inference_steps
+            step_ratio = noise_scheduler.config.num_train_timesteps // steps
+            base_step_indices = np.linspace(0, noise_scheduler.config.num_train_timesteps-1, steps+1).astype(int)
+            # Apply perturb to elements from second to second-to-last
+            perturb = np.random.randint(0, step_ratio)  # Random integer perturbation
+            base_step_indices[1:-1] += perturb
+            # Ensure indices stay within valid range [0, num_train_timesteps]
+            base_step_indices[1:-1] = np.clip(base_step_indices[1:-1], 0, noise_scheduler.config.num_train_timesteps-1).astype(int)
+            sigmas = noise_scheduler.sigmas[base_step_indices]
             
-            # Sample timesteps
-            if config.irl.buffer_perturb_timesteps:
-                step_ratio = pipeline.scheduler.config.num_train_timesteps // config.irl.buffer_num_inference_steps
-                timesteps = (torch.arange(0, config.irl.buffer_num_inference_steps) * step_ratio).round().flip(0)
-                perturb = torch.randint(0, step_ratio, (1, config.irl.batch_size))
-                timesteps = timesteps[:, None] + perturb    # [num_inference_steps, batch_size]
-            else:
-                timesteps = None
-                
+            # get sigmas with random sampling #
             with autocast():
                 with torch.no_grad():
                     pipeline.transformer.set_adapter("learner")
-                    pipeline(
-                        timesteps=timesteps,
+                    images = pipeline(
+                        sigmas=sigmas,
                         latents=xT,
                         prompt_embeds=prompt_embeds,
                         pooled_prompt_embeds=pooled_prompt_embeds,
+                        negative_prompt_embeds=negative_prompt_embeds,
+                        negative_pooled_prompt_embeds=negative_pooled_prompt_embeds,
                         num_inference_steps=config.irl.buffer_num_inference_steps,
                         guidance_scale=config.sample.guidance_scale,
-                        output_type="latent",
+                        output_type="pil",
                         height=config.resolution,
                         width=config.resolution, 
-                        ........
+                        callback_on_step_end=replay_buffer,
+                        callback_on_step_end_tensor_inputs=["latents", "noise_pred"],
+                        return_dict=False,
+                    )[0]
+            replay_buffer.commit()
+            del x0, xT, sigmas, prompt_embeds, pooled_prompt_embeds, pixel_values, images
+        
+        with accelerator.accumulate(transformer):
+            # Variable          Paper
+            # -----------------------------
+            # t              -> $t$
+            # c              -> $c$
+            # x0             -> $x_0$
+            # eps_policy     -> $\epsilon_\theta(x_t, c)$
+            # eps_expert     -> $\bar{\epsilon}$
+            # xt_policy      -> $x_t$
+            # xt_expert      -> $\bar{x}_t$
+            # unet           -> $p_{\phi}$
+            # unet_ref       -> $p_{\theta_{ref}}$
+            # unet_policy    -> $p_{\theta}$
+    
+            # Sample demonstration pairs from the replay buffer
+            samples = replay_buffer.sample(config.irl.batch_size, device=accelerator.device)
+            t = samples.t
+            sigma = samples.sigma
+            prompt_embeds = samples.prompt_embeds
+            pooled_prompt_embeds = samples.pooled_prompt_embeds
+            
+            x0_expert = samples.x0
+            xt_policy = samples.xt
+            eps_policy = samples.eps
+            
+            # forward diffusion
+            # Add noise according to flow matching.
+            # zt = (1 - texp) * x + texp * z1
+            # Reshape sigma to broadcast correctly with x0_expert [batch_size, channels, height, width]
+            # sigma has shape [batch_size], need to reshape to [batch_size, 1, 1, 1]
+            eps_expert = torch.randn_like(x0_expert)
+            sigma_reshaped = sigma.view(-1, 1, 1, 1)
+            xt_expert = (1.0 - sigma_reshaped) * x0_expert + sigma_reshaped * eps_expert
+            
+            t = torch.cat([t, t], dim=0)
+            sigma = torch.cat([sigma, sigma], dim=0)
+            
+            xt = torch.cat([xt_expert, xt_policy], dim=0)
+            eps = torch.cat([eps_expert, eps_policy], dim=0)
+            
+            prompt_embeds = torch.cat([prompt_embeds, prompt_embeds], dim=0)
+            pooled_prompt_embeds = torch.cat([pooled_prompt_embeds, pooled_prompt_embeds], dim=0)
+            
+            with autocast():
+                pipeline.transformer.set_adapter("learner")
+                pred_eps = transformer(
+                    hidden_states=xt.to(dtype=inference_dtype),
+                    timestep=t,
+                    encoder_hidden_states=prompt_embeds,
+                    pooled_projections=pooled_prompt_embeds,
+                    return_dict=False,
+                )[0]
+                
+                
+                with torch.no_grad():
+                    pipeline.transformer.set_adapter("ref")
+                    pred_eps_ref = transformer(
+                        hidden_states=xt.to(dtype=inference_dtype),
+                        timestep=t,
+                        encoder_hidden_states=prompt_embeds,
+                        pooled_projections=pooled_prompt_embeds,
+                        return_dict=False,
+                    )[0]
+            losses0 = (pred_eps_ref - eps).square().mean(dim=[1, 2, 3])
+            loss_expert0, loss_policy0 = losses0.chunk(2)
+            
+            losses = (pred_eps - eps).square().mean(dim=[1, 2, 3])
+            loss_expert, loss_policy = losses.chunk(2)
+            loss_expert_diff = loss_expert - loss_expert0
+            loss_policy_diff = loss_policy - loss_policy0
+
+            diff = loss_expert_diff - loss_policy_diff
+            loss = torch.maximum(diff + config.irl.margin, torch.zeros_like(diff)).mean()
+            accelerator.backward(loss)
+            
+            step_loss.loss += accelerator.gather(loss.unsqueeze(0).detach()).cpu().mean()
+            step_loss.diff += accelerator.gather(diff.detach()).cpu().mean()
+            step_loss.expert += accelerator.gather(loss_expert.detach()).cpu().mean()
+            step_loss.policy += accelerator.gather(loss_policy.detach()).cpu().mean()
+            step_loss.expert0 += accelerator.gather(loss_expert0.detach()).cpu().mean()
+            step_loss.policy0 += accelerator.gather(loss_policy0.detach()).cpu().mean()
+            step_loss.expert_diff += accelerator.gather(loss_expert_diff.detach()).cpu().mean()
+            step_loss.policy_diff += accelerator.gather(loss_policy_diff.detach()).cpu().mean()
+
+            if accelerator.sync_gradients:
+                    accelerator.clip_grad_norm_(
+                        transformer.parameters(), config.train.max_grad_norm
                     )
+            optimizer.step()
+            optimizer.zero_grad()
+            
+            progress_bar.set_postfix(timesteps=t.cpu().tolist(), loss=loss.item())
+        
+        # Log the training loss
+        if accelerator.sync_gradients:
+            if accelerator.is_main_process:
+                for tag in step_loss.keys():
+                    step_loss[tag] /= config.train.gradient_accumulation_steps
+                
+                swanlab.log(step_loss, step=global_step)            
+                for tag in step_loss.keys():
+                    step_loss[tag] = 0
+            
+            progress_bar.update(1)
+            global_step += 1
+            if config.train.ema:
+                ema.step(transformer_trainable_parameters, global_step)
+                
+            if global_step % config.save_freq == 0:
+                eval(pipeline, val_dataloader, config, accelerator, global_step, None, None, autocast, None, ema, transformer_trainable_parameters)
+                if accelerator.is_main_process:
+                    save_ckpt(config.save_dir, pipeline, global_step, accelerator, ema, transformer_trainable_parameters, config)
+        
+        # Wait for main processes to save the state
+        accelerator.wait_for_everyone()
+    
+    # Destroy process group
+    accelerator.end_training()        
 
 if __name__ == "__main__":
     app.run(main)

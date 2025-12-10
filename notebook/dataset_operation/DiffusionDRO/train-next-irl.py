@@ -277,7 +277,7 @@ from peft.utils import (
     help="Whether to resume training from the state."
 )
 @click.option(
-    "--unet_init", default="mhdang/dpo-sd1.5-text2image-v1", type=str,
+    "--unet_init", default="runwayml/stable-diffusion-v1-5", type=str,
 )
 @click.option(
     "--pretrained_lora_path", default=None, type=str
@@ -388,7 +388,7 @@ def main(**kwargs):
     unet_lora_config = LoraConfig(
         r=4,
         lora_alpha=4,
-        init_lora_weights="gaussian",
+        init_lora_weights="gaussian", # initialize the LoRA weights to a Gaussian distribution to ensure the ref == sd-v1-5
         target_modules=["to_k", "to_q", "to_v", "to_out.0"],
     )
     unet.add_adapter(unet_lora_config)
@@ -413,8 +413,8 @@ def main(**kwargs):
                     f"Loading adapter weights from state_dict led to unexpected keys not found in the model: "
                     f" {unexpected_keys}. "
                 )
-            accelerator.print(f"Reuse lora weights from {args.pretrained_lora_path}")
-            
+        accelerator.print(f"Reuse lora weights from {args.pretrained_lora_path}")
+        
     unet_ref = copy.deepcopy(unet)
     unet_policy = copy.deepcopy(unet)
     unet_ref.to(accelerator.device)
@@ -796,7 +796,7 @@ def main(**kwargs):
             writer.add_scalar("params/lr", lr_scheduler.get_last_lr()[0], step)
             progress_bar.set_postfix_str(
                 f"loss: {step_loss['loss']: .3E}, lr: {lr_scheduler.get_last_lr()[0]: .3E}")
-            swanlab.log({"loss": step_loss["loss"], "lr": lr_scheduler.get_last_lr()[0]}, step=step)
+            swanlab.log(step_loss, step=step)
             for tag in step_loss.keys():
                 step_loss[tag] = 0
 

@@ -278,7 +278,7 @@ def main(_):
         transformer_lora_config = LoraConfig(
             r=32,
             lora_alpha=64,
-            init_lora_weights="gaussian",
+            init_lora_weights="gaussian", ### initialize the LoRA weights to a Gaussian distribution to ensure the ref == stable3-5-medium
             target_modules=target_modules,
         )
         if config.train.lora_path:

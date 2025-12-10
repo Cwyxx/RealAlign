@@ -42,12 +42,12 @@ def paired_real_fake_dataset_sd3():
     config.sample.num_batches_per_epoch = 1
     config.sample.test_batch_size = 1 # This bs is a special design, the test set has a total of 2212, to make gpu_num*bs*n as close as possible to 2212, because when the number of samples cannot be divided evenly by the number of cards, multi-card will fill the last batch to ensure each card has the same number of samples, affecting gradient synchronization.
 
-    config.train.algorithm = 'dpo'
+    config.train.algorithm = 'irl'
     # Change ref_update_step to a small number, e.g., 40, to switch to OnlineDPO.
     config.train.ref_update_step=False # True for OnlineDPO, False for OfflineDPO
     
     config.train.batch_size = config.sample.train_batch_size
-    config.train.gradient_accumulation_steps = 64
+    config.train.gradient_accumulation_steps = 1
     config.train.num_inner_epochs = 1
     config.train.timestep_fraction = 0.99
     config.train.beta = 100
@@ -60,8 +60,8 @@ def paired_real_fake_dataset_sd3():
         "pickscore": 1.0,
     }
     
-    #### DPO parameters ####
-    config.train.learning_rate = 2.56e-6
+    #### IRL parameters ####
+    config.train.learning_rate = 1e-4
     config.irl = ml_collections.ConfigDict()
     config.irl.project_name = "diffusion-irl-sd-3-5-medium"
     config.irl.batch_size = 1
@@ -69,7 +69,9 @@ def paired_real_fake_dataset_sd3():
     config.irl.buffer_batch_size = 1
     config.irl.buffer_num_inference_steps = 10
     config.irl.buffer_perturb_timesteps = True
-    config.irl.max_train_steps = 800
+    config.irl.buffer_sample_steps = 1
+    config.irl.max_train_steps = 1600
+    config.irl.margin=0.001
     config.train.beta = 100
     config.train.ref_update_step = False # True for OnlineDPO, False for OfflineDPO
 
@@ -87,16 +89,17 @@ def paired_real_fake_dataset_sd3():
         "val": "high_quality_val"
     }
     
+    config.run_name = f"irl-top_500_pickscore_images_hpdv3_all"
     # ### DiffusionNFT parameters ###
     # config.sample.guidance_scale = 1.0
     # config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/DiffusionNFT/checkpoints/checkpoint-0/lora/learner"
     # config.run_name = f"DiffusionNFT-next-random_9984_images_no_anime_pickscore_002-hpdv3_all-inpainting"
     # ### DiffusionNFT parameters ###
     
-    #### Flow-GRPO parameters ####
-    config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/FlowGRPO-PickScore/checkpoints/checkpoint-0/lora/learner"
-    config.run_name = f"FlowGRPO-PickScore-next-irl-top_500_pickscore_images_hpdv3_all"
-    #### Flow-GRPO parameters ####
+    # #### Flow-GRPO parameters ####
+    # config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/FlowGRPO-PickScore/checkpoints/checkpoint-0/lora/learner"
+    # config.run_name = f"FlowGRPO-PickScore-next-irl-top_500_pickscore_images_hpdv3_all"
+    # #### Flow-GRPO parameters ####
     
     # #### GRPO-Guard Parameters ####
     # config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/GRPO-Guard/checkpoints/checkpoint-0/lora/learner"
