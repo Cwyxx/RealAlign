@@ -47,7 +47,7 @@ def paired_real_fake_dataset_sd3():
     config.train.ref_update_step=False # True for OnlineDPO, False for OfflineDPO
     
     config.train.batch_size = config.sample.train_batch_size
-    config.train.gradient_accumulation_steps = 1
+    config.train.gradient_accumulation_steps = 64
     config.train.num_inner_epochs = 1
     config.train.timestep_fraction = 0.99
     config.train.beta = 100

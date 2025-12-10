@@ -410,29 +410,32 @@ def main(_):
         with torch.no_grad():
             pixel_values = pixel_values.chunk(2, dim=1)[0] # [batch_size, 6, 512, 512] -> [batch_size, 3, 512, 512]
             x0 = pipeline.vae.encode(pixel_values).latent_dist.sample()
-            x0_expert = (x0 - pipeline.vae.config.shift_factor) * pipeline.vae.config.scaling_factor
-            accelerator.print(f"x0_expert: {x0_expert.shape}")
+            x0_expert = (x0 - pipeline.vae.config.shift_factor) * pipeline.vae.config.scaling_factor # [batch_size, 4, 64, 64]
+            # accelerator.print(f"x0_expert: {x0_expert.shape}")
+            
         with autocast():
             with torch.no_grad():
                 pipeline.transformer.set_adapter("learner")
-                x0_policy_images = pipeline(
+                x0_policy = pipeline(
                     prompt_embeds=prompt_embeds,
                     pooled_prompt_embeds=pooled_prompt_embeds,
                     negative_prompt_embeds=negative_prompt_embeds,
                     negative_pooled_prompt_embeds=negative_pooled_prompt_embeds,
                     num_inference_steps=config.irl.buffer_num_inference_steps,
                     guidance_scale=config.sample.guidance_scale,
-                    output_type="pil",
+                    output_type="latent",
                     height=config.resolution,
                     width=config.resolution, 
                     return_dict=False,
-                )[0]
-                x0_policy = pipeline.vae.encode(x0_policy_images).latent_dist.sample()
-                x0_policy = (x0_policy - pipeline.vae.config.shift_factor) * pipeline.vae.config.scaling_factor
+                )[0] # [batch_size, 4, 64, 64]
+                
+        with torch.no_grad():
+            prompt_embeds = prompt_embeds.repeat(2, 1, 1)
+            pooled_prompt_embeds = pooled_prompt_embeds.repeat(2, 1)
         
-        model_input = torch.cat([x0_expert, x0_policy], dim=0)
+        model_input = torch.cat([x0_expert, x0_policy], dim=0) #[batch_size * 2, 4, 64, 64]
         noise = torch.randn_like(model_input)
-        noise = torch.cat([noise[:bsz], noise[:bsz]], dim=0)
+        noise = torch.cat([noise[:bsz], noise[:bsz]], dim=0) #[batch_size * 2]
         
         # Sample a random timestep for each image for weighting schemes where we sample timesteps non-uniformly
         u = compute_density_for_timestep_sampling(
@@ -444,8 +447,7 @@ def main(_):
         )
         indices = (u * noise_scheduler.config.num_train_timesteps).long()
         timesteps = noise_scheduler.timesteps[indices].to(device=model_input.device)
-        timesteps = torch.cat([timesteps, timesteps], dim=0)
-        accelerator.print(f"timesteps: {timesteps.shape}")
+        timesteps = torch.cat([timesteps, timesteps], dim=0) #[batch_size * 2]
         
         # Add noise according to flow matching.
         # zt = (1 - texp) * x + texp * z1
@@ -455,6 +457,7 @@ def main(_):
         
         eps_expert = target[:bsz]
         xt_policy = noisy_model_input[bsz:]
+        
         with accelerator.accumulate(transformer):
             # Variable          Paper
             # -----------------------------
@@ -535,7 +538,7 @@ def main(_):
             optimizer.step()
             optimizer.zero_grad()
             
-            progress_bar.set_postfix(timesteps=t.cpu().tolist(), loss=loss.item())
+            progress_bar.set_postfix(timesteps=timesteps.cpu().tolist(), loss=loss.item())
         
         # Log the training loss
         if accelerator.sync_gradients:
