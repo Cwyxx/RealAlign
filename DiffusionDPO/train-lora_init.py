@@ -458,11 +458,11 @@ def main():
     config = ml_collections.ConfigDict()
     config.dpo = ml_collections.ConfigDict()
     config.dpo.dataset = {
-        "train" : "random_9984_images_no_anime_pickscore_002-hpdv3_all-inpainting",
+        "train" : "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting",
         "val": "high_quality_val"
     }
     config.dpo.csv_file_path = {
-        "random_9984_images_no_anime_pickscore_002-hpdv3_all-inpainting": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/random_9984_images_no_anime_pickscore_0.02-hpdv3_all-uids.csv",
+        "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
     }
     args = parse_args()
@@ -629,7 +629,7 @@ def main():
                     f"Loading adapter weights from state_dict led to unexpected keys not found in the model: "
                     f" {unexpected_keys}. "
                 )
-            logger.info(f"Reuse lora weights from {args.pretrained_lora_path}")
+        logger.info(f"Reuse lora weights from {args.pretrained_lora_path}")
             
         del ref_unet
         ref_unet = copy.deepcopy(unet)

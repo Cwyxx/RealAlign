@@ -5,9 +5,9 @@ conda activate alignprop
 export HF_ENDPOINT=https://hf-mirror.com 
 export CUDA_VISIBLE_DEVICES=0,1
 
-unet_init="mhdang/dpo-sd1.5-text2image-v1"
-run_name="dpo-next-irl_top_500_pickscore_images_hpdv3_all-next-random_9984_images_no_anime_pickscore_002-hpdv3_all-inpainting"
-pretrained_lora_path="/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-v1-5/model-ckpt/dpo-next-irl_top_500_pickscore_images_hpdv3_all/checkpoints/checkpoint-800"
+unet_init="runwayml/stable-diffusion-v1-5"
+run_name="irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_ckpt_800-dpo_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_inpainting"
+pretrained_lora_path="/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-v1-5/model-ckpt/irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all/checkpoints/checkpoint-800"
 output_dir="/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-v1-5/model-ckpt/${run_name}"
 accelerate launch --mixed_precision="fp16"  train-lora_init.py --pretrained_model_name_or_path "runwayml/stable-diffusion-v1-5" \
     --train_batch_size 2 \

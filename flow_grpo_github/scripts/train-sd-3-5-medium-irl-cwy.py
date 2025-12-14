@@ -374,6 +374,8 @@ def main(_):
     logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
     logger.info(f"  Gradient Accumulation steps = {config.train.gradient_accumulation_steps}")
     logger.info(f"  Max_Train_Steps = {config.irl.max_train_steps}")
+    logger.info(f"  IRL Margin = {config.irl.margin}")
+    logger.info(f"  Learning Rate = {config.train.learning_rate}")
 
     progress_bar = tqdm(range(global_step, config.irl.max_train_steps), position=0, disable=not accelerator.is_local_main_process)
     progress_bar.set_description("Steps")
@@ -394,9 +396,11 @@ def main(_):
     step_loss.expert_diff = 0
     step_loss.policy_diff = 0
 
-    # eval(pipeline, val_dataloader, config, accelerator, global_step, None, None, autocast, None, ema, transformer_trainable_parameters)
-    # if accelerator.is_main_process:
-    #     save_ckpt(config.save_dir, pipeline, global_step, accelerator, ema, transformer_trainable_parameters, config)
+    eval(pipeline, val_dataloader, config, accelerator, global_step, None, None, autocast, None, ema, transformer_trainable_parameters)
+    if accelerator.is_main_process:
+        save_ckpt(config.save_dir, pipeline, global_step, accelerator, ema, transformer_trainable_parameters, config)
+    
+    accelerator.wait_for_everyone()
     precomputed_embeddings_dir = config.irl.precomputed_embeddings_dir_dict[config.irl.dataset["train"]]
     negative_prompt_embeds = torch.load(os.path.join(precomputed_embeddings_dir, "empty_prompt.pt"), map_location="cpu")
     negative_pooled_prompt_embeds = torch.load(os.path.join(precomputed_embeddings_dir, "empty_prompt_pooled.pt"), map_location="cpu")

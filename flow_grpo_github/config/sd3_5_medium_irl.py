@@ -76,20 +76,20 @@ def paired_real_fake_dataset_sd3():
     config.train.ref_update_step = False # True for OnlineDPO, False for OfflineDPO
 
     config.irl.csv_file_path = {
-        "top_500_pickscore_images_hpdv3_all": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/top_500_pickscore_images_hpdv3_all.csv",
+        "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
     }
     config.irl.precomputed_embeddings_dir_dict = {
-        "top_500_pickscore_images_hpdv3_all": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/HPDv3/top_500_pickscore_images_hpdv3_all",
+        "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/HPDv3/top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/general_1/high_quality_val/",
         }
     
     config.irl.dataset = {
-        "train": "top_500_pickscore_images_hpdv3_all",
+        "train": "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all",
         "val": "high_quality_val"
     }
     
-    config.run_name = f"irl-top_500_pickscore_images_hpdv3_all"
+    config.run_name = f"irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all"
     # ### DiffusionNFT parameters ###
     # config.sample.guidance_scale = 1.0
     # config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/DiffusionNFT/checkpoints/checkpoint-0/lora/learner"

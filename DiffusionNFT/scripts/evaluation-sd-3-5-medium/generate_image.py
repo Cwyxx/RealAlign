@@ -118,6 +118,7 @@ def main(args):
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
    
+    print(f"args.checkpoint_path: {args.checkpoint_path}")
     if args.checkpoint_path is not None and args.checkpoint_path and os.path.exists(os.path.join(args.checkpoint_path, "lora", "learner")):
         lora_path = os.path.join(args.checkpoint_path, "lora", "learner")
         print(f"Loading LoRA weights from: {lora_path}")
