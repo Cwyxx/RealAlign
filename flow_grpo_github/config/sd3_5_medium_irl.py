@@ -70,6 +70,7 @@ def paired_real_fake_dataset_sd3():
     config.irl.buffer_num_inference_steps = 10
     config.irl.buffer_perturb_timesteps = True
     config.irl.buffer_sample_steps = 1
+    config.irl.buffer_guidance_scale = 1.0
     config.irl.max_train_steps = 1600
     config.irl.margin=0.001
     config.train.beta = 100

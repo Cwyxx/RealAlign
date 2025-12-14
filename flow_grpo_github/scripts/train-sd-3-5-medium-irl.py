@@ -447,7 +447,7 @@ def main(_):
                         negative_prompt_embeds=negative_prompt_embeds,
                         negative_pooled_prompt_embeds=negative_pooled_prompt_embeds,
                         num_inference_steps=config.irl.buffer_num_inference_steps,
-                        guidance_scale=config.sample.guidance_scale,
+                        guidance_scale=config.irl.buffer_guidance_scale,
                         output_type="pil",
                         height=config.resolution,
                         width=config.resolution, 
