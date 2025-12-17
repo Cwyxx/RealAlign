@@ -53,15 +53,15 @@ def paired_real_fake_dataset_sd3():
     config.train.beta = 100
     config.sample.global_std=True
     config.train.ema=True
-    config.save_freq = 50 # epoch
-    config.eval_freq = 50
+    config.save_freq = 100 # epoch
+    config.eval_freq = 100
     config.save_dir = 'logs/pickscore/sd3.5-M-dpo'
     config.reward_fn = {
         "pickscore": 1.0,
     }
     
     #### IRL parameters ####
-    config.train.learning_rate = 1e-4
+    config.train.learning_rate = 2e-4
     config.irl = ml_collections.ConfigDict()
     config.irl.project_name = "diffusion-irl-sd-3-5-medium"
     config.irl.batch_size = 1
@@ -71,7 +71,7 @@ def paired_real_fake_dataset_sd3():
     config.irl.buffer_perturb_timesteps = True
     config.irl.buffer_sample_steps = 1
     config.irl.buffer_guidance_scale = 1.0
-    config.irl.max_train_steps = 1600
+    config.irl.max_train_steps = 2000
     config.irl.margin=0.001
     config.train.beta = 100
     config.train.ref_update_step = False # True for OnlineDPO, False for OfflineDPO
@@ -90,7 +90,7 @@ def paired_real_fake_dataset_sd3():
         "val": "high_quality_val"
     }
     
-    config.run_name = f"irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all"
+    config.run_name = f"irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_lr_{config.train.learning_rate}"
     # ### DiffusionNFT parameters ###
     # config.sample.guidance_scale = 1.0
     # config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/DiffusionNFT/checkpoints/checkpoint-0/lora/learner"

@@ -563,6 +563,7 @@ def main(_):
                 eval(pipeline, val_dataloader, config, accelerator, global_step, None, None, autocast, None, ema, transformer_trainable_parameters)
                 if accelerator.is_main_process:
                     save_ckpt(config.save_dir, pipeline, global_step, accelerator, ema, transformer_trainable_parameters, config)
+                time.sleep(120)
         
         # Wait for main processes to save the state
         accelerator.wait_for_everyone()

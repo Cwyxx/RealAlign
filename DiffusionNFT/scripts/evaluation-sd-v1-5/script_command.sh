@@ -23,8 +23,6 @@ echo "dataset: ${dataset}"
 echo "ckpt_dir: ${ckpt_dir}"
 echo "image_dir: ${image_dir}"
 
-# # # sleep 36000 # 10 hours
-# # sleep 5400
 python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
      --output_dir ${image_dir} \
      --save_images

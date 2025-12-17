@@ -37,11 +37,11 @@ def aesthetic_score(device):
     scorer = AestheticScorer(dtype=torch.float32, device=device)
 
     def _fn(images, prompts, metadata):
-        if isinstance(images, torch.Tensor):
-            images = (images * 255).round().clamp(0, 255).to(torch.uint8)
-        else:
-            images = images.transpose(0, 3, 1, 2)  # NHWC -> NCHW
-            images = torch.tensor(images, dtype=torch.uint8)
+        # if isinstance(images, torch.Tensor):
+        #     images = (images * 255).round().clamp(0, 255).to(torch.uint8)
+        # else:
+        #     images = images.transpose(0, 3, 1, 2)  # NHWC -> NCHW
+        #     images = torch.tensor(images, dtype=torch.uint8)
         scores = scorer(images)
         return scores, {}
 

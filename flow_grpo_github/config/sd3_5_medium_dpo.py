@@ -74,16 +74,16 @@ def paired_real_fake_dataset_sd3():
     # }
 
     config.dpo.csv_file_path = {
-        "random_5376_images_pickscore_002-civitai_top_sfw_images-uids": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/civitai-top-sfw-images-with-metadata/random_5376_images_pickscore_0.02-civitai_top_sfw_images-uids.csv",
+        "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
     }
     config.dpo.precomputed_embeddings_dir_dict = {
-        "random_5376_images_pickscore_002-civitai_top_sfw_images-uids": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/civitai-top-sfw-images-with-metadata/random_5376_images_pickscore_002-civitai_top_sfw_images-uids",
+        "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/HPDv3/top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/general_1/high_quality_val/",
         }
     
     config.dpo.dataset = {
-        "train": "random_5376_images_pickscore_002-civitai_top_sfw_images-uids",
+        "train": "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all",
         "val": "high_quality_val"
     }
     
@@ -93,14 +93,19 @@ def paired_real_fake_dataset_sd3():
     # config.run_name = f"DiffusionNFT-next-random_9984_images_no_anime_pickscore_002-hpdv3_all-inpainting"
     # ### DiffusionNFT parameters ###
     
-    #### Flow-GRPO parameters ####
-    config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/FlowGRPO-PickScore/checkpoints/checkpoint-0/lora/learner"
-    config.run_name = f"FlowGRPO-PickScore-next-random_5376_images_pickscore_0.02-civitai_top_sfw_images-uids"
-    #### Flow-GRPO parameters ####
+    # #### Flow-GRPO parameters ####
+    # config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/FlowGRPO-PickScore/checkpoints/checkpoint-0/lora/learner"
+    # config.run_name = f"FlowGRPO-PickScore-next-random_5376_images_pickscore_0.02-civitai_top_sfw_images-uids"
+    # #### Flow-GRPO parameters ####
     
     # #### GRPO-Guard Parameters ####
     # config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/GRPO-Guard/checkpoints/checkpoint-0/lora/learner"
     # config.run_name = f"GRPO-Guard-next-top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting-w_sft"
+    
+    # #### Inverse Reinforcement Learning parameters ####
+    config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-3-5-medium/model-ckpt/irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all/checkpoints/checkpoint-1600/lora/learner"
+    config.run_name = f"irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-dpo_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all"
+    # #### Inverse Reinforcement Learning parameters ####
     
     config.save_dir = f"/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/{config.run_name}"
     

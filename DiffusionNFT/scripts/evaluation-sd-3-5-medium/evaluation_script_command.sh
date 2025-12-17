@@ -9,7 +9,7 @@ cuda_device=$1 # 0
 method=$2 # "sd-3-5-medium"
 ckpt=$3 # 0
 dataset="pick_a_pic_v2"
-rl_framework="diffusion-dro"
+rl_framework="diffusion-dpo"
 
 export CUDA_VISIBLE_DEVICES=${cuda_device}
 
@@ -24,13 +24,14 @@ echo "dataset: ${dataset}"
 echo "ckpt_dir: ${ckpt_dir}"
 echo "image_dir: ${image_dir}"
 
-# sleep 3600
-python generate_image.py --seed ${seed} --checkpoint_path ${ckpt_dir} --model_type sd3 --dataset ${dataset} \
-     --output_dir ${image_dir} \
-     --save_images
+# # sleep 3600
+# python generate_image.py --seed ${seed} --checkpoint_path ${ckpt_dir} --model_type sd3 --dataset ${dataset} \
+#      --output_dir ${image_dir} \
+#      --save_images
 
-# reward_model_list=("hpsv3")
-reward_model_list=("pickscore" "imagereward" "hpsv3" "aesthetic" "deqa")
+# reward_model_list=("pickscore" "imagereward" "hpsv3" "aesthetic" "deqa")
+reward_model_list=("SGP-HPSv3")
+# reward_model_list=("aesthetic")
 for reward_model in "${reward_model_list[@]}"; do
     echo "********************************************"
     echo "reward_model: ${reward_model}"
@@ -42,7 +43,7 @@ for reward_model in "${reward_model_list[@]}"; do
         conda activate utils
     elif [[ "$reward_model" == "vqascore" ]]; then
         conda activate t2v
-    elif [[ "$reward_model" == "hpsv3" ]]; then
+    elif [[ "$reward_model" == "hpsv3" ]] || [[ "$reward_model" == "SGP-HPSv3" ]]; then
         conda activate hpsv3
     elif [[ "$reward_model" == "cpbd" ]]; then
         conda activate utils
@@ -65,12 +66,12 @@ done
 
 # cd ../DiffusionNFT/scripts/evaluation-sd-3-5-medium
 
-echo "********************************************"
-echo "reward_model: MA-AGIQA"
-conda activate mplug_owl2
-cd ../../../evaluate_metric/MA-AGIQA
-python inference_diffusionnft.py --config configs/AGIQA_3k/MA_AGIQA.yaml --dataset ${dataset} --output_dir ${image_dir}
-cd ../../DiffusionNFT/scripts/evaluation-sd-3-5-medium
+# echo "********************************************"
+# echo "reward_model: MA-AGIQA"
+# conda activate mplug_owl2
+# cd ../../../evaluate_metric/MA-AGIQA
+# python inference_diffusionnft.py --config configs/AGIQA_3k/MA_AGIQA.yaml --dataset ${dataset} --output_dir ${image_dir}
+# cd ../../DiffusionNFT/scripts/evaluation-sd-3-5-medium
 
 # echo "********************************************"
 # echo "reward_model: PKU-AIGIQA"

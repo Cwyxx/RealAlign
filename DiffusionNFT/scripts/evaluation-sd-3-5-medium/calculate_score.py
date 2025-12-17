@@ -214,6 +214,24 @@ def main(args):
             score_details = { args.reward_model: score_list }
             return score_details, {}
         
+    elif args.reward_model == "SGP-HPSv3":
+        from hpsv3 import HPSv3RewardInferencer
+        inferencer = HPSv3RewardInferencer(device='cuda')
+        
+        def scoring_fn(images, prompts, metadata, only_strict=False):
+            ### images is image_paths #### 
+            assert type(images[0]) == str
+            image_paths = images
+            realistic_prompt = [ "Realistic photo " + prompt for prompt in prompts ]
+            cg_rendered_prompt = [ "CG Render " + prompt for prompt in prompts ]
+            with torch.no_grad():
+                realistic_rewards = inferencer.reward(prompts=realistic_prompt, image_paths=image_paths)
+                cg_rendered_rewards = inferencer.reward(prompts=cg_rendered_prompt, image_paths=image_paths)
+                score_list = [realistic_reward[0].item() - cg_rendered_reward[0].item() for realistic_reward, cg_rendered_reward in zip(realistic_rewards, cg_rendered_rewards)]
+            
+            score_details = { args.reward_model: score_list }
+            return score_details, {}
+        
     elif args.reward_model == "cpbd":
         import cpbd
 
@@ -279,7 +297,7 @@ def main(args):
                 images = pil_images.transpose(0, 3, 1, 2)
                 images = torch.tensor(images, dtype=torch.uint8)
                 
-            elif args.reward_model in [ "clipscore", "hpsv2"]:
+            if args.reward_model in [ "clipscore", "hpsv2"]:
                 images = [ np.array(img) for img in pil_images ]
                 images = np.array(images)
                 images = images.transpose(0, 3, 1, 2)  # NHWC -> NCHW
@@ -288,7 +306,7 @@ def main(args):
             elif args.reward_model in [ "imagereward", "pickscore", "unifiedreward", "code", "dinov2"]:
                 images = pil_images
         
-        elif args.reward_model in [ "vqascore", "clip_iqa", "deqa", "aesthetic_v2_5", "hpsv3", "cpbd", "q-align", "imagedoctor", "diffdoctor" ]:
+        elif args.reward_model in [ "vqascore", "clip_iqa", "deqa", "aesthetic_v2_5", "hpsv3", "cpbd", "q-align", "imagedoctor", "diffdoctor", "SGP-HPSv3" ]:
             images = image_paths # path
                 
         all_scores, _ = scoring_fn(images, prompts, metadata, only_strict=False) # calculate_score
