@@ -174,6 +174,9 @@ def main(args):
         
     elif args.dataset == "pick_a_pic_v2":
         dataset = TextPromptDataset(dataset_path, split="test")
+    
+    elif args.dataset == "drawbench_realistic_style":
+        dataset = TextPromptDataset(dataset_path, split="test")
         
     eval_batch_size = 1
 
@@ -251,7 +254,7 @@ if __name__ == "__main__":
         help="Type of the base model ('sd3').",
     )
     parser.add_argument(
-        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "pickscore_train", "pick_a_pic_v2"], help="Dataset type."
+        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "pickscore_train", "pick_a_pic_v2", "drawbench_realistic_style"], help="Dataset type."
     )
     parser.add_argument(
         "--output_dir",

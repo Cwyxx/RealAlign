@@ -384,7 +384,7 @@ if __name__ == "__main__":
     #     help="Type of the base model ('sd3').",
     # )
     parser.add_argument(
-        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "drawbench-analysis", "x_aigd", "pick_a_pic_v2", "pickscore_validation"], help="Dataset type."
+        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "drawbench-analysis", "x_aigd", "pick_a_pic_v2", "pickscore_validation", "drawbench_realistic_style"], help="Dataset type."
     )
     parser.add_argument(
         "--output_dir",
