@@ -112,6 +112,36 @@ def main(args):
         for reward_model in reward_models.values(): reward_model.to(device)
         print(f"Initializing reward models {args.reward_model} from DiffusionNFT...")
         
+    elif args.reward_model == "SGP-PickScore":
+        all_reward_scorers = { "pickscore": 1.0 }
+        pickscore_scoring_fn, pickscore_reward_models = multi_score(device, all_reward_scorers)
+        for reward_model in pickscore_reward_models.values(): reward_model.to(device)
+        def scoring_fn(images, prompts, metadata, only_strict=False):
+            ### images is image_paths #### 
+            realistic_prompt = [ "Realistic photo " + prompt for prompt in prompts ]
+            cg_rendered_prompt = [ "CG Render " + prompt for prompt in prompts ]
+            realistic_rewards,_ = pickscore_scoring_fn(images, realistic_prompt, metadata, only_strict)
+            cg_rendered_rewards,_ = pickscore_scoring_fn(images, cg_rendered_prompt, metadata, only_strict)
+            
+            score_list = [realistic_reward - cg_rendered_reward for realistic_reward, cg_rendered_reward in zip(realistic_rewards["pickscore"], cg_rendered_rewards["pickscore"])]
+            score_details = { args.reward_model: score_list }
+            return score_details, {}
+        
+    elif args.reward_model == "SGP-ImageReward":
+        all_reward_scorers = { "imagereward": 1.0 }
+        imagereward_scoring_fn, imagereward_reward_models = multi_score(device, all_reward_scorers)
+        for reward_model in imagereward_reward_models.values(): reward_model.to(device)
+        def scoring_fn(images, prompts, metadata, only_strict=False):
+            ### images is image_paths #### 
+            realistic_prompt = [ "Realistic photo " + prompt for prompt in prompts ]
+            cg_rendered_prompt = [ "CG Render " + prompt for prompt in prompts ]
+            realistic_rewards,_ = imagereward_scoring_fn(images, realistic_prompt, metadata, only_strict)
+            cg_rendered_rewards,_ = imagereward_scoring_fn(images, cg_rendered_prompt, metadata, only_strict)
+            
+            score_list = [realistic_reward - cg_rendered_reward for realistic_reward, cg_rendered_reward in zip(realistic_rewards["imagereward"], cg_rendered_rewards["imagereward"])]
+            score_details = { args.reward_model: score_list }
+            return score_details, {}
+        
     elif args.reward_model == "vqascore":
         import t2v_metrics
         clip_flant5_score = t2v_metrics.VQAScore(model='clip-flant5-xl')
@@ -289,7 +319,7 @@ def main(args):
         current_batch_size = len(prompts)
         image_paths = [ os.path.join(args.output_dir, "images", f"{sample_idx:05d}.png") for sample_idx in indices ]
         
-        if args.reward_model in [ "imagereward",  "pickscore",  "aesthetic", "clipscore", "hpsv2", "unifiedreward", "code", "dinov2"]:
+        if args.reward_model in [ "imagereward",  "pickscore",  "aesthetic", "clipscore", "hpsv2", "unifiedreward", "code", "dinov2", "SGP-PickScore", "SGP-ImageReward"]:
             pil_images = [ Image.open(image_path) for image_path in image_paths ] # imagereward, pickscore get pil image input
             
             if args.reward_model == "aesthetic":
@@ -303,7 +333,7 @@ def main(args):
                 images = images.transpose(0, 3, 1, 2)  # NHWC -> NCHW
                 images = torch.tensor(images, dtype=torch.uint8) / 255.0
             
-            elif args.reward_model in [ "imagereward", "pickscore", "unifiedreward", "code", "dinov2"]:
+            elif args.reward_model in [ "imagereward", "pickscore", "unifiedreward", "code", "dinov2", "SGP-PickScore", "SGP-ImageReward"]:
                 images = pil_images
         
         elif args.reward_model in [ "vqascore", "clip_iqa", "deqa", "aesthetic_v2_5", "hpsv3", "cpbd", "q-align", "imagedoctor", "diffdoctor", "SGP-HPSv3" ]:

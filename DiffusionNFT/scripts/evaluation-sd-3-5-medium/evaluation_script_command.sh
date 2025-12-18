@@ -29,7 +29,7 @@ python generate_image.py --seed ${seed} --checkpoint_path ${ckpt_dir} --model_ty
      --save_images
 
 # reward_model_list=("pickscore" "imagereward" "hpsv3" "aesthetic" "deqa")
-reward_model_list=("pickscore" "imagereward" "aesthetic" "deqa")
+# reward_model_list=("pickscore" "imagereward" "aesthetic" "deqa")
 for reward_model in "${reward_model_list[@]}"; do
     echo "********************************************"
     echo "reward_model: ${reward_model}"
