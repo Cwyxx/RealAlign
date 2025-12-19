@@ -8,7 +8,7 @@ export TOKENIZERS_PARALLELISM=False
 cuda_device=$1 # 0
 method=$2 # "sd-3-5-medium"
 ckpt=$3 # 0
-dataset="drawbench_realistic_style"
+dataset="pick_a_pic_v2"
 rl_framework="diffusion-dpo"
 
 export CUDA_VISIBLE_DEVICES=${cuda_device}
@@ -28,8 +28,8 @@ python generate_image.py --seed ${seed} --checkpoint_path ${ckpt_dir} --model_ty
      --output_dir ${image_dir} \
      --save_images
 
-# reward_model_list=("pickscore" "imagereward" "hpsv3" "aesthetic" "deqa")
 # reward_model_list=("pickscore" "imagereward" "aesthetic" "deqa")
+reward_model_list=("pickscore" "imagereward" "hpsv3" "aesthetic" "deqa")
 for reward_model in "${reward_model_list[@]}"; do
     echo "********************************************"
     echo "reward_model: ${reward_model}"

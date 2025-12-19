@@ -103,8 +103,8 @@ def paired_real_fake_dataset_sd3():
     # config.run_name = f"GRPO-Guard-next-top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting-w_sft"
     
     # #### Inverse Reinforcement Learning parameters ####
-    config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-3-5-medium/model-ckpt/irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all/checkpoints/checkpoint-1600/lora/learner"
-    config.run_name = f"irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-dpo_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all"
+    config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-3-5-medium/model-ckpt/irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_lr_0.0002/checkpoints/checkpoint-1600/lora/learner"
+    config.run_name = f"irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_lr_0.0002_ckpt_1600-dpo_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all"
     # #### Inverse Reinforcement Learning parameters ####
     
     config.save_dir = f"/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/{config.run_name}"

@@ -61,7 +61,7 @@ def paired_real_fake_dataset_sd3():
     }
     
     #### IRL parameters ####
-    config.train.learning_rate = 2e-4
+    config.train.learning_rate = 3e-4
     config.irl = ml_collections.ConfigDict()
     config.irl.project_name = "diffusion-irl-sd-3-5-medium"
     config.irl.batch_size = 1
@@ -71,7 +71,7 @@ def paired_real_fake_dataset_sd3():
     config.irl.buffer_perturb_timesteps = True
     config.irl.buffer_sample_steps = 1
     config.irl.buffer_guidance_scale = 1.0
-    config.irl.max_train_steps = 2000
+    config.irl.max_train_steps = 3200
     config.irl.margin=0.001
     config.train.beta = 100
     config.train.ref_update_step = False # True for OnlineDPO, False for OfflineDPO
