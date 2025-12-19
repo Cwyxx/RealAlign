@@ -20,3 +20,8 @@ export CUDA_VISIBLE_DEVICES=5
 # input_dir="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/HPDv3/real"
 # output_dir="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3"
 # python u2net_next_inpainting.py --input_dir ${input_dir} --output_dir ${output_dir} --prompt_file ${prompt_file}
+
+prompt_file="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/HPDv3/real_images_uid_prompt.csv"
+input_dir="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/HPDv3/real"
+output_dir="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3"
+python u2net_only_mask.py --input_dir ${input_dir} --output_dir ${output_dir} --prompt_file ${prompt_file}
