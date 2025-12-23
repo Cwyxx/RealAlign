@@ -18,11 +18,11 @@ echo "dataset: ${dataset}"
 echo "ckpt_dir: ${ckpt_dir}"
 echo "image_dir: ${image_dir}"
 
-HF_ENDPOINT=https://hf-mirror.com CUDA_VISIBLE_DEVICES=6 python evaluation/evaluate_images.py \
+HF_ENDPOINT=https://hf-mirror.com CUDA_VISIBLE_DEVICES=7 python evaluation/evaluate_images.py \
     "${image_folder}" \
     --outfile "${image_folder}/results.jsonl" \
     --model-path "/data_center/data2/dataset/chenwy/21164-data/model-ckpt/geneval"
 
 
 echo "summary_scores"
-HF_ENDPOINT=https://hf-mirror.com CUDA_VISIBLE_DEVICES=6 python evaluation/summary_scores.py "${image_folder}/results.jsonl"
+HF_ENDPOINT=https://hf-mirror.com CUDA_VISIBLE_DEVICES=7 python evaluation/summary_scores.py "${image_folder}/results.jsonl"

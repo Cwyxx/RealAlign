@@ -23,16 +23,15 @@ echo "dataset: ${dataset}"
 echo "ckpt_dir: ${ckpt_dir}"
 echo "image_dir: ${image_dir}"
 
-# python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
-#      --output_dir ${image_dir} \
-#      --save_images
+python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
+     --output_dir ${image_dir} \
+     --save_images
 
-# chmod 777 ${image_dir}
-# chmod 777 ${image_dir}/evaluation_results.jsonl
+chmod 777 ${image_dir}
+chmod 777 ${image_dir}/evaluation_results.jsonl
 
 cd ../evaluation-sd-3-5-medium
-reward_model_list=("aesthetic")
-# reward_model_list=("pickscore" "imagereward" "hpsv3" "deqa" "aesthetic" )
+reward_model_list=("pickscore" "imagereward" "hpsv3" "deqa" "aesthetic" )
 for reward_model in "${reward_model_list[@]}"; do
     echo "********************************************"
     echo "reward_model: ${reward_model}"
@@ -68,12 +67,12 @@ cd ../evaluation-sd-v1-5
 
 # # cd ../DiffusionNFT/scripts/evaluation
 
-# echo "********************************************"
-# echo "reward_model: MA-AGIQA"
-# conda activate mplug_owl2
-# cd ../../../evaluate_metric/MA-AGIQA
-# python inference_diffusionnft.py --config configs/AGIQA_3k/MA_AGIQA.yaml --dataset ${dataset} --output_dir ${image_dir}
-# cd ../../DiffusionNFT/scripts/evaluation-sd-v1-5
+echo "********************************************"
+echo "reward_model: MA-AGIQA"
+conda activate mplug_owl2
+cd ../../../evaluate_metric/MA-AGIQA
+python inference_diffusionnft.py --config configs/AGIQA_3k/MA_AGIQA.yaml --dataset ${dataset} --output_dir ${image_dir}
+cd ../../DiffusionNFT/scripts/evaluation-sd-v1-5
 
 # # echo "********************************************"
 # # echo "reward_model: PKU-AIGIQA"

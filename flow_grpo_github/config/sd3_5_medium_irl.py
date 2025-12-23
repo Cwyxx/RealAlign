@@ -61,7 +61,7 @@ def paired_real_fake_dataset_sd3():
     }
     
     #### IRL parameters ####
-    config.train.learning_rate = 3e-4
+    config.train.learning_rate = 2e-4
     config.irl = ml_collections.ConfigDict()
     config.irl.project_name = "diffusion-irl-sd-3-5-medium"
     config.irl.batch_size = 1

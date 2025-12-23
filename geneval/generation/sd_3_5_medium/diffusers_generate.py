@@ -13,7 +13,7 @@ from torchvision.utils import make_grid
 from torchvision.transforms import ToTensor
 from pytorch_lightning import seed_everything
 from diffusers import StableDiffusion3Pipeline
-from peft import LoraConfig, get_peft_model, PeftModel
+from peft import LoraConfig, get_peft_model
 
 torch.set_grad_enabled(False)
 
@@ -72,7 +72,7 @@ def parse_args():
     parser.add_argument(
         "--scale",
         type=float,
-        default=1.0,
+        default=4.5,
         help="unconditional guidance scale: eps = eps(x, empty) + scale * (eps(x, cond) - eps(x, empty))",
     )
     parser.add_argument(
@@ -84,7 +84,7 @@ def parse_args():
     parser.add_argument(
         "--batch_size",
         type=int,
-        default=4,
+        default=1,
         help="how many samples can be produced simultaneously",
     )
     parser.add_argument(
@@ -99,6 +99,13 @@ def parse_args():
         choices=["no", "fp16", "bf16"],
         help="Whether to use mixed precision. Choose between 'no', 'fp16', or 'bf16'.",
     )
+    parser.add_argument(
+        "--checkpoint_path",
+        type=str,
+        default=None,
+        help="path to the checkpoint directory",
+    )
+    opt = parser.parse_args()
     return opt
 
 
@@ -107,55 +114,41 @@ def main(opt):
     with open(opt.metadata_file) as fp:
         metadatas = [json.loads(line) for line in fp]
 
+    device = torch.device("cuda")
     # --- Mixed Precision Setup ---
-    device = torch.device("cuda:0")
-    torch.cuda.set_device(device)
     mixed_precision_dtype = None
     if opt.mixed_precision == "fp16":
         mixed_precision_dtype = torch.float16
     elif opt.mixed_precision == "bf16":
         mixed_precision_dtype = torch.bfloat16
-    enable_amp = mixed_precision_dtype is not None
-    
-    print(f"Running evaluation with 1 GPUs.")
-    if enable_amp: print(f"Using mixed precision: {opt.mixed_precision}")
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    # --- Mixed Precision Setup ---
-    
-    # --- Load Model and Pipeline ---
-    print("Loading model and pipeline (stabilityai/stable-diffusion-3.5-medium)...")
-    pipeline = StableDiffusion3Pipeline.from_pretrained("stabilityai/stable-diffusion-3.5-medium", text_encoder_3=None, tokenizer_3=None)
-    # pipeline = StableDiffusion3Pipeline.from_pretrained("stabilityai/stable-diffusion-3.5-medium")
-    target_modules = [
-        "attn.add_k_proj",
-        "attn.add_q_proj",
-        "attn.add_v_proj",
-        "attn.to_add_out",
-        "attn.to_k",
-        "attn.to_out.0",
-        "attn.to_q",
-        "attn.to_v",
-    ]
-    transformer_lora_config = LoraConfig(
-        r=32, lora_alpha=64, init_lora_weights="gaussian", target_modules=target_modules
-    )
-    torch.backends.cuda.matmul.allow_tf32 = True
-    torch.backends.cudnn.allow_tf32 = True
 
-    if opt.lora_hf_path is not None and opt.lora_hf_path:
-        pipeline.transformer = PeftModel.from_pretrained(pipeline.transformer, opt.lora_hf_path)
-        pipeline.transformer = pipeline.transformer.merge_and_unload()
-        print(f"Loading LoRA weights from HuggingFace: {opt.lora_hf_path}.")
-        
-    elif opt.checkpoint_path is not None and opt.checkpoint_path and os.path.exists(os.path.join(opt.checkpoint_path, "lora")):
-        lora_path = os.path.join(opt.checkpoint_path, "lora")
+    enable_amp = mixed_precision_dtype is not None
+    pipeline = StableDiffusion3Pipeline.from_pretrained("stabilityai/stable-diffusion-3.5-medium")
+    if opt.checkpoint_path is not None and opt.checkpoint_path and os.path.exists(os.path.join(opt.checkpoint_path, "lora", "learner")):
+        target_modules = [
+            "attn.add_k_proj",
+            "attn.add_q_proj",
+            "attn.add_v_proj",
+            "attn.to_add_out",
+            "attn.to_k",
+            "attn.to_out.0",
+            "attn.to_q",
+            "attn.to_v",
+        ]
+        transformer_lora_config = LoraConfig(
+            r=32, lora_alpha=64, init_lora_weights="gaussian", target_modules=target_modules
+        )
+        lora_path = os.path.join(opt.checkpoint_path, "lora", "learner")
         print(f"Loading LoRA weights from: {lora_path}")
         if not os.path.exists(lora_path):
             raise FileNotFoundError(
                 f"LoRA directory not found at {lora_path}. Ensure your checkpoint has a 'lora' subdirectory."
             )
+
         pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config)
-        pipeline.transformer.load_adapter(lora_path, adapter_name="default", is_trainable=False)
+        pipeline.transformer.load_adapter(lora_path, adapter_name="learner", is_trainable=False)
+        pipeline.transformer.set_adapter("learner")
+        print(f"pipeline.transformer.active_adapter: {pipeline.transformer.active_adapter}")
     pipeline.transformer.eval()
     text_encoder_dtype = mixed_precision_dtype if enable_amp else torch.float32
 
@@ -163,11 +156,14 @@ def main(opt):
     pipeline.vae.to(device, dtype=torch.float32)  # VAE usually fp32
     pipeline.text_encoder.to(device, dtype=text_encoder_dtype)
     pipeline.text_encoder_2.to(device, dtype=text_encoder_dtype)
-    # pipeline.text_encoder_3.to(device, dtype=text_encoder_dtype)
-
+    pipeline.text_encoder_3.to(device, dtype=text_encoder_dtype)
     pipeline.safety_checker = None
-    pipeline.set_progress_bar_config(position=1, leave=False, desc="Timestep", dynamic_ncols=True,)
-    pipeline.to(device)
+    pipeline.set_progress_bar_config(
+        position=1,
+        leave=False,
+        desc="Timestep",
+        dynamic_ncols=True,
+    )
     # --- Load Model and Pipeline ---
     
     print(f"Output dir: {opt.outdir}")
@@ -191,26 +187,38 @@ def main(opt):
         with torch.no_grad():
             all_samples = list()
             for n in trange((opt.n_samples + batch_size - 1) // batch_size, desc="Sampling"):
-                # Generate images
-                samples = pipeline(
-                    prompt,
-                    height=opt.H,
-                    width=opt.W,
-                    num_inference_steps=opt.num_inference_steps,
-                    guidance_scale=opt.scale,
-                    num_images_per_prompt=min(batch_size, opt.n_samples - sample_count),
-                    negative_prompt=opt.negative_prompt or None
-                )[0]
+                with torch.cuda.amp.autocast(enabled=enable_amp, dtype=mixed_precision_dtype):
+                    with torch.no_grad():
+                        # Generate images
+                        samples = pipeline(
+                            prompt,
+                            height=opt.H,
+                            width=opt.W,
+                            num_inference_steps=opt.num_inference_steps,
+                            guidance_scale=opt.scale,
+                            num_images_per_prompt=min(batch_size, opt.n_samples - sample_count),
+                            negative_prompt=opt.negative_prompt or None,
+                        ).images
                 
                 for sample in samples:
-                    image_path = os.path.join(sample_path, f"{sample_count:05}.png")
-                    pil_image = Image.fromarray((sample.cpu().numpy().transpose(1, 2, 0) * 255).astype(np.uint8))
-                    pil_image.save(image_path)
+                    sample.save(os.path.join(sample_path, f"{sample_count:05}.png"))
                     sample_count += 1
                     
                 if not opt.skip_grid:
                     all_samples.append(torch.stack([ToTensor()(sample) for sample in samples], 0))
 
+            if not opt.skip_grid:
+                # additionally, save as grid
+                grid = torch.stack(all_samples, 0)
+                grid = rearrange(grid, 'n b c h w -> (n b) c h w')
+                grid = make_grid(grid, nrow=n_rows)
+
+                # to image
+                grid = 255. * rearrange(grid, 'c h w -> h w c').cpu().numpy()
+                grid = Image.fromarray(grid.astype(np.uint8))
+                grid.save(os.path.join(outpath, f'grid.png'))
+                del grid
+                
         del all_samples
 
     print("Done.")

@@ -448,10 +448,6 @@ def main(_):
                         pipeline.transformer.set_adapter("learner")
                 target = noise - model_input # batch_size
 
-                ### sft ###
-                sft_loss = ((model_pred.float() - target.float()) ** 2).mean(dim=(1, 2, 3))
-                sft_loss = sft_loss[:bsz] # [win_image]
-                sft_loss = torch.mean(sft_loss)
                 
                 theta_mse = ((model_pred.float() - target.float()) ** 2).reshape(target.shape[0], -1).mean(dim=1)
                 ref_mse = ((model_pred_ref.float() - target.float()) ** 2).reshape(target.shape[0], -1).mean(dim=1)
@@ -467,6 +463,7 @@ def main(_):
                 dpo_loss = -F.logsigmoid(inside_term)
                 dpo_loss = torch.mean(dpo_loss)
                 
+                sft_loss = torch.mean(model_w_err)
                 loss = sft_loss + dpo_loss
                 info["loss"].append(loss)
                 info["sft_loss"].append(sft_loss)

@@ -82,8 +82,9 @@ def main(args):
     results_filepath = os.path.join(args.output_dir, "evaluation_results.jsonl")
 
     # --- Load Model and Pipeline ---
-    unet_init = "mhdang/dpo-sd1.5-text2image-v1"
-    # unet_init = "jacklishufan/diffusion-kto"
+    # unet_init = "mhdang/dpo-sd1.5-text2image-v1"
+    unet_init = "jacklishufan/diffusion-kto"
+    # unet_init = "ylwu/diffusion-dro-sd1.5"
     print(f"Loading model and pipeline ({unet_init})...")
     unet = UNet2DConditionModel.from_pretrained(unet_init, subfolder="unet")
     pipeline = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
