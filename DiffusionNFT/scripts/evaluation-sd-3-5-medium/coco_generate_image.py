@@ -24,57 +24,16 @@ from PIL import Image
 from tqdm import tqdm
 
 from diffusers import StableDiffusion3Pipeline
-from torch.utils.data import DataLoader, Dataset
 from peft import LoraConfig, get_peft_model
-
-
-import torch.distributed as dist
-from peft import PeftModel
 
 import logging
 
 logging.getLogger("openai").setLevel(logging.ERROR)
 logging.getLogger("httpx").setLevel(logging.ERROR)
 
-class TextPromptDataset(Dataset):
-    def __init__(self, dataset_path, split="test"):
-        self.file_path = os.path.join(dataset_path, f"{split}.txt")
-        if not os.path.exists(self.file_path):
-            raise FileNotFoundError(f"Dataset file not found at {self.file_path}")
-        with open(self.file_path, "r") as f:
-            self.prompts = [line.strip() for line in f.readlines()]
-
-    def __len__(self):
-        return len(self.prompts)
-
-    def __getitem__(self, idx):
-        return {"prompt": self.prompts[idx], "metadata": {}, "original_index": idx}
-
-
-class GenevalPromptDataset(Dataset):
-    def __init__(self, dataset_path, split="test"):
-        self.file_path = os.path.join(dataset_path, f"{split}_metadata.jsonl")
-        if not os.path.exists(self.file_path):
-            raise FileNotFoundError(f"Dataset file not found at {self.file_path}")
-        with open(self.file_path, "r", encoding="utf-8") as f:
-            self.metadatas = [json.loads(line) for line in f]
-            self.prompts = [item["prompt"] for item in self.metadatas]
-
-    def __len__(self):
-        return len(self.prompts)
-
-    def __getitem__(self, idx):
-        return {"prompt": self.prompts[idx], "metadata": self.metadatas[idx], "original_index": idx}
-
-
-def collate_fn(examples):
-    prompts = [example["prompt"] for example in examples]
-    metadatas = [example["metadata"] for example in examples]
-    indices = [example["original_index"] for example in examples]
-    return prompts, metadatas, indices
-
-
 def main(args):
+    if not torch.cuda.is_available():
+        raise RuntimeError("CUDA is not available. This script requires a GPU.")
     device = torch.device("cuda")
 
     # --- Mixed Precision Setup ---
@@ -89,9 +48,8 @@ def main(args):
     print(f"Running evaluation with 1 GPUs.")
     if enable_amp: print(f"Using mixed precision: {args.mixed_precision}")
     os.makedirs(args.output_dir, exist_ok=True)
-    if args.save_images: os.makedirs(os.path.join(args.output_dir, "images"), exist_ok=True)
-
-    results_filepath = os.path.join(args.output_dir, "evaluation_results.jsonl")
+    if args.save_images:
+        os.makedirs(os.path.join(args.output_dir, "images"), exist_ok=True)
 
     # --- Load Model and Pipeline ---
     print("Loading model and pipeline (stabilityai/stable-diffusion-3.5-medium)...")
@@ -119,10 +77,11 @@ def main(args):
     torch.backends.cudnn.allow_tf32 = True
    
     print(f"args.checkpoint_path: {args.checkpoint_path}")
-    if args.checkpoint_path is not None and args.checkpoint_path and os.path.exists(os.path.join(args.checkpoint_path, "lora", "learner")):
+    if args.checkpoint_path is not None and args.checkpoint_path:
         lora_path = os.path.join(args.checkpoint_path, "lora", "learner")
-        print(f"Loading LoRA weights from: {lora_path}")
-        if not os.path.exists(lora_path):
+        if os.path.exists(lora_path):
+            print(f"Loading LoRA weights from: {lora_path}")
+        else:
             raise FileNotFoundError(
                 f"LoRA directory not found at {lora_path}. Ensure your checkpoint has a 'lora' subdirectory."
             )
@@ -153,90 +112,36 @@ def main(args):
     dataset_path = f"../../dataset/{args.dataset}"
     print(f"Loading dataset from: {dataset_path}")
 
-    if args.dataset == "geneval":
-        dataset = GenevalPromptDataset(dataset_path, split="test")
-
-    elif args.dataset == "ocr":
-        dataset = TextPromptDataset(dataset_path, split="test")
-
-    elif args.dataset == "pickscore":
-        dataset = TextPromptDataset(dataset_path, split="test")
-
-    elif args.dataset == "drawbench":
-        dataset = TextPromptDataset(dataset_path, split="test")
-        
-    elif args.dataset == "pick_a_pic_spo":
-        dataset = TextPromptDataset(dataset_path, split="test")
-        
-    elif args.dataset == "pickscore_train":
-        dataset_path = f"../dataset/pickscore"
-        dataset = TextPromptDataset(dataset_path, split="train")
-        
-    elif args.dataset == "pick_a_pic_v2":
-        dataset = TextPromptDataset(dataset_path, split="test")
-    
-    elif args.dataset == "drawbench_realistic_style":
-        dataset = TextPromptDataset(dataset_path, split="test")
-        
-    elif args.dataset == "OneIG-Bench-Anime":
-        dataset = TextPromptDataset(dataset_path, split="test")
-        
-    elif args.dataset == "OneIG-Bench-Portrait":
-        dataset = TextPromptDataset(dataset_path, split="test")
-        
-    eval_batch_size = 1
-
-    dataloader = DataLoader(
-        dataset,
-        batch_size=eval_batch_size,
-        collate_fn=collate_fn,
-        shuffle=False,
-    )
-    
-    result_this_rank = []
-    for batch in tqdm(dataloader, desc=f"Evaluating"):
-        prompts, metadata, indices = batch
-        current_batch_size = len(prompts)
+    with open(os.path.join(dataset_path, "mscoco_val_2014_10k.json"), "r") as f:
+        full_data = json.load(f)
+        if args.end_index is None:
+            data = full_data[args.start_index:]
+            end_idx = len(full_data)
+        else:
+            data = full_data[args.start_index:args.end_index]
+            end_idx = args.end_index
+    for item in tqdm(data, desc=f"Evaluating {args.start_index} to {end_idx}"):
+        uid = item["image"]
+        prompt = item["text"]
         generator = torch.Generator(device).manual_seed(args.seed)
         
         with torch.cuda.amp.autocast(enabled=enable_amp, dtype=mixed_precision_dtype):
             with torch.no_grad():
-                images = pipeline(
-                    prompts,
+                image = pipeline(
+                    [prompt],
                     num_inference_steps=args.num_inference_steps,
                     guidance_scale=args.guidance_scale,
                     output_type="pt",
                     height=args.resolution,
                     width=args.resolution,
                     generator=generator
-                )[0]
+                )[0][0]
 
-        for i in range(current_batch_size):
-            sample_idx = indices[i]
-            result_item = {
-                "sample_id": sample_idx,
-                "prompt": prompts[i],
-                "metadata": metadata[i] if metadata else {},
-                "scores": {},
-            }
+                if args.save_images:
+                    image_path = os.path.join(args.output_dir, "images", f"{uid}.png")
+                    pil_image = Image.fromarray((image.cpu().numpy().transpose(1, 2, 0) * 255).astype(np.uint8))
+                    pil_image.save(image_path)
 
-            if args.save_images:
-                image_path = os.path.join(args.output_dir, "images", f"{sample_idx:05d}.png")
-                pil_image = Image.fromarray((images[i].cpu().numpy().transpose(1, 2, 0) * 255).astype(np.uint8))
-                pil_image.save(image_path)
-                result_item["image_path"] = image_path
-
-            result_this_rank.append(result_item)
-        
-    result_this_rank.sort(key=lambda x: x["sample_id"])
-
-    with open(results_filepath, "w") as f_out:
-        for result_item in result_this_rank:
-            f_out.write(json.dumps(result_item) + "\n")
-    
-    with open(results_filepath.replace(".jsonl", "_backup.jsonl"), "w") as f_out:
-        for result_item in result_this_rank:
-            f_out.write(json.dumps(result_item) + "\n")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate a trained diffusion model in a distributed manner.")
@@ -260,7 +165,7 @@ if __name__ == "__main__":
         help="Type of the base model ('sd3').",
     )
     parser.add_argument(
-        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "pickscore_train", "pick_a_pic_v2", "drawbench_realistic_style", "OneIG-Bench-Anime", "OneIG-Bench-Portrait"], help="Dataset type."
+        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "pickscore_train", "pick_a_pic_v2", "drawbench_realistic_style", "OneIG-Bench-Anime", "OneIG-Bench-Portrait", "coco"], help="Dataset type."
     )
     parser.add_argument(
         "--output_dir",
@@ -282,6 +187,18 @@ if __name__ == "__main__":
         default="fp16",
         choices=["no", "fp16", "bf16"],
         help="Whether to use mixed precision. Choose between 'no', 'fp16', or 'bf16'.",
+    )
+    parser.add_argument(
+        "--start_index",
+        type=int,
+        default=0,
+        help="Start index for dataset slicing.",
+    )
+    parser.add_argument(
+        "--end_index",
+        type=int,
+        default=None,
+        help="End index for dataset slicing. If None, processes all remaining items.",
     )
 
     args = parser.parse_args()

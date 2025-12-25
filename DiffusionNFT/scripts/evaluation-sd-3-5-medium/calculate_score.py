@@ -93,9 +93,13 @@ def main(args):
         dataset = TextPromptDataset(dataset_path, split="test")
     elif args.dataset == "pickscore_validation":
         dataset = TextPromptDataset(dataset_path, split="validation")   
+    elif args.dataset == "OneIG-Bench-Anime":
+        dataset = TextPromptDataset(dataset_path, split="test")
+    elif args.dataset == "OneIG-Bench-Portrait":
+        dataset = TextPromptDataset(dataset_path, split="test")
         
     eval_batch_size = 2
-    if args.reward_model == "hpsv3": eval_batch_size=1
+    if args.reward_model in  ["hpsv3", "unifiedreward"]: eval_batch_size=1
     
     dataloader = DataLoader(
         dataset,
@@ -195,6 +199,7 @@ def main(args):
             attn_implementation="eager",
             torch_dtype=torch.float16,
             device_map="auto",
+            revision="f37ba4273ad8d7548e21ac2fa58353c517e4df49"
         )
         print(f"Initializing reward models {args.reward_model}...")
         
@@ -414,7 +419,7 @@ if __name__ == "__main__":
     #     help="Type of the base model ('sd3').",
     # )
     parser.add_argument(
-        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "drawbench-analysis", "x_aigd", "pick_a_pic_v2", "pickscore_validation", "drawbench_realistic_style"], help="Dataset type."
+        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "drawbench-analysis", "x_aigd", "pick_a_pic_v2", "pickscore_validation", "drawbench_realistic_style", "OneIG-Bench-Anime", "OneIG-Bench-Portrait"], help="Dataset type."
     )
     parser.add_argument(
         "--output_dir",

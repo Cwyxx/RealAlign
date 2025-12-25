@@ -9,7 +9,7 @@ cuda_device=$1 # 0
 method=$2 # "sd-3-5-medium"
 ckpt=$3 # 0
 rl_framework=$4 # "diffusion-dpo"
-dataset="pick_a_pic_v2"
+dataset=$5
 
 export CUDA_VISIBLE_DEVICES=${cuda_device}
 
