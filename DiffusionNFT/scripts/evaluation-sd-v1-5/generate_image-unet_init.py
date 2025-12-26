@@ -83,7 +83,7 @@ def main(args):
 
     # --- Load Model and Pipeline ---
     # unet_init = "mhdang/dpo-sd1.5-text2image-v1"
-    unet_init = "jacklishufan/diffusion-kto"
+    unet_init = args.unet_init
     # unet_init = "ylwu/diffusion-dro-sd1.5"
     print(f"Loading model and pipeline ({unet_init})...")
     unet = UNet2DConditionModel.from_pretrained(unet_init, subfolder="unet")
@@ -131,6 +131,9 @@ def main(args):
         dataset = TextPromptDataset(dataset_path, split="test")
         
     elif args.dataset == "pick_a_pic_v2":
+        dataset = TextPromptDataset(dataset_path, split="test")
+        
+    elif args.dataset == "drawbench-unique":
         dataset = TextPromptDataset(dataset_path, split="test")
     eval_batch_size = 1
 
@@ -198,7 +201,7 @@ if __name__ == "__main__":
         help="Local path to the LoRA checkpoint directory (e.g., './save/run_name/checkpoints/checkpoint-5000').",
     )
     parser.add_argument(
-        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "pickscore_train", "x_aigd", "pick_a_pic_v2"], help="Dataset type."
+        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "pickscore_train", "x_aigd", "pick_a_pic_v2", "drawbench-unique"], help="Dataset type."
     )
     parser.add_argument(
         "--output_dir",
@@ -218,5 +221,12 @@ if __name__ == "__main__":
         help="Whether to use mixed precision. Choose between 'no', 'fp16', or 'bf16'.",
     )
 
+    parser.add_argument(
+        "--unet_init",
+        type=str,
+        default="jacklishufan/diffusion-kto",
+        choices=["mhdang/dpo-sd1.5-text2image-v1", "jacklishufan/diffusion-kto", "ylwu/diffusion-dro-sd1.5"],
+        help="Unet initialization model.",
+    )
     args = parser.parse_args()
     main(args)

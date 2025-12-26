@@ -8,13 +8,12 @@ conda activate utils
 # 可以根据需要添加更多任务
 
 tasks=(
-    "drawbench:FlowGRPO-PickScore/ckpt-0:FlowGRPO-PickScore"
-    "drawbench:DiffusionNFT/ckpt-0:DiffusionNFT"
-    "drawbench:sd-3-5-medium/ckpt-0:sd-3-5-medium"
-    "drawbench:irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_lr_0.0002_ckpt_3200-dpo_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all/ckpt-450:irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_lr_0.0002_ckpt_3200-dpo_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all"
+    "OneIG-Bench-Portrait:sd-3-5-medium/ckpt-0:sd-3-5-medium"
+    "OneIG-Bench-Portrait:FlowGRPO-PickScore/ckpt-0:FlowGRPO-PickScore"
+    "OneIG-Bench-Portrait:irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_lr_0.0002_ckpt_3200-dpo_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all/ckpt-450:irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_lr_0.0002_ckpt_3200-dpo_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all"
 )
 
-model="gpt-5.1-chat-latest"
+model="claude-sonnet-4-5-20250929"
 
 # ==================== 并行执行函数 ====================
 run_task() {

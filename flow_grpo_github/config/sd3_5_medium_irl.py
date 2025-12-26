@@ -90,7 +90,8 @@ def paired_real_fake_dataset_sd3():
         "val": "high_quality_val"
     }
     
-    config.run_name = f"irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_lr_{config.train.learning_rate}"
+    config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/FlowGRPO-PickScore/checkpoints/checkpoint-0/lora/learner"
+    config.run_name = f"FlowGRPO-PickScore-next-irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_lr_{config.train.learning_rate}"
     # ### DiffusionNFT parameters ###
     # config.sample.guidance_scale = 1.0
     # config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/DiffusionNFT/checkpoints/checkpoint-0/lora/learner"
@@ -98,7 +99,6 @@ def paired_real_fake_dataset_sd3():
     # ### DiffusionNFT parameters ###
     
     # #### Flow-GRPO parameters ####
-    # config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/FlowGRPO-PickScore/checkpoints/checkpoint-0/lora/learner"
     # config.run_name = f"FlowGRPO-PickScore-next-irl-top_500_pickscore_images_hpdv3_all"
     # #### Flow-GRPO parameters ####
     

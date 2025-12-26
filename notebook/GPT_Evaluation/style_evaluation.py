@@ -116,7 +116,7 @@ results = []
 system_prompt = "You are an expert computer vision assistant specialized in image style analysis."
 
 # 核心 Prompt 修改：只针对单张图片提问
-user_prompt_template = """Assess whether the provided image has a realistic style.
+user_prompt_template = """Is the image in a realistic style?
 Provide your response in strictly valid JSON format with two keys:
 1. "is_realistic": A string, either "Yes" or "No".
 2. "reason": A concise explanation (1 sentence).

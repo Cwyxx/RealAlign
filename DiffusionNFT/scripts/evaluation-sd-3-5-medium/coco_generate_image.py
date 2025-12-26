@@ -81,15 +81,10 @@ def main(args):
         lora_path = os.path.join(args.checkpoint_path, "lora", "learner")
         if os.path.exists(lora_path):
             print(f"Loading LoRA weights from: {lora_path}")
-        else:
-            raise FileNotFoundError(
-                f"LoRA directory not found at {lora_path}. Ensure your checkpoint has a 'lora' subdirectory."
-            )
-
-        pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config)
-        pipeline.transformer.load_adapter(lora_path, adapter_name="learner", is_trainable=False)
-        pipeline.transformer.set_adapter("learner")
-        print(f"pipeline.transformer.active_adapter: {pipeline.transformer.active_adapter}")
+            pipeline.transformer = get_peft_model(pipeline.transformer, transformer_lora_config)
+            pipeline.transformer.load_adapter(lora_path, adapter_name="learner", is_trainable=False)
+            pipeline.transformer.set_adapter("learner")
+            print(f"pipeline.transformer.active_adapter: {pipeline.transformer.active_adapter}")
 
     pipeline.transformer.eval()
     text_encoder_dtype = mixed_precision_dtype if enable_amp else torch.float32

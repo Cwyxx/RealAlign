@@ -10,9 +10,9 @@ rl_framework="diffusion-dpo"
 dataset="coco"
 start_index_list=(0 1250 2500 3750 5000 6250 7500 8750)
 end_index_list=(1250 2500 3750 5000 6250 7500 8750 10000)
-method_list=("FlowGRPO-PickScore" "sd-3-5-medium" "DiffusionNFT")
-cfg_guidance_list=(4.5 5.0 4.5)
-ckpt_list=(0 0 0)
+method_list=("sd-3-5-medium" "DiffusionNFT")
+cfg_guidance_list=(4.5 1.0)
+ckpt_list=(0 0)
 
 base_ckpt_dir="/data_center/data2/dataset/chenwy/21164-data/${rl_framework}/sd-3-5-medium/model-ckpt"
 base_image_dir="/data_center/data2/dataset/chenwy/21164-data/${rl_framework}/sd-3-5-medium/generate_images/${dataset}"
