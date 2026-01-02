@@ -101,7 +101,7 @@ def main(args):
         dataset = TextPromptDataset(dataset_path, split="test")
         
     eval_batch_size = 2
-    if args.reward_model in  ["hpsv3", "unifiedreward"]: eval_batch_size=1
+    if args.reward_model in  ["hpsv3", "unifiedreward", "unifiedreward_2"]: eval_batch_size=1
     
     dataloader = DataLoader(
         dataset,
@@ -112,7 +112,7 @@ def main(args):
 
     # --- Instantiate Reward Models ---
     print("Initializing reward models...")
-    if args.reward_model in ["imagereward", "pickscore", "aesthetic", "clipscore", "hpsv2", "unifiedreward", "code", "dinov2"]:
+    if args.reward_model in ["imagereward", "pickscore", "aesthetic", "clipscore", "hpsv2", "unifiedreward", "code", "dinov2", "unifiedreward_2"]:
         all_reward_scorers = { args.reward_model: 1.0 }
         scoring_fn, reward_models = multi_score(device, all_reward_scorers)
         for reward_model in reward_models.values(): reward_model.to(device)

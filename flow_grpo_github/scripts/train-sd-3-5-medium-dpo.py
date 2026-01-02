@@ -458,7 +458,8 @@ def main(_):
                 ref_l_err = ref_mse[bsz:]
                 w_diff = model_w_err - ref_w_err
                 l_diff = model_l_err - ref_l_err
-                w_l_diff = w_diff - l_diff
+                w_l_diff = w_diff - 0.5 * l_diff # !!! 0.5 l_diff
+                # w_l_diff = w_diff - l_diff
                 inside_term = -0.5 * config.train.beta * w_l_diff
                 loss = -F.logsigmoid(inside_term)
                 

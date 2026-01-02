@@ -24,11 +24,11 @@ echo "dataset: ${dataset}"
 echo "ckpt_dir: ${ckpt_dir}"
 echo "image_dir: ${image_dir}"
 
-python generate_image.py --seed ${seed} --checkpoint_path ${ckpt_dir} --model_type sd3 --dataset ${dataset} \
-     --output_dir ${image_dir} \
-     --save_images
+# python generate_image.py --seed ${seed} --checkpoint_path ${ckpt_dir} --model_type sd3 --dataset ${dataset} \
+#      --output_dir ${image_dir} \
+#      --save_images
 
-reward_model_list=("pickscore" "imagereward" "SGP-PickScore" "hpsv3" "SGP-HPSv3" "deqa" "aesthetic")
+reward_model_list=("unifiedreward_2")
 for reward_model in "${reward_model_list[@]}"; do
     echo "********************************************"
     echo "reward_model: ${reward_model}"
@@ -36,7 +36,7 @@ for reward_model in "${reward_model_list[@]}"; do
     
     if [[ "$reward_model" == "deqa" ]] || [[ "$reward_model" == "clip_iqa" ]] || [[ "$reward_model" == "q-align" ]]; then
         conda activate internvl
-    elif [[ "$reward_model" == "aesthetic_v2_5" ]] || [[ "$reward_model" == "unifiedreward" ]]; then
+    elif [[ "$reward_model" == "aesthetic_v2_5" ]] || [[ "$reward_model" == "unifiedreward" ]] || [[ "$reward_model" == "unifiedreward_2" ]]; then
         conda activate utils
     elif [[ "$reward_model" == "vqascore" ]]; then
         conda activate t2v
@@ -63,12 +63,12 @@ done
 
 # cd ../DiffusionNFT/scripts/evaluation-sd-3-5-medium
 
-echo "********************************************"
-echo "reward_model: MA-AGIQA"
-conda activate mplug_owl2
-cd ../../../evaluate_metric/MA-AGIQA
-python inference_diffusionnft.py --config configs/AGIQA_3k/MA_AGIQA.yaml --dataset ${dataset} --output_dir ${image_dir}
-cd ../../DiffusionNFT/scripts/evaluation-sd-3-5-medium
+# echo "********************************************"
+# echo "reward_model: MA-AGIQA"
+# conda activate mplug_owl2
+# cd ../../../evaluate_metric/MA-AGIQA
+# python inference_diffusionnft.py --config configs/AGIQA_3k/MA_AGIQA.yaml --dataset ${dataset} --output_dir ${image_dir}
+# cd ../../DiffusionNFT/scripts/evaluation-sd-3-5-medium
 
 # echo "********************************************"
 # echo "reward_model: PKU-AIGIQA"

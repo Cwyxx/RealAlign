@@ -73,19 +73,38 @@ def paired_real_fake_dataset_sd3():
     #     "val": "high_quality_val"
     # }
 
+    # config.dpo.csv_file_path = {
+    #     "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
+    #     "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
+    # }
+    # config.dpo.precomputed_embeddings_dir_dict = {
+    #     "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/HPDv3/top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all",
+    #     "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/general_1/high_quality_val/",
+    #     }
+    
+    # config.dpo.dataset = {
+    #     "train": "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all",
+    #     "val": "high_quality_val"
+    # }
+    
+    #### civitai top sfw images dataset ####
     config.dpo.csv_file_path = {
-        "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
+        "top_512_images_pickscore_002-civitai_top_sfw_images": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/civitai-top-sfw-images-with-metadata/top_512_images_pickscore_0.02-civitai_top_sfw_images-uids.csv",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
     }
     config.dpo.precomputed_embeddings_dir_dict = {
-        "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/HPDv3/top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all",
+        "top_512_images_pickscore_002-civitai_top_sfw_images": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/civitai-top-sfw-images-with-metadata/top_512_images_pickscore_0.02-civitai_top_sfw_images-uids.csv",
+        "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/general_1/high_quality_val/",
+        }    
+    config.dpo.precomputed_embeddings_dir_dict = {
+        "top_512_images_pickscore_002-civitai_top_sfw_images": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/civitai-top-sfw-images-with-metadata/top_512_images_pickscore_0.02-civitai_top_sfw_images-uids",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/general_1/high_quality_val/",
         }
-    
     config.dpo.dataset = {
-        "train": "top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all",
+        "train": "top_512_images_pickscore_002-civitai_top_sfw_images",
         "val": "high_quality_val"
     }
+    #### civitai top sfw images dataset ####
     
     # ### DiffusionNFT parameters ###
     # config.sample.guidance_scale = 1.0
@@ -104,19 +123,9 @@ def paired_real_fake_dataset_sd3():
     
     # #### Inverse Reinforcement Learning parameters ####
     ckpt = 3200
-    config.train.lora_path = f"/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-3-5-medium/model-ckpt/irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_lr_0.0002/checkpoints/checkpoint-{ckpt}/lora/learner"
-    config.run_name = f"irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_lr_0.0002_ckpt_{ckpt}-dpo_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all"
-    # #### Inverse Reinforcement Learning parameters ####
-    
+    config.train.lora_path = f"/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-3-5-medium/model-ckpt/irl-top_512_images_pickscore_002-civitai_top_sfw_images-uids_lr_0.0002/checkpoints/checkpoint-{ckpt}/lora/learner"
+    config.run_name = f"irl-top_512_images_pickscore_002-civitai_top_sfw_images-uids_lr_0.0002_ckpt_{ckpt}-dpo_0.5_l_diff_top_512_images_pickscore_002-civitai_top_sfw_images-uids"
     config.save_dir = f"/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/{config.run_name}"
-    
-    # ### Resume from DiffusionNFT ###
-    # config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusionnft/model-ckpt/sd3/SD3.5M-DiffusionNFT-MultiReward/checkpoints/checkpoint-0/lora"
-    # config.sample.guidance_scale = 1.0
-    # ### Resume from DiffusionNFT ###
-    #### DPO parameters ####
-    
-
     config.per_prompt_stat_tracking = True
     return config
 

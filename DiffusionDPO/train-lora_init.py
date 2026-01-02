@@ -840,10 +840,10 @@ def main():
         train_loss, train_sft_loss, train_dpo_loss = 0.0, 0.0, 0.0
         implicit_acc_accumulated = 0.0
         for step, batch in enumerate(train_dataloader):
-            if save_and_eval:
-                save_and_eval = False
-                unet.eval()
-                save_and_evaluation(accelerator, global_step, unet, text_encoder, vae, val_dataloader, args.output_dir, args.pretrained_model_name_or_path)
+            # if save_and_eval:
+            #     save_and_eval = False
+            #     unet.eval()
+            #     save_and_evaluation(accelerator, global_step, unet, text_encoder, vae, val_dataloader, args.output_dir, args.pretrained_model_name_or_path)
             
             if global_step >= args.max_train_steps:
                 break
@@ -992,7 +992,8 @@ def main():
                 implicit_acc_accumulated = 0.0
 
                 if global_step % args.checkpointing_steps == 0:
-                    save_and_eval = True
+                    # save_and_eval = True
+                    save_and_evaluation(accelerator, global_step, unet, text_encoder, vae, val_dataloader, args.output_dir, args.pretrained_model_name_or_path)
                     # if accelerator.is_main_process:
                         # save_path = os.path.join(args.output_dir, "checkpoints", f"checkpoint-{global_step}")
                         # accelerator.save_state(save_path)

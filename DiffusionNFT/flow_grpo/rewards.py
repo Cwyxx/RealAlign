@@ -312,6 +312,66 @@ def unifiedreward_score(device):
         return scores, {}
 
     return _fn, model
+
+def unifiedreward_2_score(device):
+    import re
+    from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
+    from qwen_vl_utils import process_vision_info
+
+    # print(f"Loading from /data3/chenweiyan/model-ckpt/UnifiedReward-7b-v1.5")
+    # model_path = "/data3/chenweiyan/model-ckpt/UnifiedReward-7b-v1.5"
+    model_path="CodeGoat24/UnifiedReward-2.0-qwen-7b"
+    model = Qwen2_5_VLForConditionalGeneration.from_pretrained(model_path, torch_dtype=torch.float16, device_map={"": 'cuda:0'})
+    processor = AutoProcessor.from_pretrained(model_path)
+    
+    def _extract_scores(text_outputs):
+        scores = []
+        pattern = r"Final Score:\s*([1-5](?:\.\d+)?)"
+        for text in text_outputs:
+            match = re.search(pattern, text)
+            if match:
+                try:
+                    scores.append(float(match.group(1)))
+                except ValueError:
+                    scores.append(0.0)
+            else:
+                print(f"error: dont match")
+                scores.append(0.0)
+        return scores
+    
+    def _fn(images, prompts, metadata):
+        # 处理Tensor类型转换
+        if isinstance(images, torch.Tensor):
+            images = (images * 255).round().clamp(0, 255).to(torch.uint8).cpu().numpy()
+            images = images.transpose(0, 2, 3, 1)  # NCHW -> NHWC
+            images = [Image.fromarray(image).resize((512, 512)) for image in images]
+            
+        text_outputs = []
+        for image, prompt in zip(images, prompts):
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "image": image},
+                        {
+                            "type": "text",
+                            "text": f'You are given a text caption and a generated image based on that caption. Your task is to evaluate this image based on two key criteria:\n1. Alignment with the Caption: Assess how well this image aligns with the provided caption. Consider the accuracy of depicted objects, their relationships, and attributes as described in the caption.\n2. Overall Image Quality: Examine the visual quality of this image, including clarity, detail preservation, color accuracy, and overall aesthetic appeal.\nExtract key elements from the provided text caption, evaluate their presence in the generated image using the format: \'element (type): value\' (where value=0 means not generated, and value=1 means generated), and assign a score from 1 to 5 after \'Final Score:\'.\nYour task is provided as follows:\nText Caption: [{prompt}]'
+                        },
+                    ],
+                }
+            ]    
+            text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+            image_inputs, video_inputs = process_vision_info(messages)
+            inputs = processor(text=[text], images=image_inputs, videos=video_inputs, padding=True, return_tensors="pt").to(model.device)
+            with torch.no_grad():
+                generated_ids = model.generate(**inputs, max_new_tokens=512)
+            generated_ids_trimmed = [ out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids) ]
+            output_text = processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
+            text_outputs.append(output_text)
+        scores = _extract_scores(text_outputs)
+        return scores, {}
+
+    return _fn, model
             
 def dinov2(device):
     from flow_grpo.dinov2 import Dinov2
@@ -469,7 +529,8 @@ def multi_score(device, score_dict):
         "code": code,
         "b_free": b_free,
         "dinov2": dinov2,
-        "dinov2_explain": dinov2_explain
+        "dinov2_explain": dinov2_explain,
+        "unifiedreward_2": unifiedreward_2_score
     }
     score_fns, score_models = {}, {}
     for score_name, weight in score_dict.items():
@@ -478,7 +539,7 @@ def multi_score(device, score_dict):
         score_models[score_name] = score_model
         score_model.to(torch.device("cpu"))
         
-    offload_reward_model_list = ["pickscore", "clipscore", "hpsv2", "code", "b_free", "dinov2", "dinov2_explain"]
+    offload_reward_model_list = ["pickscore", "clipscore", "hpsv2", "code", "b_free", "dinov2", "dinov2_explain", "unifiedreward_2"]
     # only_strict is only for geneval. During training, only the strict reward is needed, and non-strict rewards don't need to be computed, reducing reward calculation time.
     def _fn(images, prompts, metadata, only_strict=True, offload_to_cpu=False):
         total_scores = []
