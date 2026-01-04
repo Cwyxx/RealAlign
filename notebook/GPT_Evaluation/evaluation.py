@@ -16,7 +16,18 @@ def calculate_win_rates(df):
     total = len(df)
     
     # Count selections
-    selection_counts = Counter(df['selection'].astype(int))
+    selection_converted = df['selection'].astype('Int64')
+    
+    # Find rows that failed to convert (NA values)
+    failed_mask = selection_converted.isna()
+    conversion_failures = failed_mask.sum()
+    failed_row_indices = df.index[failed_mask].tolist()  # Get original row indices
+    
+    # Find rows that are not valid comparisons (not 1 or 2)
+    invalid_mask = ~selection_converted.isin([1, 2])
+    invalid_row_indices = df.index[invalid_mask].tolist()
+    
+    selection_counts = Counter(selection_converted)
     
     image1_wins = selection_counts.get(1, 0)  # Image 1 selected
     image2_wins = selection_counts.get(2, 0)  # Image 2 selected
@@ -37,6 +48,9 @@ def calculate_win_rates(df):
         'image1_wins': image1_wins,
         'image2_wins': image2_wins,
         'errors': errors,
+        'conversion_failures': conversion_failures,
+        'failed_row_indices': failed_row_indices,
+        'invalid_row_indices': invalid_row_indices,
         'valid_comparisons': valid_comparisons,
         'image1_win_rate': image1_win_rate,
         'image2_win_rate': image2_win_rate
@@ -68,6 +82,26 @@ stats = calculate_win_rates(df)
 print(f"\nTotal comparisons: {stats['total']}")
 print(f"Valid comparisons: {stats['valid_comparisons']}")
 print(f"Parse errors: {stats['errors']}")
+print(f"Conversion failures: {stats['conversion_failures']}")
+if stats['conversion_failures'] > 0:
+    # Convert to 1-based row numbers (assuming CSV row numbers, +1 for header, +1 for 0-index)
+    failed_rows = [idx + 2 for idx in stats['failed_row_indices']]
+    print(f"Failed conversion rows: {failed_rows}")
+
+# Output invalid comparison rows information
+invalid_count = len(stats['invalid_row_indices'])
+if invalid_count > 0:
+    print(f"\n{'─'*60}")
+    print(f"Invalid Comparison Rows (not 1 or 2): {invalid_count}")
+    print(f"{'─'*60}")
+    for idx in stats['invalid_row_indices']:
+        csv_row_num = idx + 2  # Convert to CSV row number
+        original_selection = df.loc[idx, 'selection']
+        print(f"Row {csv_row_num}: selection = {original_selection}")
+        # Optionally print more row information
+        row_data = df.loc[idx]
+        if len(row_data) > 1:
+            print(f"  Full row data: {row_data.to_dict()}")
 
 print(f"\n{'─'*60}")
 print(f"Win Rate Statistics:")

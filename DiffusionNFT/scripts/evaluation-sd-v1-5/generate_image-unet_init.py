@@ -225,7 +225,7 @@ if __name__ == "__main__":
         "--unet_init",
         type=str,
         default="jacklishufan/diffusion-kto",
-        choices=["mhdang/dpo-sd1.5-text2image-v1", "jacklishufan/diffusion-kto", "ylwu/diffusion-dro-sd1.5"],
+        choices=["mhdang/dpo-sd1.5-text2image-v1", "jacklishufan/diffusion-kto", "ylwu/diffusion-dro-sd1.5", "runwayml/stable-diffusion-v1-5", ],
         help="Unet initialization model.",
     )
     args = parser.parse_args()

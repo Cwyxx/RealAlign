@@ -3,13 +3,15 @@ source /data3/chenweiyan/miniconda3/etc/profile.d/conda.sh
 conda activate utils
 
 # ================= Configuration =================
-dataset="drawbench-unique"
+dataset="HPDv2-anime"
 txt_path="/data3/chenweiyan/notebook/fine-tune-diffusion/spo_gitee/DiffusionNFT/dataset/${dataset}/test.txt"
-image1_dir="/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/generate_images_seed_42/${dataset}/irl-top_512_images_pickscore_002-civitai_top_sfw_images-uids_lr_0.0002_ckpt_3200-dpo_top_512_images_pickscore_002-civitai_top_sfw_images-uids/ckpt-400/images"
-model="gemini-3-pro-preview"
+image1_dir="/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/generate_images_seed_42/${dataset}/irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_lr_0.0002_ckpt_3200-dpo_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all/ckpt-450/images"
+model="gemini-3-flash-preview" # "grok-4-1-fast-reasoning" # "gemini-3-flash-preview" # "claude-haiku-4-5-20251001" # "gpt-5.1-chat-latest" "grok-4-1-fast-non-reasoning"
+echo "image1_dir: ${image1_dir}"
+echo "model: ${model}"
 
 # 支持多个 vs_method，用空格分隔
-vs_methods=("FlowGRPO-PickScore" "GRPO-Guard")  # 在这里添加你需要的所有方法
+vs_methods=("DiffusionNFT" "FlowGRPO-PickScore" "GRPO-Guard")  # 在这里添加你需要的所有方法
 
 # 并行执行数量（同时运行的任务数），可以根据系统资源调整
 max_parallel=5
@@ -18,7 +20,7 @@ max_parallel=5
 run_evaluation() {
     local vs_method=$1
     local image2_dir="/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/generate_images_seed_42/${dataset}/${vs_method}/ckpt-0/images"
-    local output_dir="/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/GPT_Evaluation_v3/${dataset}/civitai-vs-${vs_method}"
+    local output_dir="/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/GPT_Evaluation_v3/${dataset}/hpdv3_all_ckpt_450-vs-${vs_method}"
     
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting evaluation for vs_method: ${vs_method}"
     

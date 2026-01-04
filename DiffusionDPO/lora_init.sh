@@ -3,43 +3,16 @@ source /data3/chenweiyan/miniconda3/etc/profile.d/conda.sh
 conda activate alignprop
 
 export HF_ENDPOINT=https://hf-mirror.com 
-export CUDA_VISIBLE_DEVICES=4,5
+export CUDA_VISIBLE_DEVICES=1,2
 
-# top_N=512
-# unet_init="runwayml/stable-diffusion-v1-5"
-# run_name="irl_top_${top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_ckpt_1600-dpo_top_${top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_inpainting"
-# pretrained_lora_path="/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-v1-5/model-ckpt/irl_top_${top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all/checkpoints/checkpoint-1600"
-# output_dir="/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-v1-5/model-ckpt/${run_name}"
-
-# echo "top_N: ${top_N}"
-# echo "run_name: ${run_name}"
-# echo "output_dir: ${output_dir}"
-# echo "unet_init: ${unet_init}"
-# echo "pretrained_lora_path: ${pretrained_lora_path}"
-
-# accelerate launch --mixed_precision="fp16"  train-lora_init.py --pretrained_model_name_or_path ${unet_init} \
-#     --train_batch_size 2 \
-#     --dataloader_num_workers 2 \
-#     --gradient_accumulation_steps 64 \
-#     --max_train_steps 1000 \
-#     --lr_scheduler "constant_with_warmup" \
-#     --lr_warmup_steps 125 \
-#     --learning_rate 1e-8 --scale_lr \
-#     --checkpointing_steps 100 \
-#     --beta_dpo 5000 \
-#     --output_dir ${output_dir} \
-#     --run_name ${run_name} \
-#     --pretrained_lora_path ${pretrained_lora_path} \
-#     --unet_init ${unet_init} \
-#     --top_N ${top_N}
-
-beta_dpo=1000
+beta_dpo=2000
 top_N=512
-ckpt=3200
+ckpt=1600
 unet_init="runwayml/stable-diffusion-v1-5"
-run_name="irl_top_${top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_lr_1e-4_ckpt_${ckpt}-dpo_${beta_dpo}_w_sft_top_${top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_inpainting"
-pretrained_lora_path="/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-v1-5/model-ckpt/irl_top_${top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_lr_1e-4/checkpoints/checkpoint-${ckpt}"
+run_name="irl_top_${top_N}_images_pickscore_0.02-civitai_top_sfw_images_lr_1e-4_ckpt_${ckpt}-dpo_${beta_dpo}_top_${top_N}_images_pickscore_0.02-civitai_top_sfw_images_inpainting"
+pretrained_lora_path="/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-v1-5/model-ckpt/irl_top_${top_N}_images_pickscore_0.02-civitai_top_sfw_images_lr_1e-4/checkpoints/checkpoint-${ckpt}"
 output_dir="/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-v1-5/model-ckpt/${run_name}"
+dataset_type="civitai_top_sfw_images"
 
 echo "top_N: ${top_N}"
 echo "run_name: ${run_name}"
@@ -49,8 +22,7 @@ echo "pretrained_lora_path: ${pretrained_lora_path}"
 echo "ckpt: ${ckpt}"
 echo "beta_dpo: ${beta_dpo}"
 
-sleep 7200
-accelerate launch --mixed_precision="fp16"  train-lora_init-w_sft.py --pretrained_model_name_or_path ${unet_init} \
+accelerate launch --mixed_precision="fp16"  train-lora_init.py --pretrained_model_name_or_path ${unet_init} \
     --train_batch_size 2 \
     --dataloader_num_workers 2 \
     --gradient_accumulation_steps 64 \
@@ -64,4 +36,5 @@ accelerate launch --mixed_precision="fp16"  train-lora_init-w_sft.py --pretraine
     --run_name ${run_name} \
     --pretrained_lora_path ${pretrained_lora_path} \
     --unet_init ${unet_init} \
-    --top_N ${top_N}
+    --top_N ${top_N} \
+    --dataset_type ${dataset_type}

@@ -126,7 +126,8 @@ def paired_real_fake_dataset_sd3():
     # config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/GRPO-Guard/checkpoints/checkpoint-0/lora/learner"
     # config.run_name = f"GRPO-Guard-next-top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting-w_sft"
     
-    config.run_name = f"irl-top_512_images_pickscore_002-civitai_top_sfw_images-uids"
+    config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/FlowGRPO-PickScore/checkpoints/checkpoint-0/lora/learner"
+    config.run_name = f"FlowGRPO-PickScore-next-irl-top_512_images_pickscore_002-civitai_top_sfw_images-uids_lr_{config.train.learning_rate}"
     config.save_dir = f"/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-3-5-medium/model-ckpt/{config.run_name}"
     
     # ### Resume from DiffusionNFT ###

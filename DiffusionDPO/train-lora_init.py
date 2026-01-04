@@ -337,6 +337,9 @@ def parse_args():
     parser.add_argument(
         "--top_N", type=int, default=None, help="Top N images to train on"
     )
+    parser.add_argument(
+        "--dataset_type", type=str, default=None, help="Dataset type"
+    )
     
     args = parser.parse_args()
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
@@ -464,14 +467,25 @@ def main():
     args = parse_args()
     args_dict = {k:v for k, v in vars(args).items()}
     config.update(args_dict)
-    config.dpo.dataset = {
-        "train" : f"top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting",
-        "val": "high_quality_val"
-    }
-    config.dpo.csv_file_path = {
-        f"top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting": f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/top_{args.top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
-        "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
-    }
+    if args.dataset_type == "hpdv3_all":
+        config.dpo.dataset = {
+            "train" : f"top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting",
+            "val": "high_quality_val"
+        }
+        config.dpo.csv_file_path = {
+            f"top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting": f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/top_{args.top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
+            "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
+        }
+    elif args.dataset_type == "civitai_top_sfw_images":
+        config.dpo.dataset = {
+            "train" : f"top_{args.top_N}_images_pickscore_002-civitai_top_sfw_images_inpainting",
+            "val": "high_quality_val"
+        }
+        config.dpo.csv_file_path = {
+            f"top_{args.top_N}_images_pickscore_002-civitai_top_sfw_images_inpainting": f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/civitai-top-sfw-images-with-metadata/top_{args.top_N}_images_pickscore_0.02-civitai_top_sfw_images-uids.csv",
+            "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
+        }
+
     
     #### START ACCELERATOR BOILERPLATE ###
     logging_dir = os.path.join(args.output_dir, args.logging_dir)
