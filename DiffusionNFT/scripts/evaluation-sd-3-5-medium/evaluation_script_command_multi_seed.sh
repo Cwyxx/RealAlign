@@ -15,7 +15,7 @@ export CUDA_VISIBLE_DEVICES=${cuda_device}
 
 base_ckpt_dir="/data_center/data2/dataset/chenwy/21164-data/${rl_framework}/sd-3-5-medium/model-ckpt"
 
-seed_list=(123)
+seed_list=(42 123 456 789 1000)
 for seed in "${seed_list[@]}"; do
     echo "********************************************"
     echo "Starting evaluation with seed: ${seed}"
@@ -26,7 +26,8 @@ for seed in "${seed_list[@]}"; do
 
     python generate_image.py --seed ${seed} --checkpoint_path ${ckpt_dir} --model_type sd3 --dataset ${dataset} \
         --output_dir ${image_dir} \
-        --save_images
+        --save_images \
+        --guidance_scale 1.0
 
 
     reward_model_list=("pickscore" "imagereward" "hpsv3" "aesthetic" "deqa" "unifiedreward")
@@ -58,5 +59,17 @@ for seed in "${seed_list[@]}"; do
     # cd ../../../evaluate_metric/MA-AGIQA
     # python inference_diffusionnft.py --config configs/AGIQA_3k/MA_AGIQA.yaml --dataset ${dataset} --output_dir ${image_dir}
     # cd ../../DiffusionNFT/scripts/evaluation-sd-3-5-medium
+
+    # conda activate vila
+    # echo "********************************************"
+    # echo "reward_model: vila_score"
+    # cd ../../../evaluate_metric
+    # python3 -m vila.run_vila_predict_by_gemini_diffusionnft \
+    #     --output_dir ${image_dir} \
+    #     --ckpt_dir "/data_center/data2/dataset/chenwy/21164-data/model-ckpt/vila/checkpoints/vila_rank_tuned/" \
+    #     --spm_model_path "/data_center/data2/dataset/chenwy/21164-data/model-ckpt/vila/spm_model/spm.model" \
+    #     --dataset "${dataset}"
+
+    # cd ../DiffusionNFT/scripts/evaluation-sd-3-5-medium
 
 done

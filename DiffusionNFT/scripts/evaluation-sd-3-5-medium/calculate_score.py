@@ -99,6 +99,10 @@ def main(args):
         dataset = TextPromptDataset(dataset_path, split="test")
     elif args.dataset == "drawbench-unique":
         dataset = TextPromptDataset(dataset_path, split="test")
+    elif args.dataset == "HPDv2-all":
+        dataset = TextPromptDataset(dataset_path, split="test")
+    elif args.dataset == "partiprompts":
+        dataset = TextPromptDataset(dataset_path, split="test")
         
     eval_batch_size = 2
     if args.reward_model in  ["hpsv3", "unifiedreward", "unifiedreward_2"]: eval_batch_size=1
@@ -421,7 +425,7 @@ if __name__ == "__main__":
     #     help="Type of the base model ('sd3').",
     # )
     parser.add_argument(
-        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "drawbench-analysis", "x_aigd", "pick_a_pic_v2", "pickscore_validation", "drawbench_realistic_style", "OneIG-Bench-Anime", "OneIG-Bench-Portrait", "drawbench-unique"], help="Dataset type."
+        "--dataset", type=str, required=True, choices=["partiprompts", "geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "drawbench-analysis", "x_aigd", "pick_a_pic_v2", "pickscore_validation", "drawbench_realistic_style", "OneIG-Bench-Anime", "OneIG-Bench-Portrait", "drawbench-unique", "HPDv2-anime", "HPDv2-concept-art", "HPDv2-paintings", "HPDv2-photo", "HPDv2-photo-all", "HPDv2-anime-all", "HPDv2-all"], help="Dataset type."
     )
     parser.add_argument(
         "--output_dir",

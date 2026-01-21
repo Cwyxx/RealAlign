@@ -28,7 +28,7 @@ python generate_image.py --seed ${seed} --checkpoint_path ${ckpt_dir} --model_ty
      --output_dir ${image_dir} \
      --save_images
 
-# reward_model_list=("unifiedreward_2")
+# reward_model_list=("pickscore")
 # for reward_model in "${reward_model_list[@]}"; do
 #     echo "********************************************"
 #     echo "reward_model: ${reward_model}"

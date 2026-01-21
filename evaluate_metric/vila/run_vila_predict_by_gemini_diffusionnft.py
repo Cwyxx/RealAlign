@@ -315,7 +315,7 @@ if __name__ == '__main__':
         "--spm_model_path", type=str, required=True, help="Path to sentence piece tokenizer model."
     )
     parser.add_argument(
-        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "pick_a_pic_v2"], help="Dataset used to find prompts and image names."
+        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "pick_a_pic_v2", "drawbench-unique"], help="Dataset used to find prompts and image names."
     )
     parser.add_argument(
         "--output_dir", type=str, default="./evaluation_output", help="Directory where 'images/' and 'evaluation_results.jsonl' are located."

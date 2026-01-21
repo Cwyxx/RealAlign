@@ -123,8 +123,8 @@ def paired_real_fake_dataset_sd3():
     
     # #### Inverse Reinforcement Learning parameters ####
     ckpt = 3200
-    config.train.lora_path = f"/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-3-5-medium/model-ckpt/irl-top_512_images_pickscore_002-civitai_top_sfw_images-uids_lr_0.0002/checkpoints/checkpoint-{ckpt}/lora/learner"
-    config.run_name = f"irl-top_512_images_pickscore_002-civitai_top_sfw_images-uids_lr_0.0002_ckpt_{ckpt}-dpo_0.5_l_diff_top_512_images_pickscore_002-civitai_top_sfw_images-uids"
+    config.train.lora_path = f"/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-3-5-medium/model-ckpt/FlowGRPO-PickScore-next-irl-top_512_images_pickscore_002-civitai_top_sfw_images-uids_lr_0.0002/checkpoints/checkpoint-{ckpt}/lora/learner"
+    config.run_name = f"FlowGRPO-PickScore-next-irl-top_512_images_pickscore_002-civitai_top_sfw_images-uids_lr_0.0002_ckpt_{ckpt}-dpo_top_512_images_pickscore_002-civitai_top_sfw_images-uids"
     config.save_dir = f"/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/{config.run_name}"
     config.per_prompt_stat_tracking = True
     return config

@@ -123,14 +123,14 @@ def main(args):
     print(f"Mask output directory: {mask_output_dir}")
     print(f"Fake image output directory: {fake_image_output_dir}")
     
-    processed_uids = set()
-    if os.path.exists(fake_image_output_dir):
-        for f in os.listdir(fake_image_output_dir):
-            if f.endswith('.png'):
-                uid = os.path.splitext(f)[0]
-                processed_uids.add(uid)
+    # processed_uids = set()
+    # if os.path.exists(fake_image_output_dir):
+    #     for f in os.listdir(fake_image_output_dir):
+    #         if f.endswith('.png'):
+    #             uid = os.path.splitext(f)[0]
+    #             processed_uids.add(uid)
     
-    print(f"Found {len(processed_uids)} already processed UIDs")
+    # print(f"Found {len(processed_uids)} already processed UIDs")
     
     df = pd.read_csv(args.prompt_file, dtype={'uid': str})
     total_uids = len(df)
@@ -156,9 +156,9 @@ def main(args):
         uid = row['uid']
         prompt = row['prompt']
         
-        if uid in processed_uids:
-            skipped_count += 1
-            continue
+        # if uid in processed_uids:
+        #     skipped_count += 1
+        #     continue
         
         image_path = None
         image_extensions = ['.jpg', '.jpeg', '.png', '.PNG', '.JPEG', '.JPG']

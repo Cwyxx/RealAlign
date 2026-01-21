@@ -15,7 +15,7 @@ export CUDA_VISIBLE_DEVICES=${cuda_device}
 
 base_ckpt_dir="/data_center/data2/dataset/chenwy/21164-data/${rl_framework}/sd-v1-5/model-ckpt"
 
-seed_list=(123 456 789 1000)
+seed_list=(42 123 456 789 1000)
 for seed in "${seed_list[@]}"; do
     conda activate alignprop
     echo "********************************************"
@@ -24,13 +24,15 @@ for seed in "${seed_list[@]}"; do
     ckpt_dir="${base_ckpt_dir}/${method}/checkpoints/checkpoint-${ckpt}"
     image_dir="${base_image_dir}/${method}/ckpt-${ckpt}"
 
-    if [[ "$method" == "dpo-official" ]] || [[ "$method" == "kto-official" ]] || [[ "$method" == "sd-v1-5" ]]; then
+    if [[ "$method" == "dpo-official" ]] || [[ "$method" == "kto-official" ]] || [[ "$method" == "sd-v1-5" ]] || [[ "$method" == "inpo-official" ]]; then
         if [[ "$method" == "dpo-official" ]]; then
             unet_init="mhdang/dpo-sd1.5-text2image-v1"
         elif [[ "$method" == "kto-official" ]]; then
             unet_init="jacklishufan/diffusion-kto"
         elif [[ "$method" == "sd-v1-5" ]]; then
             unet_init="runwayml/stable-diffusion-v1-5"
+        elif [[ "$method" == "inpo-official" ]]; then
+            unet_init="JaydenLu666/InPO-SD1.5"
         fi
         python generate_image-unet_init.py --seed ${seed} --dataset ${dataset} \
             --output_dir ${image_dir} \
@@ -72,5 +74,5 @@ for seed in "${seed_list[@]}"; do
     # conda activate mplug_owl2
     # cd ../../../evaluate_metric/MA-AGIQA
     # python inference_diffusionnft.py --config configs/AGIQA_3k/MA_AGIQA.yaml --dataset ${dataset} --output_dir ${image_dir}
-    # cd ../../DiffusionNFT/scripts/evaluation-sd-3-5-medium
+    # cd ../../DiffusionNFT/scripts/evaluation-sd-v1-5
 done

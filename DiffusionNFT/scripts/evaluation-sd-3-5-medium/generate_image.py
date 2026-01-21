@@ -153,6 +153,9 @@ def main(args):
     dataset_path = f"../../dataset/{args.dataset}"
     print(f"Loading dataset from: {dataset_path}")
 
+    if args.dataset == "partiprompts":
+        dataset = TextPromptDataset(dataset_path, split="test")
+
     if args.dataset == "geneval":
         dataset = GenevalPromptDataset(dataset_path, split="test")
 
@@ -184,7 +187,7 @@ def main(args):
     elif args.dataset == "OneIG-Bench-Portrait":
         dataset = TextPromptDataset(dataset_path, split="test")
         
-    elif args.dataset in ["drawbench-unique", "HPDv2-anime", "HPDv2-concept-art", "HPDv2-paintings", "HPDv2-photo"]:
+    elif args.dataset in ["drawbench-unique", "HPDv2-anime", "HPDv2-concept-art", "HPDv2-paintings", "HPDv2-photo", "HPDv2-photo-all", "HPDv2-anime-all", "HPDv2-all"]:
         dataset = TextPromptDataset(dataset_path, split="test")
         
     eval_batch_size = 1
@@ -263,7 +266,7 @@ if __name__ == "__main__":
         help="Type of the base model ('sd3').",
     )
     parser.add_argument(
-        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "pickscore_train", "pick_a_pic_v2", "drawbench_realistic_style", "OneIG-Bench-Anime", "OneIG-Bench-Portrait", "drawbench-unique", "HPDv2-anime", "HPDv2-concept-art", "HPDv2-paintings", "HPDv2-photo"], help="Dataset type."
+        "--dataset", type=str, required=True, choices=["partiprompts", "geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "pickscore_train", "pick_a_pic_v2", "drawbench_realistic_style", "OneIG-Bench-Anime", "OneIG-Bench-Portrait", "drawbench-unique", "HPDv2-anime", "HPDv2-concept-art", "HPDv2-paintings", "HPDv2-photo", "HPDv2-photo-all", "HPDv2-anime-all", "HPDv2-all"], help="Dataset type."
     )
     parser.add_argument(
         "--output_dir",

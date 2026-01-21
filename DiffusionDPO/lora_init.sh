@@ -3,16 +3,19 @@ source /data3/chenweiyan/miniconda3/etc/profile.d/conda.sh
 conda activate alignprop
 
 export HF_ENDPOINT=https://hf-mirror.com 
-export CUDA_VISIBLE_DEVICES=1,2
+export CUDA_VISIBLE_DEVICES=6,7
 
 beta_dpo=2000
 top_N=512
-ckpt=1600
+
 unet_init="runwayml/stable-diffusion-v1-5"
-run_name="irl_top_${top_N}_images_pickscore_0.02-civitai_top_sfw_images_lr_1e-4_ckpt_${ckpt}-dpo_${beta_dpo}_top_${top_N}_images_pickscore_0.02-civitai_top_sfw_images_inpainting"
-pretrained_lora_path="/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-v1-5/model-ckpt/irl_top_${top_N}_images_pickscore_0.02-civitai_top_sfw_images_lr_1e-4/checkpoints/checkpoint-${ckpt}"
+run_name="dpo_${beta_dpo}_top_${top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-inpainting"
+# run_name="dpo_${beta_dpo}_top_${top_N}_images_pickscore_0.02-civitai_top_sfw_images_inpainting"
+# ckpt=1600
+# run_name="irl_top_${top_N}_images_pickscore_0.02-civitai_top_sfw_images_lr_1e-4_ckpt_${ckpt}-dpo_${beta_dpo}_top_${top_N}_images_pickscore_0.02-civitai_top_sfw_images_inpainting"
+# pretrained_lora_path="/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-v1-5/model-ckpt/irl_top_${top_N}_images_pickscore_0.02-civitai_top_sfw_images_lr_1e-4/checkpoints/checkpoint-${ckpt}"
 output_dir="/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-v1-5/model-ckpt/${run_name}"
-dataset_type="civitai_top_sfw_images"
+dataset_type="hpdv3_all"
 
 echo "top_N: ${top_N}"
 echo "run_name: ${run_name}"
@@ -34,7 +37,8 @@ accelerate launch --mixed_precision="fp16"  train-lora_init.py --pretrained_mode
     --beta_dpo ${beta_dpo} \
     --output_dir ${output_dir} \
     --run_name ${run_name} \
-    --pretrained_lora_path ${pretrained_lora_path} \
     --unet_init ${unet_init} \
     --top_N ${top_N} \
     --dataset_type ${dataset_type}
+
+ # --pretrained_lora_path ${pretrained_lora_path} \

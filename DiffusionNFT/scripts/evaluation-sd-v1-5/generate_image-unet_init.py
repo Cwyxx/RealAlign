@@ -108,6 +108,9 @@ def main(args):
     dataset_path = f"../../dataset/{args.dataset}"
     print(f"Loading dataset from: {dataset_path}")
 
+    if args.dataset == "partiprompts":
+        dataset = TextPromptDataset(dataset_path, split="test")
+
     if args.dataset == "geneval":
         dataset = GenevalPromptDataset(dataset_path, split="test")
 
@@ -201,7 +204,7 @@ if __name__ == "__main__":
         help="Local path to the LoRA checkpoint directory (e.g., './save/run_name/checkpoints/checkpoint-5000').",
     )
     parser.add_argument(
-        "--dataset", type=str, required=True, choices=["geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "pickscore_train", "x_aigd", "pick_a_pic_v2", "drawbench-unique"], help="Dataset type."
+        "--dataset", type=str, required=True, choices=["partiprompts", "geneval", "ocr", "pickscore", "drawbench", "pick_a_pic_spo", "pickscore_train", "x_aigd", "pick_a_pic_v2", "drawbench-unique"], help="Dataset type."
     )
     parser.add_argument(
         "--output_dir",
@@ -225,7 +228,7 @@ if __name__ == "__main__":
         "--unet_init",
         type=str,
         default="jacklishufan/diffusion-kto",
-        choices=["mhdang/dpo-sd1.5-text2image-v1", "jacklishufan/diffusion-kto", "ylwu/diffusion-dro-sd1.5", "runwayml/stable-diffusion-v1-5", ],
+        choices=["mhdang/dpo-sd1.5-text2image-v1", "jacklishufan/diffusion-kto", "ylwu/diffusion-dro-sd1.5", "runwayml/stable-diffusion-v1-5", "JaydenLu666/InPO-SD1.5"],
         help="Unet initialization model.",
     )
     args = parser.parse_args()

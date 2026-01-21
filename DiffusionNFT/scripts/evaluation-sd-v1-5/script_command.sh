@@ -31,7 +31,7 @@ echo "image_dir: ${image_dir}"
 # chmod 777 ${image_dir}/evaluation_results.jsonl
 
 cd ../evaluation-sd-3-5-medium
-reward_model_list=("aesthetic" )
+reward_model_list=("unifiedreward" )
 for reward_model in "${reward_model_list[@]}"; do
     echo "********************************************"
     echo "reward_model: ${reward_model}"
