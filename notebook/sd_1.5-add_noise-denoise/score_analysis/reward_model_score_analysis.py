@@ -1,6 +1,6 @@
 import os
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-os.environ["CUDA_VISIBLE_DEVICES"] = "5"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 os.environ["TOKENIZERS_PARALLELISM"] = "False"
 import torch
 import sys
@@ -13,7 +13,7 @@ from PIL import Image
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM
 
-reward_model_name = "hpsv3"
+reward_model_name = "pickscore"
 # output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/{reward_model_name}/{reward_model_name}.csv"
 
 # csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/HPDv3/real_images_uid_prompt.csv"
@@ -21,11 +21,11 @@ reward_model_name = "hpsv3"
 # real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/real"
 # fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/fake"
 
-output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/civitai-top-sfw-images-with-metadata/{reward_model_name}/{reward_model_name}_score.csv"
-csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/civitai-top-sfw-images-with-metadata/uid_prompt.csv"
+output_csv_path = f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/pick-a-pic-v2-top_4096/{reward_model_name}/{reward_model_name}_score.csv"
+csv_file_path = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/pick-a-pic-v2-top_4096/top_4096_images.csv"
 df = pd.read_csv(csv_file_path, dtype=str)
-real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/civitai-top-sfw-images-with-metadata/real"
-fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/civitai-top-sfw-images-with-metadata/fake"
+real_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/pick-a-pic-v2-top_4096/real"
+fake_image_dir = "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/pick-a-pic-v2-top_4096/fake"
 ext_list = [".png", ".jpg", ".jpeg", ".PNG", ".JPG", ".JPEG"]
 
 print(f"csv file path: {csv_file_path}")

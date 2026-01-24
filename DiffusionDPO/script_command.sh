@@ -3,7 +3,7 @@ source /data3/chenweiyan/miniconda3/etc/profile.d/conda.sh
 conda activate alignprop
 
 export HF_ENDPOINT=https://hf-mirror.com 
-export CUDA_VISIBLE_DEVICES=2,3
+export CUDA_VISIBLE_DEVICES=1
 
 run_name="kto-next-random_9984_images_no_anime_pickscore_002-hpdv3_all-inpainting"
 output_dir="/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-v1-5/model-ckpt/${run_name}"

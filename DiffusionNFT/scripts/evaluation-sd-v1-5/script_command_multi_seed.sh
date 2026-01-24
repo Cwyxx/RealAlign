@@ -24,7 +24,12 @@ for seed in "${seed_list[@]}"; do
     ckpt_dir="${base_ckpt_dir}/${method}/checkpoints/checkpoint-${ckpt}"
     image_dir="${base_image_dir}/${method}/ckpt-${ckpt}"
 
-    if [[ "$method" == "dpo-official" ]] || [[ "$method" == "kto-official" ]] || [[ "$method" == "sd-v1-5" ]] || [[ "$method" == "inpo-official" ]]; then
+    if [[ "$method" == *"dpo_official-"* ]]; then
+        python generate_image-dpo_official.py --seed ${seed} --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
+            --output_dir ${image_dir} \
+            --save_images
+            
+    elif [[ "$method" == "dpo-official" ]] || [[ "$method" == "kto-official" ]] || [[ "$method" == "sd-v1-5" ]] || [[ "$method" == "inpo-official" ]]; then
         if [[ "$method" == "dpo-official" ]]; then
             unet_init="mhdang/dpo-sd1.5-text2image-v1"
         elif [[ "$method" == "kto-official" ]]; then

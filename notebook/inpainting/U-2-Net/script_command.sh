@@ -3,7 +3,7 @@ source /data3/chenweiyan/miniconda3/etc/profile.d/conda.sh
 conda activate alignprop
 
 export HF_ENDPOINT=https://hf-mirror.com 
-export CUDA_VISIBLE_DEVICES=2
+export CUDA_VISIBLE_DEVICES=3
 
 # prompt_file="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/qwen_3_caption-general_append/chameleon_real_qwen3_caption_results.csv"
 # input_dir="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/add_noise_denoise/chameleon_real-random_add_noise_step/real"
@@ -26,7 +26,7 @@ export CUDA_VISIBLE_DEVICES=2
 # output_dir="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3"
 # python u2net_only_mask.py --input_dir ${input_dir} --output_dir ${output_dir} --prompt_file ${prompt_file}
 
-prompt_file="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/civitai-top-sfw-images-with-metadata/top_512_images_pickscore_0.02-civitai_top_sfw_images-uids.csv"
-input_dir="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/civitai-top-sfw-images-with-metadata/real"
-output_dir="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/civitai-top-sfw-images-with-metadata"
-python u2net_only_mask.py --input_dir ${input_dir} --output_dir ${output_dir} --prompt_file ${prompt_file}
+prompt_file="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/pick-a-pic-v2-top_4096/top_4096_images.csv"
+input_dir="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/pick-a-pic-v2-top_4096/top_4096"
+output_dir="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/pick-a-pic-v2-top_4096"
+python u2net_next_inpainting.py --input_dir ${input_dir} --output_dir ${output_dir} --prompt_file ${prompt_file}

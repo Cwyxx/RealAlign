@@ -112,8 +112,10 @@ def main(args):
     os.makedirs(args.output_dir, exist_ok=True)
     real_image_output_dir = os.path.join(args.output_dir, "real")
     fake_image_output_dir = os.path.join(args.output_dir, "fake")
+    mask_output_dir = os.path.join(args.output_dir, "mask")
     os.makedirs(real_image_output_dir, exist_ok=True)
     os.makedirs(fake_image_output_dir, exist_ok=True)
+    os.makedirs(mask_output_dir, exist_ok=True)
 
     print(f"Processing images from {args.input_dir} to {args.output_dir}")
     print(f"Prompt file: {args.prompt_file}")
@@ -178,6 +180,12 @@ def main(args):
             fake_image_output_path = os.path.join(fake_image_output_dir, f"{uid}.png")
             real_image.save(real_image_output_path)
             fake_image.save(fake_image_output_path)
+            
+            saliency_mask_np = np.array(saliency_mask.convert('L'))  # 转换为灰度图
+            threshold = 128
+            saliency_mask_binary = (saliency_mask_np > threshold).astype(np.uint8) * 255
+            saliency_mask_binary = Image.fromarray(saliency_mask_binary, mode='L')
+            saliency_mask_binary.save(os.path.join(mask_output_dir, f"{uid}.png"))
         
         except Exception as e:
             print(f"\nError processing uid {uid}: {str(e)}")

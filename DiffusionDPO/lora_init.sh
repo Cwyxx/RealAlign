@@ -3,17 +3,15 @@ source /data3/chenweiyan/miniconda3/etc/profile.d/conda.sh
 conda activate alignprop
 
 export HF_ENDPOINT=https://hf-mirror.com 
-export CUDA_VISIBLE_DEVICES=6,7
+export CUDA_VISIBLE_DEVICES=1,2
 
 beta_dpo=2000
 top_N=512
+ckpt=1600
 
-unet_init="runwayml/stable-diffusion-v1-5"
-run_name="dpo_${beta_dpo}_top_${top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-inpainting"
-# run_name="dpo_${beta_dpo}_top_${top_N}_images_pickscore_0.02-civitai_top_sfw_images_inpainting"
-# ckpt=1600
-# run_name="irl_top_${top_N}_images_pickscore_0.02-civitai_top_sfw_images_lr_1e-4_ckpt_${ckpt}-dpo_${beta_dpo}_top_${top_N}_images_pickscore_0.02-civitai_top_sfw_images_inpainting"
-# pretrained_lora_path="/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-v1-5/model-ckpt/irl_top_${top_N}_images_pickscore_0.02-civitai_top_sfw_images_lr_1e-4/checkpoints/checkpoint-${ckpt}"
+unet_init="mhdang/dpo-sd1.5-text2image-v1"
+run_name="dpo_official-irl_top_${top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_ckpt_${ckpt}-dpo_${beta_dpo}_top_${top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-inpainting"
+pretrained_lora_path="/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-v1-5/model-ckpt/dpo_official-irl_top_${top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all/checkpoints/checkpoint-${ckpt}"
 output_dir="/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-v1-5/model-ckpt/${run_name}"
 dataset_type="hpdv3_all"
 
@@ -25,7 +23,7 @@ echo "pretrained_lora_path: ${pretrained_lora_path}"
 echo "ckpt: ${ckpt}"
 echo "beta_dpo: ${beta_dpo}"
 
-accelerate launch --mixed_precision="fp16"  train-lora_init.py --pretrained_model_name_or_path ${unet_init} \
+accelerate launch --mixed_precision="fp16"  train-lora_init.py --pretrained_model_name_or_path "runwayml/stable-diffusion-v1-5" \
     --train_batch_size 2 \
     --dataloader_num_workers 2 \
     --gradient_accumulation_steps 64 \
@@ -39,6 +37,5 @@ accelerate launch --mixed_precision="fp16"  train-lora_init.py --pretrained_mode
     --run_name ${run_name} \
     --unet_init ${unet_init} \
     --top_N ${top_N} \
-    --dataset_type ${dataset_type}
-
- # --pretrained_lora_path ${pretrained_lora_path} \
+    --dataset_type ${dataset_type} \
+    --pretrained_lora_path ${pretrained_lora_path}

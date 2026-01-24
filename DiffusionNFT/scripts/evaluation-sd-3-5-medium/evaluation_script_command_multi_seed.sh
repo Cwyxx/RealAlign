@@ -26,8 +26,7 @@ for seed in "${seed_list[@]}"; do
 
     python generate_image.py --seed ${seed} --checkpoint_path ${ckpt_dir} --model_type sd3 --dataset ${dataset} \
         --output_dir ${image_dir} \
-        --save_images \
-        --guidance_scale 1.0
+        --save_images
 
 
     reward_model_list=("pickscore" "imagereward" "hpsv3" "aesthetic" "deqa" "unifiedreward")

@@ -20,7 +20,7 @@ from misc.utils import EasyDict
 @click.command(context_settings={'show_default': True})
 # General options
 @click.option(
-    "--cache", default="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/pick-a-pic-v2/DiffusionDRO", type=str,
+    "--cache", default="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/pick-a-pic-v2/DiffusionDRO-pick-a-pic-v2", type=str,
     help="Cache directory for the `load_dataset`."
 )
 @click.option(
@@ -37,7 +37,7 @@ from misc.utils import EasyDict
     help="The score to filter the dataset."
 )
 @click.option(
-    "--top", default=500, type=int,
+    "--top", default=4096, type=int,
     help="The number of top images (sorted by score) to retrieve."
 )
 @click.option(
@@ -60,7 +60,7 @@ def main(**kwargs):
     score_cache_path = os.path.join(
         args.cache, f"pickapic{args.version}_{args.split}_{args.score}.jsonl")
 
-    calc_scores(args, score_cache_path)
+    # calc_scores(args, score_cache_path)
     save_expert(args, score_cache_path)
 
 
