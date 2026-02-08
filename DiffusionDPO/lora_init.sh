@@ -3,15 +3,15 @@ source /data3/chenweiyan/miniconda3/etc/profile.d/conda.sh
 conda activate alignprop
 
 export HF_ENDPOINT=https://hf-mirror.com 
-export CUDA_VISIBLE_DEVICES=1,2
+export CUDA_VISIBLE_DEVICES=3,4
 
 beta_dpo=2000
 top_N=512
 ckpt=1600
 
-unet_init="mhdang/dpo-sd1.5-text2image-v1"
-run_name="dpo_official-irl_top_${top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_ckpt_${ckpt}-dpo_${beta_dpo}_top_${top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-inpainting"
-pretrained_lora_path="/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-v1-5/model-ckpt/dpo_official-irl_top_${top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all/checkpoints/checkpoint-${ckpt}"
+unet_init="runwayml/stable-diffusion-v1-5"
+run_name="irl_top_${top_N}_images_no_anime_colorfulness_pickscore-hpdv3_all-uids_ckpt_${ckpt}-dpo_${beta_dpo}_top_${top_N}_images_pickscore-hpdv3_all"
+pretrained_lora_path="/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-v1-5/model-ckpt/irl_top_${top_N}_images_no_anime_colorfulness_pickscore-hpdv3_all-uids_lr_1e-4/checkpoints/checkpoint-${ckpt}"
 output_dir="/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-v1-5/model-ckpt/${run_name}"
 dataset_type="hpdv3_all"
 

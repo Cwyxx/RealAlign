@@ -47,14 +47,14 @@ def paired_real_fake_dataset_sd3():
     config.train.ref_update_step=False # True for OnlineDPO, False for OfflineDPO
     
     config.train.batch_size = config.sample.train_batch_size
-    config.train.gradient_accumulation_steps = 64
+    config.train.gradient_accumulation_steps = 32
     config.train.num_inner_epochs = 1
     config.train.timestep_fraction = 0.99
     config.train.beta = 100
     config.sample.global_std=True
     config.train.ema=True
-    config.save_freq = 50 # epoch
-    config.eval_freq = 50
+    config.save_freq = 1000 # epoch
+    config.eval_freq = 1000
     config.save_dir = 'logs/pickscore/sd3.5-M-dpo'
     config.reward_fn = {
         "pickscore": 1.0,
@@ -67,7 +67,7 @@ def paired_real_fake_dataset_sd3():
     config.dpo.batch_size = 1
     config.train.beta = 100
     config.train.ref_update_step = False # True for OnlineDPO, False for OfflineDPO
-    config.dpo.max_train_steps = 2000
+    config.dpo.max_train_steps = 21000
     # config.dpo.dataset = {
     #     "train": "random_9984_images_no_anime_pickscore_002-hpdv3_all-inpainting",
     #     "val": "high_quality_val"
@@ -87,21 +87,34 @@ def paired_real_fake_dataset_sd3():
     #     "val": "high_quality_val"
     # }
     
-    #### civitai top sfw images dataset ####
+    # #### civitai top sfw images dataset ####
+    # config.dpo.csv_file_path = {
+    #     "top_512_images_pickscore_002-civitai_top_sfw_images": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/civitai-top-sfw-images-with-metadata/top_512_images_pickscore_0.02-civitai_top_sfw_images-uids.csv",
+    #     "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
+    # }
+    # config.dpo.precomputed_embeddings_dir_dict = {
+    #     "top_512_images_pickscore_002-civitai_top_sfw_images": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/civitai-top-sfw-images-with-metadata/top_512_images_pickscore_0.02-civitai_top_sfw_images-uids.csv",
+    #     "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/general_1/high_quality_val/",
+    #     }    
+    # config.dpo.precomputed_embeddings_dir_dict = {
+    #     "top_512_images_pickscore_002-civitai_top_sfw_images": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/civitai-top-sfw-images-with-metadata/top_512_images_pickscore_0.02-civitai_top_sfw_images-uids",
+    #     "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/general_1/high_quality_val/",
+    #     }
+    # config.dpo.dataset = {
+    #     "train": "top_512_images_pickscore_002-civitai_top_sfw_images",
+    #     "val": "high_quality_val"
+    # }
+    #### pick-a-pic-v2 dataset ####
     config.dpo.csv_file_path = {
-        "top_512_images_pickscore_002-civitai_top_sfw_images": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/civitai-top-sfw-images-with-metadata/top_512_images_pickscore_0.02-civitai_top_sfw_images-uids.csv",
+        "pick-a-pic-v2": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/pick-a-pic-v2/pick-a-pic-v2-dpo_dataset.csv",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
     }
     config.dpo.precomputed_embeddings_dir_dict = {
-        "top_512_images_pickscore_002-civitai_top_sfw_images": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/civitai-top-sfw-images-with-metadata/top_512_images_pickscore_0.02-civitai_top_sfw_images-uids.csv",
-        "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/general_1/high_quality_val/",
-        }    
-    config.dpo.precomputed_embeddings_dir_dict = {
-        "top_512_images_pickscore_002-civitai_top_sfw_images": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/civitai-top-sfw-images-with-metadata/top_512_images_pickscore_0.02-civitai_top_sfw_images-uids",
+        "pick-a-pic-v2": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/pick-a-pic-v2/",
         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/precompute_prompt_embeddings/general_1/high_quality_val/",
         }
     config.dpo.dataset = {
-        "train": "top_512_images_pickscore_002-civitai_top_sfw_images",
+        "train": "pick-a-pic-v2",
         "val": "high_quality_val"
     }
     #### civitai top sfw images dataset ####
@@ -121,10 +134,12 @@ def paired_real_fake_dataset_sd3():
     # config.train.lora_path = "/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/GRPO-Guard/checkpoints/checkpoint-0/lora/learner"
     # config.run_name = f"GRPO-Guard-next-top_512_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting-w_sft"
     
-    # #### Inverse Reinforcement Learning parameters ####
-    ckpt = 3200
-    config.train.lora_path = f"/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-3-5-medium/model-ckpt/FlowGRPO-PickScore-next-irl-top_512_images_pickscore_002-civitai_top_sfw_images-uids_lr_0.0002/checkpoints/checkpoint-{ckpt}/lora/learner"
-    config.run_name = f"FlowGRPO-PickScore-next-irl-top_512_images_pickscore_002-civitai_top_sfw_images-uids_lr_0.0002_ckpt_{ckpt}-dpo_top_512_images_pickscore_002-civitai_top_sfw_images-uids"
+    # # #### Inverse Reinforcement Learning parameters ####
+    # ckpt = 3200
+    # config.train.lora_path = f"/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-3-5-medium/model-ckpt/FlowGRPO-PickScore-next-irl-top_512_images_pickscore_002-civitai_top_sfw_images-uids_lr_0.0002/checkpoints/checkpoint-{ckpt}/lora/learner"
+    # config.run_name = f"FlowGRPO-PickScore-next-irl-top_512_images_pickscore_002-civitai_top_sfw_images-uids_lr_0.0002_ckpt_{ckpt}-dpo_top_512_images_pickscore_002-civitai_top_sfw_images-uids"
+    
+    config.run_name = f"pick-a-pic-v2-dpo_dataset"
     config.save_dir = f"/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-3-5-medium/model-ckpt/{config.run_name}"
     config.per_prompt_stat_tracking = True
     return config

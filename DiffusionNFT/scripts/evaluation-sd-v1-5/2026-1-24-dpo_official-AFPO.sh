@@ -3,4 +3,4 @@ source /data3/chenweiyan/miniconda3/etc/profile.d/conda.sh
 conda activate alignprop
 
 ./script_command_multi_seed.sh 0 dpo_official-irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_ckpt_1600-dpo_2000_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-inpainting 800 diffusion-dpo pick_a_pic_v2
-./script_command_multi_seed.sh 0 dpo_official-irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_ckpt_1600-dpo_2000_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-inpainting 800 diffusion-dpo partiprompts
+# ./script_command_multi_seed.sh 0 dpo_official-irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_ckpt_1600-dpo_2000_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-inpainting 800 diffusion-dpo partiprompts

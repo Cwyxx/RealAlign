@@ -54,9 +54,9 @@ def clip_score(device):
     scorer = ClipScorer(device=device)
 
     def _fn(images, prompts, metadata):
-        if not isinstance(images, torch.Tensor):
-            images = images.transpose(0, 3, 1, 2)  # NHWC -> NCHW
-            images = torch.tensor(images, dtype=torch.uint8) / 255.0
+        # if not isinstance(images, torch.Tensor):
+        #     images = images.transpose(0, 3, 1, 2)  # NHWC -> NCHW
+        #     images = torch.tensor(images, dtype=torch.uint8) / 255.0
         scores = scorer(images, prompts)
         return scores, {}
 

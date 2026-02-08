@@ -46,7 +46,7 @@ for seed in "${seed_list[@]}"; do
         elif [[ "$reward_model" == "cpbd" ]]; then
             conda activate utils
         elif [[ "$reward_model" == "imagedoctor" ]] || [[ "$reward_model" == "diffdoctor" ]]; then
-            conda activate imagedoctor
+            conda activate utils
         fi
 
         python calculate_score.py --reward_model ${reward_model} --dataset ${dataset} --output_dir ${image_dir} 

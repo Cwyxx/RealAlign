@@ -21,7 +21,11 @@ class DiffDoctor(nn.Module):
         segformer_path = "/data_center/data2/dataset/chenwy/21164-data/model-ckpt/DiffDoctor/ad_pytorch_model.bin"
         method = os.path.basename(os.path.dirname(image_dir))
         dataset = os.path.basename(os.path.dirname(os.path.dirname(image_dir)))
-        self.output_dir = f"/data_center/data2/dataset/chenwy/21164-data/Artifact_Segmentor_Tmp/visualization/DiffDoctor/{dataset}/{method}"
+        generated_image_seed = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(image_dir))))
+        print(f"generated_image_seed: {generated_image_seed}")
+        print(f"dataset: {dataset}")
+        print(f"method: {method}")
+        self.output_dir = f"/data_center/data2/dataset/chenwy/21164-data/Artifact_Segmentor_Tmp/visualization/DiffDoctor/{generated_image_seed}/{dataset}/{method}"
         os.makedirs(self.output_dir, exist_ok=True)
         
         self.device = torch.device("cuda")

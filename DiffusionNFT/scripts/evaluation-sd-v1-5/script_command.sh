@@ -10,11 +10,12 @@ method=$2 # "sd-3-5-medium"
 ckpt=$3 # 0
 rl_framework=$4 # "diffusion-dpo"
 dataset=$5
+seed=$6
 
 export CUDA_VISIBLE_DEVICES=${cuda_device}
 
 base_ckpt_dir="/data_center/data2/dataset/chenwy/21164-data/${rl_framework}/sd-v1-5/model-ckpt"
-base_image_dir="/data_center/data2/dataset/chenwy/21164-data/${rl_framework}/sd-v1-5/generate_images/${dataset}"
+base_image_dir="/data_center/data2/dataset/chenwy/21164-data/${rl_framework}/sd-v1-5/generate_images_seed_${seed}/${dataset}"
 
 ckpt_dir="${base_ckpt_dir}/${method}/checkpoints/checkpoint-${ckpt}"
 image_dir="${base_image_dir}/${method}/ckpt-${ckpt}"
@@ -23,7 +24,7 @@ echo "dataset: ${dataset}"
 echo "ckpt_dir: ${ckpt_dir}"
 echo "image_dir: ${image_dir}"
 
-# python generate_image.py --seed 42 --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
+# python generate_image.py --seed ${seed} --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
 #      --output_dir ${image_dir} \
 #      --save_images
 
@@ -31,7 +32,7 @@ echo "image_dir: ${image_dir}"
 # chmod 777 ${image_dir}/evaluation_results.jsonl
 
 cd ../evaluation-sd-3-5-medium
-reward_model_list=("unifiedreward" )
+reward_model_list=("pickscore" "imagereward" "hpsv3" "deqa" "aesthetic" "unifiedreward")
 for reward_model in "${reward_model_list[@]}"; do
     echo "********************************************"
     echo "reward_model: ${reward_model}"

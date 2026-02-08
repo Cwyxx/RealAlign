@@ -4,6 +4,7 @@ conda activate alignprop
 
 export HF_ENDPOINT=https://hf-mirror.com 
 export TOKENIZERS_PARALLELISM=False
+export TMPDIR=/data1/chenwy/newtmp
 
 cuda_device=$1 # 0
 method=$2 # "sd-3-5-medium"
@@ -56,18 +57,18 @@ for seed in "${seed_list[@]}"; do
         echo "reward_model: ${reward_model}"
         conda activate alignprop
 
-        if [[ "$reward_model" == "deqa" ]] || [[ "$reward_model" == "clip_iqa" ]] || [[ "$reward_model" == "q-align" ]]; then
+        if [[ "$reward_model" == "deqa" ]] || [[ "$reward_model" == "clip_iqa" ]] || [[ "$reward_model" == "niqe" ]] || [[ "$reward_model" == "brisque" ]] || [[ "$reward_model" == "edge_density" ]] || [[ "$reward_model" == "GLCM_homogeneity" ]] || [[ "$reward_model" == "GLCM_contrast" ]] || [[ "$reward_model" == "shannon_entropy" ]] || [[ "$reward_model" == "laplacian_variance" ]] || [[ "$reward_model" == "LBP" ]] || [[ "$reward_model" == "q-align" ]]; then
             conda activate internvl
         elif [[ "$reward_model" == "aesthetic_v2_5" ]] || [[ "$reward_model" == "unifiedreward" ]]; then
             conda activate utils
         elif [[ "$reward_model" == "vqascore" ]]; then
             conda activate t2v
-        elif [[ "$reward_model" == "hpsv3" ]] || [[ "$reward_model" == "SGP-HPSv3" ]]; then
+        elif [[ "$reward_model" == "hpsv3" ]] || [[ "$reward_model" == "SGP-HPSv3" ]] || [[ "$reward_model" == "SGP-v2-HPSv3" ]] || [[ "$reward_model" == "SGP-v1.5-HPSv3" ]]; then
             conda activate hpsv3
         elif [[ "$reward_model" == "cpbd" ]]; then
             conda activate utils
         elif [[ "$reward_model" == "imagedoctor" ]] || [[ "$reward_model" == "diffdoctor" ]]; then
-            conda activate imagedoctor
+            conda activate alignprop
         fi
 
         python calculate_score.py --reward_model ${reward_model} --dataset ${dataset} --output_dir ${image_dir} 

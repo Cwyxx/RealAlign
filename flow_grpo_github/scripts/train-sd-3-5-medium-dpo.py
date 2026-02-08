@@ -42,6 +42,7 @@ logger = get_logger(__name__)
 
 class Paired_Real_Fake_Dataset(Dataset):
     def __init__(self, config, image_transform, split="train"):
+        self.config = config
         self.precomputed_embeddings_dir = config.dpo.precomputed_embeddings_dir_dict[split]
         self.image_transform = image_transform
         self.csv_file_path = config.dpo.csv_file_path[split]
@@ -77,7 +78,6 @@ class Paired_Real_Fake_Dataset(Dataset):
             "pooled_prompt_embed": pooled_prompt_embed,
             "pixel_values": pixel_values
         }
-        
     @staticmethod
     def collate_fn(examples):
         prompts = [ example["prompt"] for example in examples ]

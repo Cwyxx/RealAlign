@@ -1,6 +1,5 @@
 import os
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import torch
@@ -19,17 +18,25 @@ from torchvision import transforms
 tqdm = partial(tqdm.tqdm, dynamic_ncols=True)
 FLAGS = flags.FLAGS
 config_flags.DEFINE_config_file("config", "config/base.py", "Training configuration.")
+flags.DEFINE_integer("start_index", 0, "The starting index of the dataset to process.")
+flags.DEFINE_integer("end_index", -1, "The ending index of the dataset to process. -1 means process to the end.")
 logger = get_logger(__name__)
 
 class Paired_Real_Fake_Dataset(Dataset):
-    def __init__(self, config, image_transform, split="train"):
+    def __init__(self, config, image_transform, split="train", start_idx=0, end_idx=-1):
         self.image_transform = image_transform
-        self.csv_file_path = config.irl.csv_file_path[split]
+        self.csv_file_path = config.dpo.csv_file_path[split]
         
         self.ext_list = [ ".png", ".PNG", ".jpg", ".JPG", ".jpeg", ".JPEG" ]
         self.df = pd.read_csv(self.csv_file_path)
         
         if split == "high_quality_val": self.df = self.df.head(24)
+        else:
+            if end_idx == -1:
+                self.df = self.df.iloc[start_idx:]
+            else:
+                self.df = self.df.iloc[start_idx:end_idx]
+        
         
     def __len__(self):
         return len(self.df)
@@ -44,9 +51,13 @@ class Paired_Real_Fake_Dataset(Dataset):
         if lose_image_path is None:
             raise FileNotFoundError(f"Missing LOSE image for uid: {uid} at {lose_image_path}")
         
-        win_pixel_values = self.image_transform(Image.open(win_image_path).convert("RGB"))
-        lose_pixel_values = self.image_transform(Image.open(lose_image_path).convert("RGB"))
-        pixel_values = torch.cat([win_pixel_values, lose_pixel_values], dim=0) # torch.cat [3, 512, 512] -> [6, 512, 512]
+        try:
+            win_pixel_values = self.image_transform(Image.open(win_image_path).convert("RGB"))
+            lose_pixel_values = self.image_transform(Image.open(lose_image_path).convert("RGB"))
+            pixel_values = torch.cat([win_pixel_values, lose_pixel_values], dim=0) # torch.cat [3, 512, 512] -> [6, 512, 512]
+        except Exception:
+            print(f"Exception uid: {uid}, Create black images")
+            exit(0)
         
         return {
             "uid": uid,
@@ -74,6 +85,8 @@ def compute_text_embeddings(prompt, text_encoders, tokenizers, max_sequence_leng
 def main(_):
     # basic Accelerate and logging setup
     config = FLAGS.config
+    start_idx = FLAGS.start_index
+    end_idx = FLAGS.end_index
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     #### Load Scheduler, Tokenizer and Model. ####
@@ -110,16 +123,16 @@ def main(_):
         ]
     )
     #### image_transform, copy from dive-into-sd-3-5-medium ####
-    train_dataset = Paired_Real_Fake_Dataset(config, image_transform, split=config.irl.dataset["train"])
+    train_dataset = Paired_Real_Fake_Dataset(config, image_transform, split=config.dpo.dataset["train"], start_idx=start_idx, end_idx=end_idx)
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
-        batch_size=2,
+        batch_size=4,
         shuffle=False,
         collate_fn=Paired_Real_Fake_Dataset.collate_fn,
-        num_workers=1
+        num_workers=4,
     )
     
-    precomputed_embeddings_dir = config.irl.precomputed_embeddings_dir_dict[config.irl.dataset["train"]]
+    precomputed_embeddings_dir = config.dpo.precomputed_embeddings_dir_dict[config.dpo.dataset["train"]]
     os.makedirs(precomputed_embeddings_dir, exist_ok=True)
     for uids, prompts, pixel_values in tqdm(train_dataloader):
         prompt_embeds, pooled_prompt_embeds = compute_text_embeddings(
@@ -149,6 +162,6 @@ def main(_):
     pooled_prompt_embed_path = os.path.join(precomputed_embeddings_dir, f"empty_prompt_pooled.pt")
     torch.save(pooled_prompt_embed, pooled_prompt_embed_path)
     
-# python scripts/precompute_prompt_embeddings.py --config config/sd3_5_medium_irl.py:paired_real_fake_dataset_sd3
+# python scripts/precompute_prompt_embeddings.py --config config/sd3_5_medium_dpo.py:paired_real_fake_dataset_sd3
 if __name__ == "__main__":
     app.run(main)

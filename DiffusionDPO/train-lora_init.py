@@ -468,12 +468,20 @@ def main():
     args_dict = {k:v for k, v in vars(args).items()}
     config.update(args_dict)
     if args.dataset_type == "hpdv3_all":
+        # config.dpo.dataset = {
+        #     "train" : f"top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting",
+        #     "val": "high_quality_val"
+        # }
+        # config.dpo.csv_file_path = {
+        #     f"top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting": f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/top_{args.top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
+        #     "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
+        # }
         config.dpo.dataset = {
-            "train" : f"top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting",
+            "train" : f"top_{args.top_N}_images_no_anime_colorfulness_pickscore-hpdv3_all",
             "val": "high_quality_val"
         }
         config.dpo.csv_file_path = {
-            f"top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting": f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/top_{args.top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
+            f"top_{args.top_N}_images_no_anime_colorfulness_pickscore-hpdv3_all": f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/top_{args.top_N}_images_no_anime_colorfulness_pickscore-hpdv3_all-uids.csv",
             "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
         }
     elif args.dataset_type == "civitai_top_sfw_images":
@@ -483,6 +491,16 @@ def main():
         }
         config.dpo.csv_file_path = {
             f"top_{args.top_N}_images_pickscore_002-civitai_top_sfw_images_inpainting": f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/civitai-top-sfw-images-with-metadata/top_{args.top_N}_images_pickscore_0.02-civitai_top_sfw_images-uids.csv",
+            "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
+        }
+        
+    elif args.dataset_type == "pick_a_pic_v2":
+        config.dpo.dataset = {
+            "train" : f"top_{args.top_N}_images_pickscore_002-pick_a_pic_v2",
+            "val": "high_quality_val"
+        }
+        config.dpo.csv_file_path = {
+            f"top_{args.top_N}_images_pickscore_002-pick_a_pic_v2": f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/pick-a-pic-v2-top_4096/top_{args.top_N}_images_pickscore_0.02-pick_a_pic_v2_uids.csv",
             "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
         }
 
@@ -813,6 +831,7 @@ def main():
     logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
     logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
     logger.info(f"  Total optimization steps = {args.max_train_steps}")
+    logger.info(f"  Config.dpo.dataset.train = {config.dpo.dataset['train']}")
     global_step = 0
     first_epoch = 0
     save_and_eval = True
