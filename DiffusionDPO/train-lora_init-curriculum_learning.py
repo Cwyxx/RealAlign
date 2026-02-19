@@ -341,6 +341,12 @@ def parse_args():
         "--dataset_type", type=str, default=None, help="Dataset type"
     )
     
+    #### Curriculum Learning ####
+    parser.add_argument(
+        "--curriculum_learning_step", type=int, default=250, help="Step to switch to all dataset"
+    )
+    #### Curriculum Learning ####
+    
     args = parser.parse_args()
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
     if env_local_rank != -1 and env_local_rank != args.local_rank:
@@ -468,99 +474,27 @@ def main():
     args_dict = {k:v for k, v in vars(args).items()}
     config.update(args_dict)
     
-    # if args.dataset_type == "hpdv3_all-two_stage_text_to_image":
-    #     config.dpo.dataset = {
-    #         "train" : f"two_stage-text-to-image_top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all",
-    #         "val": "high_quality_val"
-    #     }
-    #     config.dpo.csv_file_path = {
-    #         f"two_stage-text-to-image_top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all": f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/saliency_inpainting-text_to_image/text_to_image-top_{args.top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
-    #         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
-    #     }
-        
-    # elif args.dataset_type == "hpdv3_all-two_stage_saliency_inpainting":
-    #     config.dpo.dataset = {
-    #         "train" : f"two_stage_saliency_inpainting_top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all",
-    #         "val": "high_quality_val"
-    #     }
-    #     config.dpo.csv_file_path = {
-    #         f"two_stage_saliency_inpainting_top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all": f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/saliency_inpainting-text_to_image/saliency_inpainting-top_{args.top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
-    #         "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
-    #     }
-    if args.dataset_type == "hpdv3_all-saliencyInpainting-sd3.5m":
+    if args.dataset_type == "hpdv3_all-saliency_inpainting-full_inpainting":
         config.dpo.dataset = {
-            "train" : f"saliencyInpainting-sd3_5m_top_{args.top_N}_images_NAC_pickscore_002-hpdv3_all-uids",
+            "train-easy" : f"full_inpainting-top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting",
+            "train-hard" : f"top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-uids",
             "val": "high_quality_val"
         }
         config.dpo.csv_file_path = {
-            f"saliencyInpainting-sd3_5m_top_{args.top_N}_images_NAC_pickscore_002-hpdv3_all-uids": f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net-next-sd3.5m-inpainting/HPDv3/top_{args.top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
-            "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
-        }
-        
-    elif args.dataset_type == "hpdv3_all-text-to-image":
-        config.dpo.dataset = {
-            "train" : f"text-to-image_top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting",
-            "val": "high_quality_val"
-        }
-        config.dpo.csv_file_path = {
-            f"text-to-image_top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting": f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/text-to-image/HPDv3/no_anime-hpdv3_all/t2i_top_{args.top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
+            f"full_inpainting-top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting": f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/saliency_inpainting-full_inpainting/full_inpainting-top_{args.top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
+            f"top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-uids": f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/saliency_inpainting-full_inpainting/top_{args.top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
             "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
         }
     
-    elif args.dataset_type == "hpdv3_all-full_inpainting":
+    elif args.dataset_type == "hpdv3_all-saliency_inpainting-text_to_image":
         config.dpo.dataset = {
-            "train" : f"full_inpainting_top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting",
+            "train-easy" : f"text_to_image-top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-uids",
+            "train-hard" : f"saliency_inpainting-top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-uids",
             "val": "high_quality_val"
         }
         config.dpo.csv_file_path = {
-            f"full_inpainting_top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting": f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/full_inpainting/HPDv3/full_inpainting_top_{args.top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
-            "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
-        }
-    
-    elif args.dataset_type == "hpdv3_all-sam_top_5_mask":
-        config.dpo.dataset = {
-            "train" : f"sam_random_top_5_mask_top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting",
-            "val": "high_quality_val"
-        }
-        config.dpo.csv_file_path = {
-            f"sam_random_top_5_mask_top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting": f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/sam_next_inpainting/HPDv3/random_top_5_mask/sam_random_top_5_inpaint_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
-            "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
-        }
-    
-    elif args.dataset_type == "hpdv3_all":
-        config.dpo.dataset = {
-            "train" : f"top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting",
-            "val": "high_quality_val"
-        }
-        config.dpo.csv_file_path = {
-            f"top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-inpainting": f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/top_{args.top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
-            "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
-        }
-        # config.dpo.dataset = {
-        #     "train" : f"top_{args.top_N}_images_no_anime_colorfulness_pickscore-hpdv3_all",
-        #     "val": "high_quality_val"
-        # }
-        # config.dpo.csv_file_path = {
-        #     f"top_{args.top_N}_images_no_anime_colorfulness_pickscore-hpdv3_all": f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/top_{args.top_N}_images_no_anime_colorfulness_pickscore-hpdv3_all-uids.csv",
-        #     "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
-        # }
-    elif args.dataset_type == "civitai_top_sfw_images":
-        config.dpo.dataset = {
-            "train" : f"top_{args.top_N}_images_pickscore_002-civitai_top_sfw_images_inpainting",
-            "val": "high_quality_val"
-        }
-        config.dpo.csv_file_path = {
-            f"top_{args.top_N}_images_pickscore_002-civitai_top_sfw_images_inpainting": f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/civitai-top-sfw-images-with-metadata/top_{args.top_N}_images_pickscore_0.02-civitai_top_sfw_images-uids.csv",
-            "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
-        }
-        
-    elif args.dataset_type == "pick_a_pic_v2":
-        config.dpo.dataset = {
-            "train" : f"top_{args.top_N}_images_pickscore_002-pick_a_pic_v2",
-            "val": "high_quality_val"
-        }
-        config.dpo.csv_file_path = {
-            f"top_{args.top_N}_images_pickscore_002-pick_a_pic_v2": f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/pick-a-pic-v2-top_4096/top_{args.top_N}_images_pickscore_0.02-pick_a_pic_v2_uids.csv",
+            f"text_to_image-top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-uids": f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/saliency_inpainting-text_to_image/text_to_image-top_{args.top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
+            f"saliency_inpainting-top_{args.top_N}_images_no_anime_colorfulness_pickscore_002-hpdv3_all-uids": f"/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/saliency_inpainting-text_to_image/saliency_inpainting-top_{args.top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv",
             "high_quality_val": "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/paired_real_generated_dataset/high_quality_val/high_quality_val.csv"
         }
 
@@ -806,10 +740,19 @@ def main():
         ]
     )
     
-    train_dataset = Paired_Real_Fake_Dataset(config, tokenize_captions, train_transforms, config.dpo.dataset["train"])
+    train_easy_dataset = Paired_Real_Fake_Dataset(config, tokenize_captions, train_transforms, config.dpo.dataset["train-easy"])
+    train_hard_dataset = Paired_Real_Fake_Dataset(config, tokenize_captions, train_transforms, config.dpo.dataset["train-hard"])
     val_dataset = Paired_Real_Fake_Dataset(config, tokenize_captions, train_transforms, config.dpo.dataset["val"])
-    train_dataloader = torch.utils.data.DataLoader(
-        train_dataset,
+    train_easy_dataloader = torch.utils.data.DataLoader(
+        train_easy_dataset,
+        shuffle=True,
+        collate_fn=Paired_Real_Fake_Dataset.collate_fn,
+        batch_size=args.train_batch_size,
+        num_workers=args.dataloader_num_workers,
+        drop_last=True
+    )
+    train_hard_dataloader = torch.utils.data.DataLoader(
+        train_hard_dataset,
         shuffle=True,
         collate_fn=Paired_Real_Fake_Dataset.collate_fn,
         batch_size=args.train_batch_size,
@@ -832,7 +775,7 @@ def main():
     
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
-    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
+    num_update_steps_per_epoch = math.ceil(len(train_easy_dataloader) / args.gradient_accumulation_steps)
     if args.max_train_steps is None:
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
         overrode_max_train_steps = True
@@ -846,8 +789,8 @@ def main():
 
     
     #### START ACCELERATOR PREP ####
-    unet, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
-        unet, optimizer, train_dataloader, lr_scheduler
+    unet, optimizer, train_easy_dataloader, train_hard_dataloader, lr_scheduler = accelerator.prepare(
+        unet, optimizer, train_easy_dataloader, train_hard_dataloader, lr_scheduler
     )
 
     # For mixed precision training we cast all non-trainable weights (vae, non-lora text_encoder and non-lora unet) to half-precision
@@ -869,7 +812,7 @@ def main():
     ### END ACCELERATOR PREP ###
     
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
-    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
+    num_update_steps_per_epoch = math.ceil(len(train_easy_dataloader) / args.gradient_accumulation_steps)
     if overrode_max_train_steps:
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
     # Afterwards we recalculate our number of training epochs
@@ -885,13 +828,15 @@ def main():
     total_batch_size = args.train_batch_size * accelerator.num_processes * args.gradient_accumulation_steps
 
     logger.info("***** Running training *****")
-    logger.info(f"  Num examples = {len(train_dataset)}")
+    logger.info(f"  Num easy examples = {len(train_easy_dataset)}")
+    logger.info(f"  Num hard examples = {len(train_hard_dataset)}")
     logger.info(f"  Num Epochs = {args.num_train_epochs}")
     logger.info(f"  Instantaneous batch size per device = {args.train_batch_size}")
     logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
     logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
     logger.info(f"  Total optimization steps = {args.max_train_steps}")
-    logger.info(f"  Config.dpo.dataset.train = {config.dpo.dataset['train']}")
+    logger.info(f"  Config.dpo.dataset.train-easy = {config.dpo.dataset['train-easy']}")
+    logger.info(f"  Config.dpo.dataset.train-hard = {config.dpo.dataset['train-hard']}")
     global_step = 0
     first_epoch = 0
     save_and_eval = True
@@ -926,7 +871,7 @@ def main():
     progress_bar = tqdm(range(global_step, args.max_train_steps), disable=not accelerator.is_local_main_process)
     progress_bar.set_description("Steps")
 
-        
+    train_dataloader = train_easy_dataloader
     #### START MAIN TRAINING LOOP #####
     for epoch in range(first_epoch, args.num_train_epochs):
         unet.train()
@@ -1099,6 +1044,12 @@ def main():
                 logs["implicit_acc"] = avg_acc
             progress_bar.set_postfix(**logs)
 
+        # Curriculum switch at epoch end (if not already switched in step loop)
+        if global_step >= args.curriculum_learning_step and train_dataloader is train_easy_dataloader:
+            accelerator.wait_for_everyone()
+            train_dataloader = train_hard_dataloader
+            if accelerator.is_main_process:
+                logger.info(f"Curriculum: switching to full dataset at step {global_step} (epoch end)")
             
         if global_step >= args.max_train_steps:
                 break

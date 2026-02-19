@@ -10,10 +10,10 @@ top_N=512
 ckpt=1600
 
 unet_init="runwayml/stable-diffusion-v1-5" # "JaydenLu666/InPO-SD1.5" # "runwayml/stable-diffusion-v1-5"
-run_name="irl_saliencyInpainting-sd3.5m_top_${top_N}_images_NAC_pickscore_0.02-hpdv3_all-uids_ckpt_${ckpt}-dpo_${beta_dpo}_saliencyInpainting-sd3.5m"
-pretrained_lora_path="/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-v1-5/model-ckpt/irl_saliencyInpainting-sd3.5m_top_${top_N}_images_NAC_pickscore_0.02-hpdv3_all/checkpoints/checkpoint-${ckpt}"
+run_name="irl_saliencyInpaint-t2i_top_${top_N}_images_NAC_pickscore_0.02-hpdv3_all_lr_1e-4_${ckpt}-dpo_${beta_dpo}_t2i_250-dpo_${beta_dpo}_saliencyInpaint"
+pretrained_lora_path="/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-v1-5/model-ckpt/irl_saliency_inpainting-text_to_image_top_${top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids_lr_1e-4_1600-dpo_2000_text_to_image/checkpoints/checkpoint-250"
 output_dir="/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-v1-5/model-ckpt/${run_name}"
-dataset_type="hpdv3_all-saliencyInpainting-sd3.5m"
+dataset_type="hpdv3_all-two_stage_saliency_inpainting"
 
 echo "top_N: ${top_N}"
 echo "run_name: ${run_name}"

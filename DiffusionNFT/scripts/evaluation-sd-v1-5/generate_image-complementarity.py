@@ -82,7 +82,7 @@ def main(args):
     results_filepath = os.path.join(args.output_dir, "evaluation_results.jsonl")
 
     # --- Load Model and Pipeline ---
-    unet_init = "mhdang/dpo-sd1.5-text2image-v1"
+    unet_init = args.unet_init
     print(f"Loading model and pipeline ({unet_init})...")
     unet = UNet2DConditionModel.from_pretrained(unet_init, subfolder="unet")
     pipeline = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
@@ -224,6 +224,13 @@ if __name__ == "__main__":
         default="fp16",
         choices=["no", "fp16", "bf16"],
         help="Whether to use mixed precision. Choose between 'no', 'fp16', or 'bf16'.",
+    )
+    
+    parser.add_argument(
+        "--unet_init",
+        type=str,
+        default="mhdang/dpo-sd1.5-text2image-v1",
+        help="Unet initialization model.",
     )
 
     args = parser.parse_args()

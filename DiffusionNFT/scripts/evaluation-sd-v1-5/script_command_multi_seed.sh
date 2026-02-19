@@ -26,7 +26,15 @@ for seed in "${seed_list[@]}"; do
     image_dir="${base_image_dir}/${method}/ckpt-${ckpt}"
 
     if [[ "$method" == *"dpo_official-"* ]]; then
-        python generate_image-dpo_official.py --seed ${seed} --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
+        python generate_image-complementarity.py --seed ${seed} --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
+            --unet_init "mhdang/dpo-sd1.5-text2image-v1" \
+            --output_dir ${image_dir} \
+            --save_images
+
+    elif [[ "$method" == *"inpo_official-"* ]]; then
+
+        python generate_image-complementarity.py --seed ${seed} --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
+            --unet_init "JaydenLu666/InPO-SD1.5" \
             --output_dir ${image_dir} \
             --save_images
             
