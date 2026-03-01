@@ -972,7 +972,7 @@ def main():
     #### START MAIN TRAINING LOOP #####
     for epoch in range(first_epoch, args.num_train_epochs):
         unet.train()
-        train_loss, train_sft_loss, train_dpo_loss, train_w_diff, train_l_diff = 0.0, 0.0, 0.0, 0.0, 0.0
+        train_loss, train_sft_loss, train_dpo_loss, train_w_diff, train_l_diff, train_w_l_diff = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
         implicit_acc_accumulated = 0.0
         for step, batch in enumerate(train_dataloader):
             # if save_and_eval:
@@ -1076,19 +1076,23 @@ def main():
                     ref_losses_w, ref_losses_l = ref_losses.chunk(2)
                     ref_diff = ref_losses_w - ref_losses_l
                     raw_ref_loss = ref_losses.mean()    
-                    
+                
+                w_diff = model_losses_w - ref_losses_w
+                l_diff = model_losses_l - ref_losses_l
+                w_l_diff = w_diff - l_diff*args.l_diff_coeffi
+                
                 scale_term = -0.5 * args.beta_dpo
-                inside_term = scale_term * (model_diff - ref_diff)
+                inside_term = scale_term * w_l_diff
                 implicit_acc = (inside_term > 0).sum().float() / inside_term.size(0)
                 loss_dpo = -1 * F.logsigmoid(inside_term).mean()
-                
-                w_diff = (model_losses_w - ref_losses_w).mean()
-                l_diff = (model_losses_l - ref_losses_l).mean()
                 #### END LOSS COMPUTATION ###
                 
                 # loss = loss_sft + loss_dpo
                 loss = loss_dpo
                 # Gather the losses across all processes for logging 
+                w_dff = torch.mean(w_diff)
+                l_dff = torch.mean(l_diff)
+                w_l_dff = torch.mean(w_l_diff)
                 avg_loss = accelerator.gather(loss.repeat(args.train_batch_size)).mean()
                 train_loss += avg_loss.item() / args.gradient_accumulation_steps
                 # avg_sft_loss = accelerator.gather(loss_sft.repeat(args.train_batch_size)).mean()
@@ -1098,8 +1102,10 @@ def main():
                 
                 avg_w_diff = accelerator.gather(w_diff.repeat(args.train_batch_size)).mean()
                 avg_l_diff = accelerator.gather(l_diff.repeat(args.train_batch_size)).mean()
+                avg_w_l_diff = accelerator.gather(w_l_diff.repeat(args.train_batch_size)).mean()
                 train_w_diff += avg_w_diff.item() / args.gradient_accumulation_steps
                 train_l_diff += avg_l_diff.item() / args.gradient_accumulation_steps
+                train_w_l_diff += avg_w_l_diff.item() / args.gradient_accumulation_steps
                 
                 # Also gather:
                 # - model MSE vs reference MSE (useful to observe divergent behavior)
