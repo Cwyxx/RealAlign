@@ -312,10 +312,10 @@ def parse_args():
         "--unet_init", type=str, default='', help="Initialize start of run from unet (not compatible w/ checkpoint load)"
     )
     parser.add_argument(
-        "--proportion_empty_prompts",
+        "--random_drop_prompt_probability",
         type=float,
-        default=0.2,
-        help="Proportion of image prompts to be replaced with empty strings. Defaults to 0 (no prompt replacement).",
+        default=None,
+        help="Probability to replace prompt with empty string in preference pairs. If set, overrides proportion_empty_prompts for this behavior.",
     )
     parser.add_argument(
         "--split", type=str, default='train', help="Datasplit"
@@ -831,7 +831,7 @@ def main():
     # Preprocessing the datasets.
     # We need to tokenize input captions and transform the images.
     def tokenize_captions(caption, is_train=True):
-        if random.random() < args.proportion_empty_prompts:
+        if args.random_drop_prompt_probability is not None and random.random() < args.random_drop_prompt_probability:
             caption = ""
         caption = [caption]
         inputs = tokenizer(caption, max_length=tokenizer.model_max_length, padding="max_length", truncation=True, return_tensors="pt")

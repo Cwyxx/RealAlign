@@ -16,7 +16,7 @@ export CUDA_VISIBLE_DEVICES=${cuda_device}
 
 base_ckpt_dir="/data_center/data2/dataset/chenwy/21164-data/${rl_framework}/sd-v1-5/model-ckpt"
 
-seed_list=(42 123 456 789 1000)
+seed_list=(456 789 1000)
 for seed in "${seed_list[@]}"; do
     conda activate alignprop
     echo "********************************************"

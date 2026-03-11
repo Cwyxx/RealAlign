@@ -8,12 +8,13 @@ export CUDA_VISIBLE_DEVICES=0,1,2,3
 beta_dpo=2000
 top_N=512
 ckpt=1600
+random_drop_prompt_probability=0.2
 
 unet_init="runwayml/stable-diffusion-v1-5" # "JaydenLu666/InPO-SD1.5" # "runwayml/stable-diffusion-v1-5"
-run_name="irl_saliency_inpaint-full_inpaint-str_0.8-cfg_3.0_top_${top_N}_images_NAC_pickscore_002-hpdv3_all-uids_ckpt_${ckpt}-dpo_${beta_dpo}_all"
-pretrained_lora_path="/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-v1-5/model-ckpt/irl_saliency_inpainting-full_inpainting-strength_0.8-guidance_scale_3.0_top_${top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all/checkpoints/checkpoint-${ckpt}"
+run_name="irl_top_${top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-ckpt_1600-dpo_${beta_dpo}_random_drop_prompt_probability_${random_drop_prompt_probability}"
+pretrained_lora_path="/data_center/data2/dataset/chenwy/21164-data/diffusion-dro/sd-v1-5/model-ckpt/irl_top_${top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all/checkpoints/checkpoint-${ckpt}"
 output_dir="/data_center/data2/dataset/chenwy/21164-data/diffusion-dpo/sd-v1-5/model-ckpt/${run_name}"
-csv_file_path_train="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/saliency_inpainting-full_inpainting-strength_0.8-guidance_scale_3.0/top_${top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv"
+csv_file_path_train="/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/top_${top_N}_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids.csv"
 
 echo "top_N: ${top_N}"
 echo "run_name: ${run_name}"
@@ -23,6 +24,7 @@ echo "pretrained_lora_path: ${pretrained_lora_path}"
 echo "ckpt: ${ckpt}"
 echo "beta_dpo: ${beta_dpo}"
 echo "csv_file_path_train: ${csv_file_path_train}"
+echo "random_drop_prompt_probability: ${random_drop_prompt_probability}"
 
 accelerate launch --mixed_precision="fp16"  train-lora_init.py --pretrained_model_name_or_path "runwayml/stable-diffusion-v1-5" \
     --train_batch_size 2 \
@@ -39,4 +41,5 @@ accelerate launch --mixed_precision="fp16"  train-lora_init.py --pretrained_mode
     --unet_init ${unet_init} \
     --top_N ${top_N} \
     --csv_file_path_train ${csv_file_path_train} \
-    --pretrained_lora_path ${pretrained_lora_path}
+    --pretrained_lora_path ${pretrained_lora_path} \
+    --random_drop_prompt_probability ${random_drop_prompt_probability}
