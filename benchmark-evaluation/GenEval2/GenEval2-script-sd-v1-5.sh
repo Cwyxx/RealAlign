@@ -22,7 +22,10 @@ if [[ "$method" == *"dpo-official"* ]]; then
     unet_init="mhdang/dpo-sd1.5-text2image-v1"
 fi
 
-#### Generating ####
+mapping_file="${image_dir}/prompt_image_mapping.json"
+scores_file="${image_dir}/scores.json"
+
+# #### Generating ####
 python generate-image-sd-v1-5.py \
     --checkpoint_path "${ckpt_dir}" \
     --output_dir "${image_dir}" \
@@ -30,3 +33,16 @@ python generate-image-sd-v1-5.py \
     --seed 42 \
     --resolution 512 \
     --unet_init ${unet_init}
+
+#### Evaluation ####
+conda activate geneval2
+python evaluation.py \
+    --benchmark_data "${benchmark_data}" \
+    --image_filepath_data "${mapping_file}" \
+    --method soft_tifa_gm \
+    --output_file "${scores_file}"
+
+#### Soft-TIFA Analysis ####
+python soft_tifa_analysis.py \
+    --benchmark_data "${benchmark_data}" \
+    --score_data "${scores_file}"

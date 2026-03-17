@@ -1,0 +1,7 @@
+Collecting decord
+  Using cached decord-0.6.0-py3-none-manylinux2010_x86_64.whl.metadata (422 bytes)
+Requirement already satisfied: numpy>=1.14.0 in /data3/chenweiyan/miniconda3/envs/geneval2/lib/python3.10/site-packages (from decord) (2.2.6)
+Downloading decord-0.6.0-py3-none-manylinux2010_x86_64.whl (13.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 13.6/13.6 MB 2.6 MB/s eta 0:00:00
+Installing collected packages: decord
+Successfully installed decord-0.6.0
