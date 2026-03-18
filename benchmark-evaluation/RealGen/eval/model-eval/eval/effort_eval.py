@@ -7,6 +7,8 @@ from tqdm import tqdm
 from sklearn import metrics
 from typing import Union
 from collections import defaultdict
+import argparse
+import json
 
 from torchvision import transforms
 from PIL import Image
@@ -40,8 +42,9 @@ class EffortDetector(nn.Module):
         # std: [0.26862954, 0.26130258, 0.27577711]
         
         # ViT-L/14 224*224
-        clip_model = CLIPModel.from_pretrained("../RealGen/models/clip-vit-large-patch14")  # the path of this folder in your disk (download from the above link)
-
+        # clip_model = CLIPModel.from_pretrained("../RealGen/models/clip-vit-large-patch14")  # the path of this folder in your disk (download from the above link)
+        clip_model = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
+        
         # Apply SVD to self_attn layers only
         # ViT-L/14 224*224: 1024-1
         clip_model.vision_model = apply_svd_residual_to_self_attn(clip_model.vision_model, r=1024-1)
@@ -325,16 +328,16 @@ def process_images(image_paths):
 
 
 class EffortScorer(torch.nn.Module):
-    def __init__(self, device="cuda", dtype=torch.bfloat16):
+    def __init__(self, ckpt_path, device="cuda", dtype=torch.bfloat16):
         super().__init__()
         self.device = device
         self.dtype = dtype
         self.model = EffortDetector(device=self.device)
-        checkpoint = torch.load('../RealGen/models/model_path', map_location='cpu')
+        checkpoint = torch.load(ckpt_path, map_location='cpu')
 
         new_weights = {}
         for key, value in checkpoint.items():
-            new_key = key.replace('module.', '')  # 删除module前缀
+            new_key = key.replace('module.', '')
             new_weights[new_key] = value
 
         self.model.load_state_dict(new_weights, strict=False)
@@ -355,26 +358,94 @@ class EffortScorer(torch.nn.Module):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Effort evaluation for RealGen benchmark")
+    parser.add_argument(
+        "--ckpt_path",
+        type=str,
+        default="/data_center/data2/dataset/chenwy/21164-data/model-ckpt/Effort/effort_clip_L14_trainOn_sdv14.pth",
+        help="Path to Effort checkpoint"
+    )
+    parser.add_argument(
+        "--image_dir",
+        type=str,
+        required=True,
+        help="Directory containing generated images (expects images/ subdirectory)"
+    )
+    parser.add_argument(
+        "--output_file",
+        type=str,
+        required=True,
+        help="Path to save evaluation results (JSON format)"
+    )
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="cuda",
+        help="Device to run inference on"
+    )
+    parser.add_argument(
+        "--mixed_precision",
+        type=str,
+        default="no",
+        choices=["no", "fp16", "bf16"],
+        help="Mixed precision mode"
+    )
+    args = parser.parse_args()
+
+    # Set dtype based on mixed precision
+    if args.mixed_precision == "fp16":
+        dtype = torch.float16
+    elif args.mixed_precision == "bf16":
+        dtype = torch.bfloat16
+    else:
+        dtype = torch.float32
+
+    print(f"Loading Effort model from: {args.ckpt_path}")
     scorer = EffortScorer(
-        device="cuda",
-        dtype=torch.bfloat16
+        ckpt_path=args.ckpt_path,
+        device=args.device,
+        dtype=dtype
     )
 
-    is_rewrite = "short"
-    img_list = ['xxx']
-    for img_path in img_list:
-        image_paths=[]
-        for i in range(1041):
-            path = f"/model-eval/{is_rewrite}-img/{img_path}/photo/{i:05}.jpg"
-            if os.path.exists(path):
-                image_paths.append(path)
-        image_paths = [Image.open(img).convert('RGB') for img in image_paths]
-        
-        scores = scorer(image_paths)
-        rate = new_list = [1 if number > 0.5 else 0 for number in scores]
-        print(f"=========={img_path}==========")
-        print(sum(scores)/len(scores))
-        print(sum(rate)/len(rate))
+    # Load images from directory
+    images_dir = os.path.join(args.image_dir, "images")
+    if not os.path.exists(images_dir):
+        raise FileNotFoundError(f"Images directory not found: {images_dir}")
+
+    image_paths = sorted([
+        os.path.join(images_dir, f)
+        for f in os.listdir(images_dir)
+        if f.endswith(('.png', '.jpg', '.jpeg'))
+    ])
+
+    print(f"Found {len(image_paths)} images in {images_dir}")
+
+    if len(image_paths) == 0:
+        raise ValueError(f"No images found in {images_dir}")
+
+    # Load images
+    images = [Image.open(img).convert('RGB') for img in tqdm(image_paths, desc="Loading images")]
+
+    # Run evaluation
+    print("Running Effort evaluation...")
+    scores = scorer(images)
+    mean_score = sum(scores) / len(scores)
+
+    # Save results
+    results = {
+        "ckpt_path": args.ckpt_path,
+        "image_dir": args.image_dir,
+        "num_images": len(image_paths),
+        "mean_score": float(mean_score),
+        "scores": [float(s) for s in scores]
+    }
+
+    os.makedirs(os.path.dirname(args.output_file), exist_ok=True)
+    with open(args.output_file, 'w') as f:
+        json.dump(results, f, indent=2)
+
+    print(f"\nMean score: {mean_score:.4f}")
+    print(f"Results saved to: {args.output_file}")
 
 
 if __name__ == "__main__":

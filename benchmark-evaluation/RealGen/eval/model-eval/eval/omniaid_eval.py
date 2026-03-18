@@ -8,6 +8,9 @@ from transformers.models.clip.modeling_clip import CLIPVisionEmbeddings, CLIPMLP
 from PIL import Image
 from tqdm import tqdm
 import types
+import argparse
+import json
+import os
 
 class OmniAID(nn.Module):
     def __init__(self, config=None):
@@ -251,16 +254,15 @@ class GatingNetwork(nn.Module):
         return {'top_k_indices': top_k_indices, 'top_k_gates': top_k_gates}
 
 
-def get_config():
+def get_config(ckpt_path, clip_path):
     config = types.SimpleNamespace()
-    config.ckpt_path = "../RealGen/models/router/checkpoint-0.pth"  # Path to the checkpoint
-    # config.CLIP_path = "openai/clip-vit-large-patch14-336" # Default
-    config.CLIP_path = "../RealGen/models/model_path"
+    config.ckpt_path = ckpt_path
+    config.CLIP_path = clip_path
     config.num_experts = 6
     config.rank_per_expert = 1
     config.moe_top_k = 2
     config.moe_router_hidden_dim = 256
-    config.image_resolution = 336 
+    config.image_resolution = 336
     config.is_hybrid = True
     return config
 
@@ -283,13 +285,13 @@ def process_images(image_paths):
     return batch_tensor
 
 class OmniAIDScorer(torch.nn.Module):
-    def __init__(self, device="cuda"):
+    def __init__(self, ckpt_path, clip_path, device="cuda"):
         super().__init__()
         self.device = device
-        config = get_config()
+        config = get_config(ckpt_path, clip_path)
         self.model = OmniAID(config=config)
         checkpoint = torch.load(config.ckpt_path, map_location='cpu', weights_only=False)
-        self.model.load_state_dict(checkpoint['model'], strict=False) 
+        self.model.load_state_dict(checkpoint['model'], strict=False)
         self.model.to(self.device)
         self.model.eval()
         self.model.requires_grad_(False)
@@ -304,22 +306,87 @@ class OmniAIDScorer(torch.nn.Module):
         return rewards
 
 def main():
-    scorer = OmniAIDScorer(device="cuda")
+    parser = argparse.ArgumentParser(description="OmniAID evaluation for RealGen benchmark")
+    parser.add_argument(
+        "--ckpt_path",
+        type=str,
+        default="/data_center/data2/dataset/chenwy/21164-data/model-ckpt/OmniAID/OmniAID/router/checkpoint-0.pth",
+        help="Path to OmniAID checkpoint"
+    )
+    parser.add_argument(
+        "--clip_path",
+        type=str,
+        default="openai/clip-vit-large-patch14-336",
+        help="Path to CLIP model"
+    )
+    parser.add_argument(
+        "--image_dir",
+        type=str,
+        required=True,
+        help="Directory containing generated images (expects images/ subdirectory)"
+    )
+    parser.add_argument(
+        "--output_file",
+        type=str,
+        required=True,
+        help="Path to save evaluation results (JSON format)"
+    )
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="cuda",
+        help="Device to run inference on"
+    )
+    args = parser.parse_args()
 
-    is_rewrite = "short"
-    img_list = ['xxx']
-    for img_path in img_list:
-        image_paths=[]
-        for i in range(1041):
-            path = f"/model-eval/{is_rewrite}-img/{img_path}/photo/{i:05}.jpg"
-            if os.path.exists(path):
-                image_paths.append(path)
-        image_paths = [Image.open(img).convert('RGB') for img in image_paths]
-        scores = scorer(image_paths)
-        rate = new_list = [1 if number > 0.5 else 0 for number in scores]
-        print(f"=========={img_path}==========")
-        print(sum(scores)/len(scores))
-        print(sum(rate)/len(rate))
+    print(f"Loading OmniAID model from: {args.ckpt_path}")
+    print(f"Using CLIP model: {args.clip_path}")
+    scorer = OmniAIDScorer(
+        ckpt_path=args.ckpt_path,
+        clip_path=args.clip_path,
+        device=args.device
+    )
+
+    # Load images from directory
+    images_dir = os.path.join(args.image_dir, "images")
+    if not os.path.exists(images_dir):
+        raise FileNotFoundError(f"Images directory not found: {images_dir}")
+
+    image_paths = sorted([
+        os.path.join(images_dir, f)
+        for f in os.listdir(images_dir)
+        if f.endswith(('.png', '.jpg', '.jpeg'))
+    ])
+
+    print(f"Found {len(image_paths)} images in {images_dir}")
+
+    if len(image_paths) == 0:
+        raise ValueError(f"No images found in {images_dir}")
+
+    # Load images
+    images = [Image.open(img).convert('RGB') for img in tqdm(image_paths, desc="Loading images")]
+
+    # Run evaluation
+    print("Running OmniAID evaluation...")
+    scores = scorer(images)
+    mean_score = sum(scores) / len(scores)
+
+    # Save results
+    results = {
+        "ckpt_path": args.ckpt_path,
+        "clip_path": args.clip_path,
+        "image_dir": args.image_dir,
+        "num_images": len(image_paths),
+        "mean_score": float(mean_score),
+        "scores": [float(s) for s in scores]
+    }
+
+    os.makedirs(os.path.dirname(args.output_file), exist_ok=True)
+    with open(args.output_file, 'w') as f:
+        json.dump(results, f, indent=2)
+
+    print(f"\nMean score: {mean_score:.4f}")
+    print(f"Results saved to: {args.output_file}")
 
 
 if __name__ == "__main__":
