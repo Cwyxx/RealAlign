@@ -1,0 +1,12 @@
+dataset/*
+output*
+wandb
+__pycache__
+*.log
+output
+logs
+log
+weights
+scripts
+*.whl
+ckpt*

@@ -16,7 +16,7 @@ export CUDA_VISIBLE_DEVICES=${cuda_device}
 
 base_ckpt_dir="/data_center/data2/dataset/chenwy/21164-data/${rl_framework}/sd-v1-5/model-ckpt"
 
-seed_list=(456 789 1000)
+seed_list=(42 123 456 789 1000)
 for seed in "${seed_list[@]}"; do
     conda activate alignprop
     echo "********************************************"
@@ -25,41 +25,42 @@ for seed in "${seed_list[@]}"; do
     ckpt_dir="${base_ckpt_dir}/${method}/checkpoints/checkpoint-${ckpt}"
     image_dir="${base_image_dir}/${method}/ckpt-${ckpt}"
 
-    if [[ "$method" == *"dpo_official-"* ]]; then
-        python generate_image-complementarity.py --seed ${seed} --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
-            --unet_init "mhdang/dpo-sd1.5-text2image-v1" \
-            --output_dir ${image_dir} \
-            --save_images
+    # if [[ "$method" == *"dpo_official-"* ]]; then
+    #     python generate_image-complementarity.py --seed ${seed} --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
+    #         --unet_init "mhdang/dpo-sd1.5-text2image-v1" \
+    #         --output_dir ${image_dir} \
+    #         --save_images
 
-    elif [[ "$method" == *"inpo_official-"* ]]; then
+    # elif [[ "$method" == *"inpo_official-"* ]]; then
 
-        python generate_image-complementarity.py --seed ${seed} --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
-            --unet_init "JaydenLu666/InPO-SD1.5" \
-            --output_dir ${image_dir} \
-            --save_images
+    #     python generate_image-complementarity.py --seed ${seed} --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
+    #         --unet_init "JaydenLu666/InPO-SD1.5" \
+    #         --output_dir ${image_dir} \
+    #         --save_images
             
-    elif [[ "$method" == "dpo-official" ]] || [[ "$method" == "kto-official" ]] || [[ "$method" == "sd-v1-5" ]] || [[ "$method" == "inpo-official" ]]; then
-        if [[ "$method" == "dpo-official" ]]; then
-            unet_init="mhdang/dpo-sd1.5-text2image-v1"
-        elif [[ "$method" == "kto-official" ]]; then
-            unet_init="jacklishufan/diffusion-kto"
-        elif [[ "$method" == "sd-v1-5" ]]; then
-            unet_init="runwayml/stable-diffusion-v1-5"
-        elif [[ "$method" == "inpo-official" ]]; then
-            unet_init="JaydenLu666/InPO-SD1.5"
-        fi
-        python generate_image-unet_init.py --seed ${seed} --dataset ${dataset} \
-            --output_dir ${image_dir} \
-            --save_images \
-            --unet_init ${unet_init}
-    else
-        python generate_image.py --seed ${seed} --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
-            --output_dir ${image_dir} \
-            --save_images
-    fi
+    # elif [[ "$method" == "dpo-official" ]] || [[ "$method" == "kto-official" ]] || [[ "$method" == "sd-v1-5" ]] || [[ "$method" == "inpo-official" ]]; then
+    #     if [[ "$method" == "dpo-official" ]]; then
+    #         unet_init="mhdang/dpo-sd1.5-text2image-v1"
+    #     elif [[ "$method" == "kto-official" ]]; then
+    #         unet_init="jacklishufan/diffusion-kto"
+    #     elif [[ "$method" == "sd-v1-5" ]]; then
+    #         unet_init="runwayml/stable-diffusion-v1-5"
+    #     elif [[ "$method" == "inpo-official" ]]; then
+    #         unet_init="JaydenLu666/InPO-SD1.5"
+    #     fi
+    #     python generate_image-unet_init.py --seed ${seed} --dataset ${dataset} \
+    #         --output_dir ${image_dir} \
+    #         --save_images \
+    #         --unet_init ${unet_init}
+    # else
+    #     python generate_image.py --seed ${seed} --checkpoint_path ${ckpt_dir} --dataset ${dataset} \
+    #         --output_dir ${image_dir} \
+    #         --save_images
+    # fi
 
     cd ../evaluation-sd-3-5-medium
-    reward_model_list=("pickscore" "imagereward" "hpsv3" "deqa" "aesthetic" "unifiedreward")
+    reward_model_list=("color-fidelity-metric")
+    # reward_model_list=("pickscore" "imagereward" "hpsv3" "deqa" "aesthetic" "unifiedreward" "color-fidelity-metric")
     for reward_model in "${reward_model_list[@]}"; do
         echo "********************************************"
         echo "reward_model: ${reward_model}"
@@ -71,7 +72,7 @@ for seed in "${seed_list[@]}"; do
             conda activate utils
         elif [[ "$reward_model" == "vqascore" ]]; then
             conda activate t2v
-        elif [[ "$reward_model" == "hpsv3" ]] || [[ "$reward_model" == "SGP-HPSv3" ]] || [[ "$reward_model" == "SGP-v2-HPSv3" ]] || [[ "$reward_model" == "SGP-v1.5-HPSv3" ]]; then
+        elif [[ "$reward_model" == "hpsv3" ]] || [[ "$reward_model" == "color-fidelity-metric" ]]; then
             conda activate hpsv3
         elif [[ "$reward_model" == "cpbd" ]]; then
             conda activate utils

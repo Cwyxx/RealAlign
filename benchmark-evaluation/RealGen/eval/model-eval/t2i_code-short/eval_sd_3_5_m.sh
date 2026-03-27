@@ -4,7 +4,7 @@
 # Usage: bash forensic_chat_eval_sd_3_5_m.sh [cuda_device] [method] [checkpoint] [rl_framework]
 
 source /data3/chenweiyan/miniconda3/etc/profile.d/conda.sh
-conda activate alignprop
+conda activate geneval2
 
 cuda_device=${1:-0}
 method=${2:-"sd-3-5-medium"}

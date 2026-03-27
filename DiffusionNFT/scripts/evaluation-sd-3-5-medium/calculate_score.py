@@ -112,7 +112,7 @@ def main(args):
         dataset = TextPromptDataset(dataset_path, split="test")
         
     eval_batch_size = 2
-    if args.reward_model in  ["hpsv3", "unifiedreward", "unifiedreward_2"]: eval_batch_size=1
+    if args.reward_model in  ["hpsv3", "unifiedreward", "unifiedreward_2", "color-fidelity-metric"]: eval_batch_size=1
     
     dataloader = DataLoader(
         dataset,
@@ -129,65 +129,19 @@ def main(args):
         for reward_model in reward_models.values(): reward_model.to(device)
         print(f"Initializing reward models {args.reward_model} from DiffusionNFT...")
         
-    elif args.reward_model == "SGP-PickScore":
-        all_reward_scorers = { "pickscore": 1.0 }
-        pickscore_scoring_fn, pickscore_reward_models = multi_score(device, all_reward_scorers)
-        for reward_model in pickscore_reward_models.values(): reward_model.to(device)
+    elif args.reward_model == "color-fidelity-metric":
+        from CFM.cfm.inference import CFMRewardInferencer
+        
+        cfm_model = CFMRewardInferencer()
+        
         def scoring_fn(images, prompts, metadata, only_strict=False):
             ### images is image_paths #### 
-            realistic_prompt = [ "Realistic photo " + prompt for prompt in prompts ]
-            cg_rendered_prompt = [ "CG Render " + prompt for prompt in prompts ]
-            realistic_rewards,_ = pickscore_scoring_fn(images, realistic_prompt, metadata, only_strict)
-            cg_rendered_rewards,_ = pickscore_scoring_fn(images, cg_rendered_prompt, metadata, only_strict)
-            
-            score_list = [realistic_reward - cg_rendered_reward for realistic_reward, cg_rendered_reward in zip(realistic_rewards["pickscore"], cg_rendered_rewards["pickscore"])]
-            score_details = { args.reward_model: score_list }
+            assert type(images[0]) == str
+            image_paths = images
+            score_list = cfm_model.reward(prompts, image_paths)
+            score_details = { args.reward_model: score_list}
             return score_details, {}
-        
-    elif args.reward_model == "purple-pickscore":
-        all_reward_scorers = { "pickscore": 1.0 }
-        pickscore_scoring_fn, pickscore_reward_models = multi_score(device, all_reward_scorers)
-        for reward_model in pickscore_reward_models.values(): reward_model.to(device)
-        def scoring_fn(images, prompts, metadata, only_strict=False):
-            ### images is image_paths #### 
-            normal_prompt = [ prompt for prompt in prompts ]
-            purple_prompt = [ "purple color tones; " + prompt for prompt in prompts ]
-            normal_rewards,_ = pickscore_scoring_fn(images, normal_prompt, metadata, only_strict)
-            purple_rewards,_ = pickscore_scoring_fn(images, purple_prompt, metadata, only_strict)
-            
-            score_list = [ normal_reward - purple_reward for normal_reward, purple_reward in zip(normal_rewards["pickscore"], purple_rewards["pickscore"])]
-            score_details = { args.reward_model: score_list }
-            return score_details, {}
-        
-    elif args.reward_model == "SGP-v2-clipscore":
-        all_reward_scorers = { "clipscore": 1.0 }
-        clipscore_scoring_fn, clipscore_reward_models = multi_score(device, all_reward_scorers)
-        for reward_model in clipscore_reward_models.values(): reward_model.to(device)
-        def scoring_fn(images, prompts, metadata, only_strict=False):
-            ### images is image_paths #### 
-            normal_prompt = [ prompt for prompt in prompts ]
-            cg_rendered_prompt = [ "CG Render " + prompt for prompt in prompts ]
-            normal_rewards,_ = clipscore_scoring_fn(images, normal_prompt, metadata, only_strict)
-            cg_rendered_rewards,_ = clipscore_scoring_fn(images, cg_rendered_prompt, metadata, only_strict)
-            score_list = [cg_rendered_reward - normal_reward for normal_reward, cg_rendered_reward in zip(normal_rewards["clipscore"], cg_rendered_rewards["clipscore"])]
-            score_details = { args.reward_model: score_list }
-            return score_details, {}
-        
-    elif args.reward_model == "SGP-ImageReward":
-        all_reward_scorers = { "imagereward": 1.0 }
-        imagereward_scoring_fn, imagereward_reward_models = multi_score(device, all_reward_scorers)
-        for reward_model in imagereward_reward_models.values(): reward_model.to(device)
-        def scoring_fn(images, prompts, metadata, only_strict=False):
-            ### images is image_paths #### 
-            realistic_prompt = [ "Realistic photo " + prompt for prompt in prompts ]
-            cg_rendered_prompt = [ "CG Render " + prompt for prompt in prompts ]
-            realistic_rewards,_ = imagereward_scoring_fn(images, realistic_prompt, metadata, only_strict)
-            cg_rendered_rewards,_ = imagereward_scoring_fn(images, cg_rendered_prompt, metadata, only_strict)
-            
-            score_list = [realistic_reward - cg_rendered_reward for realistic_reward, cg_rendered_reward in zip(realistic_rewards["imagereward"], cg_rendered_rewards["imagereward"])]
-            score_details = { args.reward_model: score_list }
-            return score_details, {}
-        
+    
     elif args.reward_model == "vqascore":
         import t2v_metrics
         clip_flant5_score = t2v_metrics.VQAScore(model='clip-flant5-xl')
@@ -198,91 +152,6 @@ def main(args):
             scores = clip_flant5_score(images=images, texts=prompts)
             diagonal_scores = [scores[i][i] for i in range(len(scores))]
             score_details = { args.reward_model: diagonal_scores}
-            return score_details, {}
-        
-    elif args.reward_model == "clip_iqa":
-        import pyiqa
-        reward_model = pyiqa.create_metric("clipiqa", device=device)
-        print(f"Initializing reward models {args.reward_model}...")
-        
-        def scoring_fn(images, prompts, metadata, only_strict=False):
-            ### images is image_paths #### 
-            score_list = []
-            for image in images:
-                score = reward_model(image)
-                if isinstance(score, torch.Tensor):
-                    score = score.item()
-                score_list.append(score)
-                
-            score_details = { args.reward_model: score_list}
-            return score_details, {}
-        
-    elif args.reward_model == "clip_iqa":
-        import pyiqa
-        reward_model = pyiqa.create_metric("n", device=device)
-        print(f"Initializing reward models {args.reward_model}...")
-        
-        def scoring_fn(images, prompts, metadata, only_strict=False):
-            ### images is image_paths #### 
-            score_list = []
-            for image in images:
-                score = reward_model(image)
-                if isinstance(score, torch.Tensor):
-                    score = score.item()
-                score_list.append(score)
-                
-            score_details = { args.reward_model: score_list}
-            return score_details, {}
-        
-    elif args.reward_model == "niqe":
-        import pyiqa
-        reward_model = pyiqa.create_metric("niqe", device=device)
-        print(f"Initializing reward models {args.reward_model}...")
-        
-        def scoring_fn(images, prompts, metadata, only_strict=False):
-            ### images is image_paths #### 
-            score_list = []
-            for image in images:
-                score = reward_model(image)
-                if isinstance(score, torch.Tensor):
-                    score = score.item()
-                score_list.append(score)
-                
-            score_details = { args.reward_model: score_list}
-            return score_details, {}
-        
-    elif args.reward_model == "brisque":
-        import pyiqa
-        reward_model = pyiqa.create_metric("brisque", device=device)
-        print(f"Initializing reward models {args.reward_model}...")
-        
-        def scoring_fn(images, prompts, metadata, only_strict=False):
-            ### images is image_paths #### 
-            score_list = []
-            for image in images:
-                score = reward_model(image)
-                if isinstance(score, torch.Tensor):
-                    score = score.item()
-                score_list.append(score)
-                
-            score_details = { args.reward_model: score_list}
-            return score_details, {}
-        
-    elif args.reward_model == "q-align":
-        import pyiqa
-        reward_model = pyiqa.create_metric("qalign", device=device)
-        print(f"Initializing reward models {args.reward_model}...")
-        
-        def scoring_fn(images, prompts, metadata, only_strict=False):
-            ### images is image_paths #### 
-            score_list = []
-            for image in images:
-                score = reward_model(image)
-                if isinstance(score, torch.Tensor):
-                    score = score.item()
-                score_list.append(score)
-                
-            score_details = { args.reward_model: score_list}
             return score_details, {}
         
     elif args.reward_model == "deqa":
@@ -342,92 +211,6 @@ def main(args):
             score_details = { args.reward_model: score_list }
             return score_details, {}
         
-    elif args.reward_model == "purple-hpsv3":
-        from hpsv3 import HPSv3RewardInferencer
-        inferencer = HPSv3RewardInferencer(device='cuda')
-        # inferencer.model = inferencer.model.to(device).to(torch.float16) 
-        def scoring_fn(images, prompts, metadata, only_strict=False):
-            ### images is image_paths #### 
-            assert type(images[0]) == str
-            image_paths = images
-            purple_prompt = [ "purple color tones; " + prompt for prompt in prompts ]
-            normal_prompt = [ prompt for prompt in prompts ]
-            with torch.no_grad():
-                normal_rewards = inferencer.reward(prompts=normal_prompt, image_paths=image_paths)
-                purple_rewards = inferencer.reward(prompts=purple_prompt, image_paths=image_paths)
-                score_list = [normal_reward[0].item() - purple_reward[0].item() for normal_reward, purple_reward in zip(normal_rewards, purple_rewards)]
-            
-            score_details = { args.reward_model: score_list }
-            return score_details, {}
-        
-    elif args.reward_model == "SGP-HPSv3":
-        from hpsv3 import HPSv3RewardInferencer
-        inferencer = HPSv3RewardInferencer(device='cuda')
-        
-        def scoring_fn(images, prompts, metadata, only_strict=False):
-            ### images is image_paths #### 
-            assert type(images[0]) == str
-            image_paths = images
-            realistic_prompt = [ "Realistic photo " + prompt for prompt in prompts ]
-            cg_rendered_prompt = [ "CG Render " + prompt for prompt in prompts ]
-            with torch.no_grad():
-                realistic_rewards = inferencer.reward(prompts=realistic_prompt, image_paths=image_paths)
-                cg_rendered_rewards = inferencer.reward(prompts=cg_rendered_prompt, image_paths=image_paths)
-                score_list = [realistic_reward[0].item() - cg_rendered_reward[0].item() for realistic_reward, cg_rendered_reward in zip(realistic_rewards, cg_rendered_rewards)]
-            
-            score_details = { args.reward_model: score_list }
-            return score_details, {}
-        
-    elif args.reward_model == "SGP-v2-HPSv3":
-        from hpsv3 import HPSv3RewardInferencer
-        inferencer = HPSv3RewardInferencer(device='cuda')
-        
-        def scoring_fn(images, prompts, metadata, only_strict=False):
-            ### images is image_paths #### 
-            assert type(images[0]) == str
-            image_paths = images
-            cg_rendered_prompt = [ "CG Render " + prompt for prompt in prompts ]
-            normal_prompt = [ prompt for prompt in prompts ]
-            with torch.no_grad():
-                cg_rendered_rewards = inferencer.reward(prompts=cg_rendered_prompt, image_paths=image_paths)
-                normal_rewards = inferencer.reward(prompts=normal_prompt, image_paths=image_paths)
-                score_list = [cg_rendered_reward[0].item() - normal_reward[0].item() for normal_reward, cg_rendered_reward in zip(normal_rewards, cg_rendered_rewards)]
-            
-            score_details = { args.reward_model: score_list }
-            return score_details, {}
-        
-    elif args.reward_model == "SGP-v1.5-HPSv3":
-        from hpsv3 import HPSv3RewardInferencer
-        inferencer = HPSv3RewardInferencer(device='cuda')
-        
-        def scoring_fn(images, prompts, metadata, only_strict=False):
-            ### images is image_paths #### 
-            assert type(images[0]) == str
-            image_paths = images
-            cg_rendered_prompt = [ "CG Render " + prompt for prompt in prompts ]
-            realistic_prompt = [ "Realistic photo " + prompt for prompt in prompts ]
-            with torch.no_grad():
-                cg_rendered_rewards = inferencer.reward(prompts=cg_rendered_prompt, image_paths=image_paths)
-                realistic_rewards = inferencer.reward(prompts=realistic_prompt, image_paths=image_paths)
-                score_list = [ cg_rendered_reward[0].item() - realistic_reward[0].item() for realistic_reward, cg_rendered_reward in zip(realistic_rewards, cg_rendered_rewards)]
-            
-            score_details = { args.reward_model: score_list }
-            return score_details, {}
-        
-    elif args.reward_model == "cpbd":
-        import cpbd
-
-        def scoring_fn(images, prompts, metadata, only_strict=False):
-            score_list = []
-            image_paths = images
-            for image_path in image_paths:
-                img = np.array(Image.open(image_path).convert('L'))
-                score = cpbd.compute(img)
-                score_list.append(score)
-            
-            score_details = { args.reward_model: score_list }
-            return score_details, {}
-        
     elif args.reward_model == "imagedoctor":
         from imagedoctor import ImageDoctor
         reward_model = ImageDoctor(image_dir=args.output_dir)
@@ -458,222 +241,6 @@ def main(args):
                 
             score_details = { args.reward_model: score_list }
             return score_details, {}
-        
-    elif args.reward_model == "GLCM_homogeneity":
-    
-        def scoring_fn(images, prompts, metadata, only_strict=False):
-            score_list = []
-            image_paths = images
-            
-            for image_path in image_paths:
-                # 1. 加载图像并转换为灰度图
-                # 真实场景中，AI生成的图通常是RGB，需转为灰度以计算纹理指标
-                img = io.imread(image_path)
-                if len(img.shape) == 3:
-                    gray_img = color.rgb2gray(img)
-                else:
-                    gray_img = img
-
-                # 2. 将图像转换为 8-bit 无符号整型 (0-255)
-                # GLCM 要求离散灰度级，这是计算的前提
-                gray_img_8bit = img_as_ubyte(gray_img)
-
-                # 3. 计算 GLCM
-                # distances: 像素对的距离（通常选 1-5 像素）
-                # angles: 方向（0°, 45°, 90°, 135°）。通常取平均值以获得旋转不变性
-                glcm = graycomatrix(gray_img_8bit, 
-                                    distances=[1], 
-                                    angles=[0, np.pi/4, np.pi/2, 3*np.pi/4], 
-                                    levels=256, 
-                                    symmetric=True, 
-                                    normed=True)
-
-                # 4. 计算 Homogeneity
-                homogeneity_values = graycoprops(glcm, 'homogeneity')
-                
-                score_list.append(np.mean(homogeneity_values).item())
-                
-            score_details = { args.reward_model: score_list }
-            return score_details, {}
-        
-    elif args.reward_model == "GLCM_contrast":
-        def scoring_fn(images, prompts, metadata, only_strict=False):
-            score_list = []
-            image_paths = images
-            
-            for image_path in image_paths:
-                # 1. 加载图像并转换为灰度图
-                # 真实场景中，AI生成的图通常是RGB，需转为灰度以计算纹理指标
-                img = io.imread(image_path)
-                if len(img.shape) == 3:
-                    gray_img = color.rgb2gray(img)
-                else:
-                    gray_img = img
-
-                # 2. 将图像转换为 8-bit 无符号整型 (0-255)
-                # GLCM 要求离散灰度级，这是计算的前提
-                gray_img_8bit = img_as_ubyte(gray_img)
-
-                # 3. 计算 GLCM
-                # distances: 像素对的距离（通常选 1-5 像素）
-                # angles: 方向（0°, 45°, 90°, 135°）。通常取平均值以获得旋转不变性
-                glcm = graycomatrix(gray_img_8bit, 
-                                    distances=[1], 
-                                    angles=[0, np.pi/4, np.pi/2, 3*np.pi/4], 
-                                    levels=256, 
-                                    symmetric=True, 
-                                    normed=True)
-
-                # 4. 计算 Homogeneity
-                contrast_values = graycoprops(glcm, 'contrast')
-                
-                score_list.append(np.mean(contrast_values).item())
-                
-            score_details = { args.reward_model: score_list }
-            return score_details, {}
-    
-    elif args.reward_model == "shannon_entropy":
-        def scoring_fn(images, prompts, metadata, only_strict=False):
-            score_list = []
-            image_paths = images
-            
-            for image_path in image_paths:
-                img = io.imread(image_path)
-                # 转换为灰度图计算纹理信息量
-                if len(img.shape) == 3:
-                    gray_img = color.rgb2gray(img)
-                else:
-                    gray_img = img
-                
-                # 将图像转为 8-bit (0-255)
-                gray_img_8bit = img_as_ubyte(gray_img)
-                
-                # 计算香农熵
-                entropy_value = shannon_entropy(gray_img_8bit)
-                score_list.append(entropy_value)
-                
-            score_details = { args.reward_model: score_list }
-            return score_details, {}
-    
-    elif args.reward_model == "laplacian_variance":
-        def scoring_fn(images, prompts, metadata, only_strict=False):
-            score_list = []
-            image_paths = images
-            
-            for image_path in image_paths:
-                # 1. 读取图像
-                img = io.imread(image_path)
-                
-                # 2. 转为灰度图 (必须)
-                if len(img.shape) == 3:
-                    gray = color.rgb2gray(img)
-                else:
-                    gray = img
-                    
-                # 3. 转为 uint8 格式 (OpenCV通常处理0-255)
-                gray = img_as_ubyte(gray)
-                
-                # 4. 计算拉普拉斯算子
-                # ddepth=cv2.CV_64F 防止溢出
-                laplacian = cv2.Laplacian(gray, cv2.CV_64F)
-                
-                # 5. 计算方差
-                variance = laplacian.var()
-                score_list.append(variance)
-                
-            score_details = { args.reward_model: score_list }
-            return score_details, {}
-        
-    elif args.reward_model == "LBP":    
-        def scoring_fn(images, prompts, metadata, only_strict=False):
-            score_list = []
-            image_paths = images
-            radius = 1
-            n_points = 8
-            for image_path in image_paths:
-                # 1. 读取图像并转换为灰度
-                img = io.imread(image_path)
-                if len(img.shape) == 3:
-                    gray = color.rgb2gray(img)
-                else:
-                    gray = img
-                
-                # 转换为 8-bit 整数 (0-255)
-                gray = img_as_ubyte(gray)
-                
-                # 2. 计算 LBP 特征图
-                # 'uniform' 模式具有旋转不变性，且能有效减少特征维度，是分析纹理的标准选择
-                lbp = local_binary_pattern(gray, n_points, radius, method='uniform')
-                
-                # 3. 计算 LBP 直方图 (概率分布)
-                # uniform 模式下的 bin 数量为 n_points + 2
-                n_bins = int(lbp.max() + 1)
-                hist, _ = np.histogram(lbp.ravel(), bins=n_bins, range=(0, n_bins), density=True)
-                
-                # 4. 计算香农熵 (Shannon Entropy)
-                # 熵越高 = 纹理模式越多样 = 细节越丰富
-                # 使用 base=2，单位为 bit
-                lbp_entropy_score = entropy(hist, base=2)
-                
-                score_list.append(lbp_entropy_score)
-                
-            score_details = { args.reward_model: score_list }
-            return score_details, {}
-        
-    elif args.reward_model == "edge_density":    
-        def scoring_fn(images, prompts, metadata, only_strict=False):
-            score_list = []
-            image_paths = images
-            low_threshold = 100
-            high_threshold = 200
-            for image_path in image_paths:
-                # 1. 读取并转灰度
-                img = io.imread(image_path)
-                if len(img.shape) == 3:
-                    gray = color.rgb2gray(img)
-                else:
-                    gray = img
-                gray = img_as_ubyte(gray)
-                
-                # 2. Canny 边缘检测
-                # 阈值选取很关键，100/200 是比较标准的自然图像设置
-                edges = cv2.Canny(gray, low_threshold, high_threshold)
-                
-                # 3. 计算边缘密度 (非零像素占比)
-                # 结果是百分比，比如 0.05 表示 5% 的像素是边缘
-                density = np.count_nonzero(edges) / edges.size
-                
-                score_list.append(density)
-                
-            score_details = { args.reward_model: score_list }
-            return score_details, {}
-        
-    elif args.reward_model == "saturation":
-        def calculate_saturation(image_path):
-            img = Image.open(image_path).convert("HSV")
-            s_channel = np.array(img)[:, :, 1]
-            return s_channel.mean()
-        
-        def scoring_fn(images, prompts, metadata, only_strict=False):
-            #### images is image_paths ####
-            image_paths = images
-            score_list = [calculate_saturation(image_path) for image_path in image_paths]
-            score_details = { "saturation": score_list }
-            return score_details, {}
-        
-    elif args.reward_model == "brightness":
-        def calculate_average_brightness(image_path):
-            image = Image.open(image_path)
-            gray_image = image.convert('L')
-            gray_array = np.array(gray_image)
-            return np.mean(gray_array)
-        
-        def scoring_fn(images, prompts, metadata, only_strict=False):
-            #### images is image_paths ####
-            image_paths = images
-            score_list = [calculate_average_brightness(image_path) for image_path in image_paths]
-            score_details = { "brightness": score_list }
-            return score_details, {}
 
     score_list = []
     # --- Evaluation Loop ---
@@ -688,7 +255,7 @@ def main(args):
         current_batch_size = len(prompts)
         image_paths = [ os.path.join(args.output_dir, "images", f"{sample_idx:05d}.png") for sample_idx in indices ]
         
-        if args.reward_model in [ "imagereward",  "purple-pickscore", "purple-hpsv3", "pickscore",  "aesthetic", "SGP-v2-clipscore", "clipscore", "hpsv2", "unifiedreward", "code", "dinov2", "SGP-PickScore", "SGP-ImageReward"]:
+        if args.reward_model in [ "imagereward",  "purple-pickscore", "purple-hpsv3", "pickscore",  "aesthetic", "clipscore", "hpsv2", "unifiedreward", "code", "dinov2" ]:
             pil_images = [ Image.open(image_path) for image_path in image_paths ] # imagereward, pickscore get pil image input
             
             if args.reward_model == "aesthetic":
@@ -702,10 +269,10 @@ def main(args):
                 images = images.transpose(0, 3, 1, 2)  # NHWC -> NCHW
                 images = torch.tensor(images, dtype=torch.uint8) / 255.0
             
-            elif args.reward_model in [ "imagereward", "purple-pickscore", "pickscore", "unifiedreward", "code", "dinov2", "SGP-PickScore", "SGP-ImageReward"]:
+            elif args.reward_model in [ "imagereward", "purple-pickscore", "pickscore", "unifiedreward", "code", "dinov2" ]:
                 images = pil_images
         
-        elif args.reward_model in [ "edge_density", "LBP", "laplacian_variance", "brightness", "saturation", "GLCM_homogeneity", "GLCM_contrast", "shannon_entropy", "vqascore", "clip_iqa", "niqe", "brisque", "deqa", "aesthetic_v2_5", "hpsv3", "cpbd", "q-align", "imagedoctor", "diffdoctor", "SGP-HPSv3", "SGP-v2-HPSv3", "SGP-v1.5-HPSv3" ]:
+        elif args.reward_model in [ "deqa", "aesthetic_v2_5", "hpsv3", "cpbd", "q-align", "imagedoctor", "diffdoctor", "color-fidelity-metric" ]:
             images = image_paths # path
                 
         all_scores, _ = scoring_fn(images, prompts, metadata, only_strict=False) # calculate_score
@@ -809,3 +376,452 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     main(args)
+
+    # elif args.reward_model == "SGP-PickScore":
+    #     all_reward_scorers = { "pickscore": 1.0 }
+    #     pickscore_scoring_fn, pickscore_reward_models = multi_score(device, all_reward_scorers)
+    #     for reward_model in pickscore_reward_models.values(): reward_model.to(device)
+    #     def scoring_fn(images, prompts, metadata, only_strict=False):
+    #         ### images is image_paths #### 
+    #         realistic_prompt = [ "Realistic photo " + prompt for prompt in prompts ]
+    #         cg_rendered_prompt = [ "CG Render " + prompt for prompt in prompts ]
+    #         realistic_rewards,_ = pickscore_scoring_fn(images, realistic_prompt, metadata, only_strict)
+    #         cg_rendered_rewards,_ = pickscore_scoring_fn(images, cg_rendered_prompt, metadata, only_strict)
+            
+    #         score_list = [realistic_reward - cg_rendered_reward for realistic_reward, cg_rendered_reward in zip(realistic_rewards["pickscore"], cg_rendered_rewards["pickscore"])]
+    #         score_details = { args.reward_model: score_list }
+    #         return score_details, {}
+        
+    # elif args.reward_model == "purple-pickscore":
+    #     all_reward_scorers = { "pickscore": 1.0 }
+    #     pickscore_scoring_fn, pickscore_reward_models = multi_score(device, all_reward_scorers)
+    #     for reward_model in pickscore_reward_models.values(): reward_model.to(device)
+    #     def scoring_fn(images, prompts, metadata, only_strict=False):
+    #         ### images is image_paths #### 
+    #         normal_prompt = [ prompt for prompt in prompts ]
+    #         purple_prompt = [ "purple color tones; " + prompt for prompt in prompts ]
+    #         normal_rewards,_ = pickscore_scoring_fn(images, normal_prompt, metadata, only_strict)
+    #         purple_rewards,_ = pickscore_scoring_fn(images, purple_prompt, metadata, only_strict)
+            
+    #         score_list = [ normal_reward - purple_reward for normal_reward, purple_reward in zip(normal_rewards["pickscore"], purple_rewards["pickscore"])]
+    #         score_details = { args.reward_model: score_list }
+    #         return score_details, {}
+        
+    # elif args.reward_model == "SGP-v2-clipscore":
+    #     all_reward_scorers = { "clipscore": 1.0 }
+    #     clipscore_scoring_fn, clipscore_reward_models = multi_score(device, all_reward_scorers)
+    #     for reward_model in clipscore_reward_models.values(): reward_model.to(device)
+    #     def scoring_fn(images, prompts, metadata, only_strict=False):
+    #         ### images is image_paths #### 
+    #         normal_prompt = [ prompt for prompt in prompts ]
+    #         cg_rendered_prompt = [ "CG Render " + prompt for prompt in prompts ]
+    #         normal_rewards,_ = clipscore_scoring_fn(images, normal_prompt, metadata, only_strict)
+    #         cg_rendered_rewards,_ = clipscore_scoring_fn(images, cg_rendered_prompt, metadata, only_strict)
+    #         score_list = [cg_rendered_reward - normal_reward for normal_reward, cg_rendered_reward in zip(normal_rewards["clipscore"], cg_rendered_rewards["clipscore"])]
+    #         score_details = { args.reward_model: score_list }
+    #         return score_details, {}
+        
+    # elif args.reward_model == "SGP-ImageReward":
+    #     all_reward_scorers = { "imagereward": 1.0 }
+    #     imagereward_scoring_fn, imagereward_reward_models = multi_score(device, all_reward_scorers)
+    #     for reward_model in imagereward_reward_models.values(): reward_model.to(device)
+    #     def scoring_fn(images, prompts, metadata, only_strict=False):
+    #         ### images is image_paths #### 
+    #         realistic_prompt = [ "Realistic photo " + prompt for prompt in prompts ]
+    #         cg_rendered_prompt = [ "CG Render " + prompt for prompt in prompts ]
+    #         realistic_rewards,_ = imagereward_scoring_fn(images, realistic_prompt, metadata, only_strict)
+    #         cg_rendered_rewards,_ = imagereward_scoring_fn(images, cg_rendered_prompt, metadata, only_strict)
+            
+    #         score_list = [realistic_reward - cg_rendered_reward for realistic_reward, cg_rendered_reward in zip(realistic_rewards["imagereward"], cg_rendered_rewards["imagereward"])]
+    #         score_details = { args.reward_model: score_list }
+    #         return score_details, {}
+    
+    # elif args.reward_model == "clip_iqa":
+    #     import pyiqa
+    #     reward_model = pyiqa.create_metric("clipiqa", device=device)
+    #     print(f"Initializing reward models {args.reward_model}...")
+        
+    #     def scoring_fn(images, prompts, metadata, only_strict=False):
+    #         ### images is image_paths #### 
+    #         score_list = []
+    #         for image in images:
+    #             score = reward_model(image)
+    #             if isinstance(score, torch.Tensor):
+    #                 score = score.item()
+    #             score_list.append(score)
+                
+    #         score_details = { args.reward_model: score_list}
+    #         return score_details, {}
+        
+    # elif args.reward_model == "clip_iqa":
+    #     import pyiqa
+    #     reward_model = pyiqa.create_metric("n", device=device)
+    #     print(f"Initializing reward models {args.reward_model}...")
+        
+    #     def scoring_fn(images, prompts, metadata, only_strict=False):
+    #         ### images is image_paths #### 
+    #         score_list = []
+    #         for image in images:
+    #             score = reward_model(image)
+    #             if isinstance(score, torch.Tensor):
+    #                 score = score.item()
+    #             score_list.append(score)
+                
+    #         score_details = { args.reward_model: score_list}
+    #         return score_details, {}
+        
+    # elif args.reward_model == "niqe":
+    #     import pyiqa
+    #     reward_model = pyiqa.create_metric("niqe", device=device)
+    #     print(f"Initializing reward models {args.reward_model}...")
+        
+    #     def scoring_fn(images, prompts, metadata, only_strict=False):
+    #         ### images is image_paths #### 
+    #         score_list = []
+    #         for image in images:
+    #             score = reward_model(image)
+    #             if isinstance(score, torch.Tensor):
+    #                 score = score.item()
+    #             score_list.append(score)
+                
+    #         score_details = { args.reward_model: score_list}
+    #         return score_details, {}
+        
+    # elif args.reward_model == "brisque":
+    #     import pyiqa
+    #     reward_model = pyiqa.create_metric("brisque", device=device)
+    #     print(f"Initializing reward models {args.reward_model}...")
+        
+    #     def scoring_fn(images, prompts, metadata, only_strict=False):
+    #         ### images is image_paths #### 
+    #         score_list = []
+    #         for image in images:
+    #             score = reward_model(image)
+    #             if isinstance(score, torch.Tensor):
+    #                 score = score.item()
+    #             score_list.append(score)
+                
+    #         score_details = { args.reward_model: score_list}
+    #         return score_details, {}
+        
+    # elif args.reward_model == "q-align":
+    #     import pyiqa
+    #     reward_model = pyiqa.create_metric("qalign", device=device)
+    #     print(f"Initializing reward models {args.reward_model}...")
+        
+    #     def scoring_fn(images, prompts, metadata, only_strict=False):
+    #         ### images is image_paths #### 
+    #         score_list = []
+    #         for image in images:
+    #             score = reward_model(image)
+    #             if isinstance(score, torch.Tensor):
+    #                 score = score.item()
+    #             score_list.append(score)
+                
+    #         score_details = { args.reward_model: score_list}
+    #         return score_details, {}
+    
+            
+    # elif args.reward_model == "GLCM_homogeneity":
+    
+    #     def scoring_fn(images, prompts, metadata, only_strict=False):
+    #         score_list = []
+    #         image_paths = images
+            
+    #         for image_path in image_paths:
+    #             # 1. 加载图像并转换为灰度图
+    #             # 真实场景中，AI生成的图通常是RGB，需转为灰度以计算纹理指标
+    #             img = io.imread(image_path)
+    #             if len(img.shape) == 3:
+    #                 gray_img = color.rgb2gray(img)
+    #             else:
+    #                 gray_img = img
+
+    #             # 2. 将图像转换为 8-bit 无符号整型 (0-255)
+    #             # GLCM 要求离散灰度级，这是计算的前提
+    #             gray_img_8bit = img_as_ubyte(gray_img)
+
+    #             # 3. 计算 GLCM
+    #             # distances: 像素对的距离（通常选 1-5 像素）
+    #             # angles: 方向（0°, 45°, 90°, 135°）。通常取平均值以获得旋转不变性
+    #             glcm = graycomatrix(gray_img_8bit, 
+    #                                 distances=[1], 
+    #                                 angles=[0, np.pi/4, np.pi/2, 3*np.pi/4], 
+    #                                 levels=256, 
+    #                                 symmetric=True, 
+    #                                 normed=True)
+
+    #             # 4. 计算 Homogeneity
+    #             homogeneity_values = graycoprops(glcm, 'homogeneity')
+                
+    #             score_list.append(np.mean(homogeneity_values).item())
+                
+    #         score_details = { args.reward_model: score_list }
+    #         return score_details, {}
+        
+    # elif args.reward_model == "GLCM_contrast":
+    #     def scoring_fn(images, prompts, metadata, only_strict=False):
+    #         score_list = []
+    #         image_paths = images
+            
+    #         for image_path in image_paths:
+    #             # 1. 加载图像并转换为灰度图
+    #             # 真实场景中，AI生成的图通常是RGB，需转为灰度以计算纹理指标
+    #             img = io.imread(image_path)
+    #             if len(img.shape) == 3:
+    #                 gray_img = color.rgb2gray(img)
+    #             else:
+    #                 gray_img = img
+
+    #             # 2. 将图像转换为 8-bit 无符号整型 (0-255)
+    #             # GLCM 要求离散灰度级，这是计算的前提
+    #             gray_img_8bit = img_as_ubyte(gray_img)
+
+    #             # 3. 计算 GLCM
+    #             # distances: 像素对的距离（通常选 1-5 像素）
+    #             # angles: 方向（0°, 45°, 90°, 135°）。通常取平均值以获得旋转不变性
+    #             glcm = graycomatrix(gray_img_8bit, 
+    #                                 distances=[1], 
+    #                                 angles=[0, np.pi/4, np.pi/2, 3*np.pi/4], 
+    #                                 levels=256, 
+    #                                 symmetric=True, 
+    #                                 normed=True)
+
+    #             # 4. 计算 Homogeneity
+    #             contrast_values = graycoprops(glcm, 'contrast')
+                
+    #             score_list.append(np.mean(contrast_values).item())
+                
+    #         score_details = { args.reward_model: score_list }
+    #         return score_details, {}
+    
+    # elif args.reward_model == "shannon_entropy":
+    #     def scoring_fn(images, prompts, metadata, only_strict=False):
+    #         score_list = []
+    #         image_paths = images
+            
+    #         for image_path in image_paths:
+    #             img = io.imread(image_path)
+    #             # 转换为灰度图计算纹理信息量
+    #             if len(img.shape) == 3:
+    #                 gray_img = color.rgb2gray(img)
+    #             else:
+    #                 gray_img = img
+                
+    #             # 将图像转为 8-bit (0-255)
+    #             gray_img_8bit = img_as_ubyte(gray_img)
+                
+    #             # 计算香农熵
+    #             entropy_value = shannon_entropy(gray_img_8bit)
+    #             score_list.append(entropy_value)
+                
+    #         score_details = { args.reward_model: score_list }
+    #         return score_details, {}
+    
+    # elif args.reward_model == "laplacian_variance":
+    #     def scoring_fn(images, prompts, metadata, only_strict=False):
+    #         score_list = []
+    #         image_paths = images
+            
+    #         for image_path in image_paths:
+    #             # 1. 读取图像
+    #             img = io.imread(image_path)
+                
+    #             # 2. 转为灰度图 (必须)
+    #             if len(img.shape) == 3:
+    #                 gray = color.rgb2gray(img)
+    #             else:
+    #                 gray = img
+                    
+    #             # 3. 转为 uint8 格式 (OpenCV通常处理0-255)
+    #             gray = img_as_ubyte(gray)
+                
+    #             # 4. 计算拉普拉斯算子
+    #             # ddepth=cv2.CV_64F 防止溢出
+    #             laplacian = cv2.Laplacian(gray, cv2.CV_64F)
+                
+    #             # 5. 计算方差
+    #             variance = laplacian.var()
+    #             score_list.append(variance)
+                
+    #         score_details = { args.reward_model: score_list }
+    #         return score_details, {}
+        
+    # elif args.reward_model == "LBP":    
+    #     def scoring_fn(images, prompts, metadata, only_strict=False):
+    #         score_list = []
+    #         image_paths = images
+    #         radius = 1
+    #         n_points = 8
+    #         for image_path in image_paths:
+    #             # 1. 读取图像并转换为灰度
+    #             img = io.imread(image_path)
+    #             if len(img.shape) == 3:
+    #                 gray = color.rgb2gray(img)
+    #             else:
+    #                 gray = img
+                
+    #             # 转换为 8-bit 整数 (0-255)
+    #             gray = img_as_ubyte(gray)
+                
+    #             # 2. 计算 LBP 特征图
+    #             # 'uniform' 模式具有旋转不变性，且能有效减少特征维度，是分析纹理的标准选择
+    #             lbp = local_binary_pattern(gray, n_points, radius, method='uniform')
+                
+    #             # 3. 计算 LBP 直方图 (概率分布)
+    #             # uniform 模式下的 bin 数量为 n_points + 2
+    #             n_bins = int(lbp.max() + 1)
+    #             hist, _ = np.histogram(lbp.ravel(), bins=n_bins, range=(0, n_bins), density=True)
+                
+    #             # 4. 计算香农熵 (Shannon Entropy)
+    #             # 熵越高 = 纹理模式越多样 = 细节越丰富
+    #             # 使用 base=2，单位为 bit
+    #             lbp_entropy_score = entropy(hist, base=2)
+                
+    #             score_list.append(lbp_entropy_score)
+                
+    #         score_details = { args.reward_model: score_list }
+    #         return score_details, {}
+        
+    # elif args.reward_model == "edge_density":    
+    #     def scoring_fn(images, prompts, metadata, only_strict=False):
+    #         score_list = []
+    #         image_paths = images
+    #         low_threshold = 100
+    #         high_threshold = 200
+    #         for image_path in image_paths:
+    #             # 1. 读取并转灰度
+    #             img = io.imread(image_path)
+    #             if len(img.shape) == 3:
+    #                 gray = color.rgb2gray(img)
+    #             else:
+    #                 gray = img
+    #             gray = img_as_ubyte(gray)
+                
+    #             # 2. Canny 边缘检测
+    #             # 阈值选取很关键，100/200 是比较标准的自然图像设置
+    #             edges = cv2.Canny(gray, low_threshold, high_threshold)
+                
+    #             # 3. 计算边缘密度 (非零像素占比)
+    #             # 结果是百分比，比如 0.05 表示 5% 的像素是边缘
+    #             density = np.count_nonzero(edges) / edges.size
+                
+    #             score_list.append(density)
+                
+    #         score_details = { args.reward_model: score_list }
+    #         return score_details, {}
+        
+    # elif args.reward_model == "saturation":
+    #     def calculate_saturation(image_path):
+    #         img = Image.open(image_path).convert("HSV")
+    #         s_channel = np.array(img)[:, :, 1]
+    #         return s_channel.mean()
+        
+    #     def scoring_fn(images, prompts, metadata, only_strict=False):
+    #         #### images is image_paths ####
+    #         image_paths = images
+    #         score_list = [calculate_saturation(image_path) for image_path in image_paths]
+    #         score_details = { "saturation": score_list }
+    #         return score_details, {}
+        
+    # elif args.reward_model == "brightness":
+    #     def calculate_average_brightness(image_path):
+    #         image = Image.open(image_path)
+    #         gray_image = image.convert('L')
+    #         gray_array = np.array(gray_image)
+    #         return np.mean(gray_array)
+        
+    #     def scoring_fn(images, prompts, metadata, only_strict=False):
+    #         #### images is image_paths ####
+    #         image_paths = images
+    #         score_list = [calculate_average_brightness(image_path) for image_path in image_paths]
+    #         score_details = { "brightness": score_list }
+    #         return score_details, {}
+
+
+    # elif args.reward_model == "purple-hpsv3":
+    #     from hpsv3 import HPSv3RewardInferencer
+    #     inferencer = HPSv3RewardInferencer(device='cuda')
+    #     # inferencer.model = inferencer.model.to(device).to(torch.float16) 
+    #     def scoring_fn(images, prompts, metadata, only_strict=False):
+    #         ### images is image_paths #### 
+    #         assert type(images[0]) == str
+    #         image_paths = images
+    #         purple_prompt = [ "purple color tones; " + prompt for prompt in prompts ]
+    #         normal_prompt = [ prompt for prompt in prompts ]
+    #         with torch.no_grad():
+    #             normal_rewards = inferencer.reward(prompts=normal_prompt, image_paths=image_paths)
+    #             purple_rewards = inferencer.reward(prompts=purple_prompt, image_paths=image_paths)
+    #             score_list = [normal_reward[0].item() - purple_reward[0].item() for normal_reward, purple_reward in zip(normal_rewards, purple_rewards)]
+            
+    #         score_details = { args.reward_model: score_list }
+    #         return score_details, {}
+        
+    # elif args.reward_model == "SGP-HPSv3":
+    #     from hpsv3 import HPSv3RewardInferencer
+    #     inferencer = HPSv3RewardInferencer(device='cuda')
+        
+    #     def scoring_fn(images, prompts, metadata, only_strict=False):
+    #         ### images is image_paths #### 
+    #         assert type(images[0]) == str
+    #         image_paths = images
+    #         realistic_prompt = [ "Realistic photo " + prompt for prompt in prompts ]
+    #         cg_rendered_prompt = [ "CG Render " + prompt for prompt in prompts ]
+    #         with torch.no_grad():
+    #             realistic_rewards = inferencer.reward(prompts=realistic_prompt, image_paths=image_paths)
+    #             cg_rendered_rewards = inferencer.reward(prompts=cg_rendered_prompt, image_paths=image_paths)
+    #             score_list = [realistic_reward[0].item() - cg_rendered_reward[0].item() for realistic_reward, cg_rendered_reward in zip(realistic_rewards, cg_rendered_rewards)]
+            
+    #         score_details = { args.reward_model: score_list }
+    #         return score_details, {}
+        
+    # elif args.reward_model == "SGP-v2-HPSv3":
+    #     from hpsv3 import HPSv3RewardInferencer
+    #     inferencer = HPSv3RewardInferencer(device='cuda')
+        
+    #     def scoring_fn(images, prompts, metadata, only_strict=False):
+    #         ### images is image_paths #### 
+    #         assert type(images[0]) == str
+    #         image_paths = images
+    #         cg_rendered_prompt = [ "CG Render " + prompt for prompt in prompts ]
+    #         normal_prompt = [ prompt for prompt in prompts ]
+    #         with torch.no_grad():
+    #             cg_rendered_rewards = inferencer.reward(prompts=cg_rendered_prompt, image_paths=image_paths)
+    #             normal_rewards = inferencer.reward(prompts=normal_prompt, image_paths=image_paths)
+    #             score_list = [cg_rendered_reward[0].item() - normal_reward[0].item() for normal_reward, cg_rendered_reward in zip(normal_rewards, cg_rendered_rewards)]
+            
+    #         score_details = { args.reward_model: score_list }
+    #         return score_details, {}
+        
+    # elif args.reward_model == "SGP-v1.5-HPSv3":
+    #     from hpsv3 import HPSv3RewardInferencer
+    #     inferencer = HPSv3RewardInferencer(device='cuda')
+        
+    #     def scoring_fn(images, prompts, metadata, only_strict=False):
+    #         ### images is image_paths #### 
+    #         assert type(images[0]) == str
+    #         image_paths = images
+    #         cg_rendered_prompt = [ "CG Render " + prompt for prompt in prompts ]
+    #         realistic_prompt = [ "Realistic photo " + prompt for prompt in prompts ]
+    #         with torch.no_grad():
+    #             cg_rendered_rewards = inferencer.reward(prompts=cg_rendered_prompt, image_paths=image_paths)
+    #             realistic_rewards = inferencer.reward(prompts=realistic_prompt, image_paths=image_paths)
+    #             score_list = [ cg_rendered_reward[0].item() - realistic_reward[0].item() for realistic_reward, cg_rendered_reward in zip(realistic_rewards, cg_rendered_rewards)]
+            
+    #         score_details = { args.reward_model: score_list }
+    #         return score_details, {}
+        
+    # elif args.reward_model == "cpbd":
+    #     import cpbd
+
+    #     def scoring_fn(images, prompts, metadata, only_strict=False):
+    #         score_list = []
+    #         image_paths = images
+    #         for image_path in image_paths:
+    #             img = np.array(Image.open(image_path).convert('L'))
+    #             score = cpbd.compute(img)
+    #             score_list.append(score)
+            
+    #         score_details = { args.reward_model: score_list }
+    #         return score_details, {}
+        

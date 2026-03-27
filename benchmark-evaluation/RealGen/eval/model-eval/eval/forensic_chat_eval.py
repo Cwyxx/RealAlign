@@ -152,12 +152,9 @@ def main():
     if len(image_paths) == 0:
         raise ValueError(f"No images found in {images_dir}")
 
-    # Load images
-    images = [Image.open(img) for img in tqdm(image_paths, desc="Loading images")]
-
     # Run evaluation
     print("Running Forensic-Chat evaluation...")
-    result = scorer(images)
+    result = scorer(image_paths)
     mean_score = sum(result) / len(result)
 
     # Save results

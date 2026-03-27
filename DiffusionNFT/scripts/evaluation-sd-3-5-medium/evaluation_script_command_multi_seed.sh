@@ -24,12 +24,13 @@ for seed in "${seed_list[@]}"; do
     image_dir="${base_image_dir}/${method}/ckpt-${ckpt}"
     conda activate alignprop
 
-    python generate_image.py --seed ${seed} --checkpoint_path ${ckpt_dir} --model_type sd3 --dataset ${dataset} \
-        --output_dir ${image_dir} \
-        --save_images
+    # python generate_image.py --seed ${seed} --checkpoint_path ${ckpt_dir} --model_type sd3 --dataset ${dataset} \
+    #     --output_dir ${image_dir} \
+    #     --save_images
 
 
-    reward_model_list=("pickscore" "imagereward" "hpsv3" "aesthetic" "deqa" "unifiedreward")
+    # reward_model_list=("pickscore" "imagereward" "hpsv3" "aesthetic" "deqa" "unifiedreward")
+    reward_model_list=("color-fidelity-metric")
     for reward_model in "${reward_model_list[@]}"; do
         echo "********************************************"
         echo "reward_model: ${reward_model}"
@@ -41,7 +42,7 @@ for seed in "${seed_list[@]}"; do
             conda activate utils
         elif [[ "$reward_model" == "vqascore" ]]; then
             conda activate t2v
-        elif [[ "$reward_model" == "hpsv3" ]] || [[ "$reward_model" == "SGP-HPSv3" ]]; then
+        elif [[ "$reward_model" == "hpsv3" ]] || [[ "$reward_model" == "color-fidelity-metric" ]]; then
             conda activate hpsv3
         elif [[ "$reward_model" == "cpbd" ]]; then
             conda activate utils
