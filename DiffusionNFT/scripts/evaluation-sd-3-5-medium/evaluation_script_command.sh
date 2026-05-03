@@ -15,7 +15,7 @@ seed=$6 # 42
 export CUDA_VISIBLE_DEVICES=${cuda_device}
 
 base_ckpt_dir="/data_center/data2/dataset/chenwy/21164-data/${rl_framework}/sd-3-5-medium/model-ckpt"
-base_image_dir="/data_center/data2/dataset/chenwy/21164-data/tmpDir/sd-3-5-medium/generate_images_seed_${seed}/${dataset}"
+base_image_dir="/data_center/data2/dataset/chenwy/21164-data/${rl_framework}/sd-3-5-medium/generate_images_seed_${seed}/${dataset}"
 
 ckpt_dir="${base_ckpt_dir}/${method}/checkpoints/checkpoint-${ckpt}"
 image_dir="${base_image_dir}/${method}/ckpt-${ckpt}"

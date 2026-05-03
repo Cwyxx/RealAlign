@@ -106,7 +106,7 @@ def main(args):
         dataset = TextPromptDataset(dataset_path, split="test")
     elif args.dataset == "drawbench-unique":
         dataset = TextPromptDataset(dataset_path, split="test")
-    elif args.dataset == "HPDv2-all":
+    elif args.dataset in ["HPDv2-all", "HPDv2-anime-all"]:
         dataset = TextPromptDataset(dataset_path, split="test")
     elif args.dataset == "partiprompts":
         dataset = TextPromptDataset(dataset_path, split="test")

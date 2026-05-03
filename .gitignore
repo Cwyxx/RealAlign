@@ -9,3 +9,4 @@ evaluate_metric/MA-AGIQA
 evaluate_metric/PKU-AIGIQA-4K
 evaluate_metric/General-Visual-Quality-RL
 tmp/
+benchmark-evaluation/RealGen/benchmark/real-img-benchmark

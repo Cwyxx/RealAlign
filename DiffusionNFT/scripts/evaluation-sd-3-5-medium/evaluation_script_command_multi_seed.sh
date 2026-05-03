@@ -30,7 +30,7 @@ for seed in "${seed_list[@]}"; do
 
 
     # reward_model_list=("pickscore" "imagereward" "hpsv3" "aesthetic" "deqa" "unifiedreward")
-    reward_model_list=("color-fidelity-metric")
+    reward_model_list=("unifiedreward")
     for reward_model in "${reward_model_list[@]}"; do
         echo "********************************************"
         echo "reward_model: ${reward_model}"

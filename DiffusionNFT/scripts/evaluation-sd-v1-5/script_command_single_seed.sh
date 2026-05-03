@@ -49,7 +49,7 @@ image_dir="${base_image_dir}/${method}/ckpt-${ckpt}"
 # fi
 
 cd ../evaluation-sd-3-5-medium
-reward_model_list=("pickscore" "imagereward" "hpsv3" "deqa" "aesthetic" "unifiedreward")
+reward_model_list=("unifiedreward")
 for reward_model in "${reward_model_list[@]}"; do
     echo "********************************************"
     echo "reward_model: ${reward_model}"
