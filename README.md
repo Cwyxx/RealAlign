@@ -31,13 +31,14 @@ Preference alignment aims to guide generative models by learning from comparison
 
 ## Repository layout
 
-Only the directories listed below are part of RealAlign itself. `DiffusionNFT/` is included as a vendored baseline for comparison; `notebook/` holds scratch analyses unrelated to the pipeline.
+Only the directories listed below are part of RealAlign itself. `notebook/` holds scratch analyses unrelated to the pipeline.
 
 | Path | What lives here |
 |---|---|
 | [`data_curation/`](data_curation/) | Builds (real, fake) preference pairs from HPDv3 / Pick-a-Pic v2 / Civitai-top. Four stages: `extract → construct_pairs → score → filter`. Outputs the CSV consumed by training. |
 | [`training_sd15/`](training_sd15/) | RealAlign **SD-1.5** two-stage trainers. `stage1_diffusion_dro/train-irl.py` (Stage 1) and `stage2_dpo/train-lora_init.py` (Stage 2, LoRA-init from Stage 1). |
 | [`flow_grpo_github/scripts/`](flow_grpo_github/scripts/) | RealAlign **SD-3.5-M** two-stage trainers: `train-sd-3-5-medium-irl.py` (Stage 1) and `train-sd-3-5-medium-dpo.py` (Stage 2). Live here because they `import flow_grpo.*` and depend on the local `diffusers_patch/` SDE samplers. |
+| [`flow_grpo_github/evaluation/`](flow_grpo_github/evaluation/) | SD-3.5-M eval harness: `sd-3-5-medium/{generate_image.py, calculate_score.py}` + prompt lists for Pick-a-Pic v2 / Parti-Prompts / DrawBench under `dataset/`. All six metrics (PickScore, ImageReward, Aesthetic, HPSv3, DeQA, UnifiedReward) go through `flow_grpo.rewards.multi_score`. |
 | [`evaluate_metric/`](evaluate_metric/) | PickScore / HPSv3 / Aesthetic / CLIPScore / DeQA / VILA + vendored Clean-FID, CMMD, CPBD. |
 | [`benchmark-evaluation/`](benchmark-evaluation/) | GenEval / GenEval2 / DPG-Bench / OneIG-Benchmark / WISE, plus our **RealGen** benchmark. |
 

@@ -1,1 +1,0 @@
-./script_command_single_seed.sh 1 dpo_official-irl_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all_ckpt_1600-dpo_2000_top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-inpainting 800 diffusion-dpo partiprompts 1000

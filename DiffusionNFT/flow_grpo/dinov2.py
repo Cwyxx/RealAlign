@@ -1,1 +1,0 @@
-../../aigi_detector_training/dinov2.py

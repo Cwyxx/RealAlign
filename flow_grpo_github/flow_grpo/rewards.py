@@ -159,52 +159,25 @@ def video_ocr_score(device):
 
     return _fn
 
-def deqa_score_remote(device):
-    """Submits images to DeQA and computes a reward.
-    """
-    import requests
-    from requests.adapters import HTTPAdapter, Retry
-    from io import BytesIO
-    import pickle
+def deqa_score(device):
+    """Local DeQA-Score model (zhiyuanyou/DeQA-Score-Mix3). Expects file paths."""
+    del device  # device_map="auto" handles placement
+    from transformers import AutoModelForCausalLM
 
-    batch_size = 64
-    url = "http://127.0.0.1:18086"
-    sess = requests.Session()
-    retries = Retry(
-        total=1000, backoff_factor=1, status_forcelist=[500], allowed_methods=False
+    reward_model = AutoModelForCausalLM.from_pretrained(
+        "zhiyuanyou/DeQA-Score-Mix3",
+        trust_remote_code=True,
+        attn_implementation="eager",
+        torch_dtype=torch.float16,
+        device_map="auto",
+        revision="f37ba4273ad8d7548e21ac2fa58353c517e4df49",
     )
-    sess.mount("http://", HTTPAdapter(max_retries=retries))
 
     def _fn(images, prompts, metadata):
-        del prompts
-        if isinstance(images, torch.Tensor):
-            images = (images * 255).round().clamp(0, 255).to(torch.uint8).cpu().numpy()
-            images = images.transpose(0, 2, 3, 1)  # NCHW -> NHWC
-        images_batched = np.array_split(images, np.ceil(len(images) / batch_size))
-        all_scores = []
-        for image_batch in images_batched:
-            jpeg_images = []
-
-            # Compress the images using JPEG
-            for image in image_batch:
-                img = Image.fromarray(image)
-                buffer = BytesIO()
-                img.save(buffer, format="JPEG")
-                jpeg_images.append(buffer.getvalue())
-
-            # format for LLaVA server
-            data = {
-                "images": jpeg_images,
-            }
-            data_bytes = pickle.dumps(data)
-
-            # send a request to the llava server
-            response = sess.post(url, data=data_bytes, timeout=120)
-            response_data = pickle.loads(response.content)
-
-            all_scores += response_data["outputs"]
-
-        return all_scores, {}
+        del prompts, metadata
+        pil_images = [Image.open(p) for p in images]
+        scores = reward_model.score(pil_images).tolist()
+        return scores, {}
 
     return _fn
 
@@ -332,80 +305,74 @@ def unifiedreward_score_remote(device):
 
     return _fn
 
-def unifiedreward_score_sglang(device):
-    import asyncio
-    from openai import AsyncOpenAI
-    import base64
-    from io import BytesIO
-    import re 
+def unifiedreward_score(device):
+    """Local UnifiedReward (CodeGoat24/UnifiedReward-qwen-7b)."""
+    import re
 
-    def pil_image_to_base64(image):
-        buffered = BytesIO()
-        image.save(buffered, format="PNG")
-        encoded_image_text = base64.b64encode(buffered.getvalue()).decode("utf-8")
-        base64_qwen = f"data:image;base64,{encoded_image_text}"
-        return base64_qwen
+    from qwen_vl_utils import process_vision_info
+    from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
 
-    def _extract_scores(text_outputs):
-        scores = []
-        pattern = r"Final Score:\s*([1-5](?:\.\d+)?)"
-        for text in text_outputs:
-            match = re.search(pattern, text)
-            if match:
-                try:
-                    scores.append(float(match.group(1)))
-                except ValueError:
-                    scores.append(0.0)
-            else:
-                scores.append(0.0)
-        return scores
+    model_path = "CodeGoat24/UnifiedReward-qwen-7b"
+    model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+        model_path, torch_dtype=torch.float16, device_map={"": device}
+    )
+    processor = AutoProcessor.from_pretrained(model_path)
 
-    client = AsyncOpenAI(base_url="http://127.0.0.1:17140/v1", api_key="flowgrpo")
-        
-    async def evaluate_image(prompt, image):
-        question = f"<image>\nYou are given a text caption and a generated image based on that caption. Your task is to evaluate this image based on two key criteria:\n1. Alignment with the Caption: Assess how well this image aligns with the provided caption. Consider the accuracy of depicted objects, their relationships, and attributes as described in the caption.\n2. Overall Image Quality: Examine the visual quality of this image, including clarity, detail preservation, color accuracy, and overall aesthetic appeal.\nBased on the above criteria, assign a score from 1 to 5 after \'Final Score:\'.\nYour task is provided as follows:\nText Caption: [{prompt}]"
-        images_base64 = pil_image_to_base64(image)
-        response = await client.chat.completions.create(
-            model="UnifiedReward-7b-v1.5",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": images_base64},
-                        },
-                        {
-                            "type": "text",
-                            "text": question,
-                        },
-                    ],
-                },
-            ],
-            temperature=0,
-        )
-        return response.choices[0].message.content
+    score_pattern = re.compile(r"Final Score:\s*([1-5](?:\.\d+)?)")
+    prompt_template = (
+        "You are given a text caption and a generated image based on that caption. "
+        "Your task is to evaluate this image based on two key criteria:\n"
+        "1. Alignment with the Caption: Assess how well this image aligns with the provided caption. "
+        "Consider the accuracy of depicted objects, their relationships, and attributes as described in the caption.\n"
+        "2. Overall Image Quality: Examine the visual quality of this image, including clarity, detail preservation, "
+        "color accuracy, and overall aesthetic appeal.\n"
+        "Extract key elements from the provided text caption, evaluate their presence in the generated image using "
+        "the format: 'element (type): value' (where value=0 means not generated, and value=1 means generated), and "
+        "assign a score from 1 to 5 after 'Final Score:'.\n"
+        "Your task is provided as follows:\n"
+        "Text Caption: [{prompt}]"
+    )
 
-    async def evaluate_batch_image(images, prompts):
-        tasks = [evaluate_image(prompt, img) for prompt, img in zip(prompts, images)]
-        results = await asyncio.gather(*tasks)
-        return results
+    def _extract_score(text):
+        m = score_pattern.search(text)
+        if not m:
+            return 0.0
+        try:
+            return float(m.group(1))
+        except ValueError:
+            return 0.0
 
     def _fn(images, prompts, metadata):
-        # 处理Tensor类型转换
+        del metadata
         if isinstance(images, torch.Tensor):
             images = (images * 255).round().clamp(0, 255).to(torch.uint8).cpu().numpy()
             images = images.transpose(0, 2, 3, 1)  # NCHW -> NHWC
-        
-        # 转换为PIL Image并调整尺寸
-        images = [Image.fromarray(image).resize((512, 512)) for image in images]
+            images = [Image.fromarray(image).resize((512, 512)) for image in images]
 
-        # 执行异步批量评估
-        text_outputs = asyncio.run(evaluate_batch_image(images, prompts))
-        score = _extract_scores(text_outputs)
-        score = [sc/5.0 for sc in score]
-        return score, {}
-    
+        scores = []
+        for image, prompt in zip(images, prompts):
+            messages = [{
+                "role": "user",
+                "content": [
+                    {"type": "image", "image": image},
+                    {"type": "text", "text": prompt_template.format(prompt=prompt)},
+                ],
+            }]
+            text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+            image_inputs, video_inputs = process_vision_info(messages)
+            inputs = processor(
+                text=[text], images=image_inputs, videos=video_inputs,
+                padding=True, return_tensors="pt",
+            ).to(model.device)
+            with torch.no_grad():
+                generated_ids = model.generate(**inputs, max_new_tokens=512)
+            trimmed = [out[len(inp):] for inp, out in zip(inputs.input_ids, generated_ids)]
+            output_text = processor.batch_decode(
+                trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False,
+            )[0]
+            scores.append(_extract_score(output_text))
+        return scores, {}
+
     return _fn
 
 def dinov2_score(device):
@@ -442,9 +409,26 @@ def dinov2_score(device):
     
     return _fn
 
+def hpsv3_score(device):
+    """HPSv3 reward via the `hpsv3` package. Expects file paths."""
+    from hpsv3 import HPSv3RewardInferencer
+
+    inferencer = HPSv3RewardInferencer(device=str(device))
+
+    def _fn(images, prompts, metadata):
+        del metadata
+        with torch.no_grad():
+            rewards = inferencer.reward(prompts=prompts, image_paths=images)
+            scores = [reward[0].item() for reward in rewards]
+        return scores, {}
+
+    return _fn
+
+
 def multi_score(device, score_dict):
     score_functions = {
-        "deqa": deqa_score_remote,
+        "deqa": deqa_score,
+        "hpsv3": hpsv3_score,
         "ocr": ocr_score,
         "video_ocr": video_ocr_score,
         "imagereward": imagereward_score,
@@ -452,7 +436,7 @@ def multi_score(device, score_dict):
         "qwenvl": qwenvl_score,
         "aesthetic": aesthetic_score,
         "jpeg_compressibility": jpeg_compressibility,
-        "unifiedreward": unifiedreward_score_sglang,
+        "unifiedreward": unifiedreward_score,
         "geneval": geneval_score,
         "clipscore": clip_score,
         "image_similarity": image_similarity_score,
