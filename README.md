@@ -31,7 +31,7 @@ Preference alignment aims to guide generative models by learning from comparison
 
 ## Repository layout
 
-Only the directories listed below are part of RealAlign itself. Other top-level folders (`training_and_inference/`, `DiffusionNFT/`, `aigi_detector_training/`, ...) are vendored baselines or auxiliary tools.
+Only the directories listed below are part of RealAlign itself. `DiffusionNFT/` is included as a vendored baseline for comparison; `notebook/` holds scratch analyses unrelated to the pipeline.
 
 | Path | What lives here |
 |---|---|

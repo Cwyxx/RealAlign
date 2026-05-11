@@ -1,2 +1,0 @@
-python u2net_single_image.py --input_image_path "/data_center/data2/dataset/chenwy/21164-data/dpo_dataset/u2net_next_inpainting/HPDv3/visualization/top_512_images_no_anime_colorfulness_pickscore_0.02-hpdv3_all-uids/real/00dc5011-8df6-41fc-a2dd-06281978a5ed.png" \
-    --output_image_path "/data3/chenweiyan/notebook/fine-tune-diffusion/spo_gitee/notebook/inpainting/U-2-Net/saliency_mask-00dc5011-8df6-41fc-a2dd-06281978a5ed.png"
