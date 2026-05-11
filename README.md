@@ -1,112 +1,89 @@
+<h1 align="center"> When Preference Labels Fall Short — Aligning Diffusion Models from Real Data </h1>
+
 <div align="center">
-
-# Aesthetic Post-Training Diffusion Models from Generic Preferences with Step-by-step Preference Optimization
- [Zhanhao Liang](https://github.com/RockeyCoss), [Yuhui Yuan](https://www.microsoft.com/en-us/research/people/yuyua/), [Shuyang Gu](https://cientgu.github.io), [Bohan Chen](https://github.com/BHCHENGIT), [Tiankai Hang](https://tiankaihang.github.io/), [Mingxi Cheng](https://sites.google.com/a/usc.edu/mingxicheng/), [Ji Li](https://sites.google.com/a/usc.edu/jili/), [Liang Zheng](https://zheng-lab.cecs.anu.edu.au)
- 
- ${{\color{Red}\Huge{\textsf{  CVPR\ 2025\ \}}}}\$
-
-<a href="https://arxiv.org/abs/2406.04314"><img src="https://img.shields.io/badge/Paper-arXiv-red?style=for-the-badge" height=22.5></a>
-<a href="https://rockeycoss.github.io/spo.github.io/"><img src="https://img.shields.io/badge/Project-Page-blue?style=for-the-badge" height=22.5></a>
-<a href="https://huggingface.co/SPO-Diffusion-Models"><img src="https://img.shields.io/badge/Hugging-Face-yellow?style=for-the-badge" height=22.5></a>
+  <a href='TODO'><img src='https://img.shields.io/badge/OpenReview-red?logo=openreview'></a> &nbsp;
+  <a href='TODO'><img src='https://img.shields.io/badge/Project_Page-9E95B7?logo=github'></a> &nbsp;
+  <a href='TODO'><img src='https://img.shields.io/badge/Code-9E95B7?logo=github'></a> &nbsp;
+  <a href='TODO'><img src='https://img.shields.io/badge/Model-blue?logo=huggingface'></a> &nbsp;
+  <a href='TODO'><img src='https://img.shields.io/badge/Dataset-blue?logo=huggingface'></a>
 </div>
 
-This is the official implementation of SPO, introduced in [Aesthetic Post-Training Diffusion Models from Generic Preferences with Step-by-step Preference Optimization](https://arxiv.org/abs/2406.04314).
+<p align="center"><em>Accepted at ICML 2026. Links above are placeholders — TODO before public release.</em></p>
 
 ## Abstract
-<p>
-    Generating visually appealing images is fundamental to modern text-to-image generation models. 
-    A potential solution to better aesthetics is direct preference optimization (DPO), 
-    which has been applied to diffusion models to improve general image quality including prompt alignment and aesthetics. 
-    Popular DPO methods propagate preference labels from clean image pairs to all the intermediate steps along the two generation trajectories. 
-    However, preference labels provided in existing datasets are blended with layout and aesthetic opinions, which would disagree with aesthetic preference. 
-    Even if aesthetic labels were provided (at substantial cost), it would be hard for the two-trajectory methods to capture nuanced visual differences at different steps.
-</p>
-<p>
-    To improve aesthetics economically, this paper uses existing generic preference data and introduces step-by-step preference optimization 
-    (SPO) that discards the propagation strategy and allows fine-grained image details to be assessed. Specifically, 
-    at each denoising step, we 1) sample a pool of candidates by denoising from a shared noise latent, 
-    2) use a step-aware preference model to find a suitable win-lose pair to supervise the diffusion model, and 
-    3) randomly select one from the pool to initialize the next denoising step. 
-    This strategy ensures that diffusion models focus on the subtle, fine-grained visual differences 
-    instead of layout aspect. We find that aesthetics can be significantly enhanced by accumulating these 
-    improved minor differences.
-</p>
-<p>
-    When fine-tuning Stable Diffusion v1.5 and SDXL, SPO yields significant 
-    improvements in aesthetics compared with existing DPO methods while not sacrificing image-text alignment 
-    compared with vanilla models. Moreover, SPO converges much faster than DPO methods due to the use of 
-    more correct preference labels provided by the step-aware preference model.                       
-</p>
 
-## Method Overview
-![method_overview](assets/method.jpg)
-
-## TODO
-- [x] Release training code for step-aware preference model
-- [x] Release training code for SPO
-- [x] Release checkpoints and inference code
-- [x] Initialization
+Preference alignment aims to guide generative models by learning from comparisons between preferred and non-preferred samples. In practice, most existing approaches rely on preference pairs constructed from model-generated images. Such supervision is inherently relative and can be ambiguous when both samples exhibit artifacts or limited visual quality, making it difficult to infer what constitutes a truly desirable output. In this work, we investigate whether real data can serve as an alternative source of supervision for preference alignment. We adopt a data-centric perspective and study a curation strategy that treats real images as reference points and constructs preference signals by contrasting them with generated or perturbed samples, without requiring manually annotated preference pairs. Through empirical analysis, we show that real-data-based supervision provides effective guidance for aligning diffusion models and achieves performance comparable to existing preference-based methods. Our results suggest that real data offers a practical and complementary source of supervision for preference alignment and highlight directions of label-efficient alignment strategies.
 
 ## Gallery
-<table>
-  <tr>
-    <td><img src="assets/teaser/0.png" alt="teaser example 0" width="200"/></td>
-    <td><img src="assets/teaser/1.png" alt="teaser example 1" width="200"/></td>
-    <td><img src="assets/teaser/2.png" alt="teaser example 2" width="200"/></td>
-    <td><img src="assets/teaser/3.png" alt="teaser example 3" width="200"/></td>
-  </tr>
-  <tr>
-    <td><img src="assets/teaser/4.png" alt="teaser example 4" width="200"/></td>
-    <td><img src="assets/teaser/5.png" alt="teaser example 5" width="200"/></td>
-    <td><img src="assets/teaser/6.png" alt="teaser example 6" width="200"/></td>
-    <td><img src="assets/teaser/7.png" alt="teaser example 7" width="200"/></td>
-  </tr>
-  <tr>
-    <td><img src="assets/teaser/8.png" alt="teaser example 8" width="200"/></td>
-    <td><img src="assets/teaser/9.png" alt="teaser example 9" width="200"/></td>
-    <td><img src="assets/teaser/10.png" alt="teaser example 10" width="200"/></td>
-    <td><img src="assets/teaser/11.png" alt="teaser example 11" width="200"/></td>
-  </tr>
-  <tr>
-    <td><img src="assets/teaser/12.png" alt="teaser example 12" width="200"/></td>
-    <td><img src="assets/teaser/13.png" alt="teaser example 13" width="200"/></td>
-    <td><img src="assets/teaser/14.png" alt="teaser example 14" width="200"/></td>
-    <td><img src="assets/teaser/15.png" alt="teaser example 15" width="200"/></td>
-  </tr>
-  <tr>
-    <td><img src="assets/teaser/16.png" alt="teaser example 16" width="200"/></td>
-    <td><img src="assets/teaser/17.png" alt="teaser example 17" width="200"/></td>
-    <td><img src="assets/teaser/18.png" alt="teaser example 18" width="200"/></td>
-    <td><img src="assets/teaser/19.png" alt="teaser example 19" width="200"/></td>
-  </tr>
-</table>
 
-## :wrench: Usage
-For SPO training and inference using the available checkpoints, please refer to [spo_training_and_inference](spo_training_and_inference/).
+<p align="center">
+  <img src="assets/gallery/00009.png" alt="gallery 00009" width="220"/>
+  <img src="assets/gallery/00368.png" alt="gallery 00368" width="220"/>
+  <img src="assets/gallery/00149.png" alt="gallery 00149" width="220"/>
+  <img src="assets/gallery/00150.png" alt="gallery 00150" width="220"/>
+</p>
+<p align="center">
+  <img src="assets/gallery/00243.png" alt="gallery 00243" width="220"/>
+  <img src="assets/gallery/01175.png" alt="gallery 01175" width="220"/>
+  <img src="assets/gallery/00269.png" alt="gallery 00269" width="220"/>
+  <img src="assets/gallery/00264.png" alt="gallery 00264" width="220"/>
+</p>
 
-For the training of the step-aware preference model, please refer to [step_aware_preference_model](step_aware_preference_model/).
+## Repository layout
 
-## :unlock: Available Checkpoints
+Only the directories listed below are part of RealAlign itself. Other top-level folders (`training_and_inference/`, `DiffusionNFT/`, `aigi_detector_training/`, ...) are vendored baselines or auxiliary tools.
 
-[SPO-SDXL_4k-prompts_10-epochs](https://huggingface.co/SPO-Diffusion-Models/SPO-SDXL_4k-p_10ep)
+| Path | What lives here |
+|---|---|
+| [`data_curation/`](data_curation/) | Builds (real, fake) preference pairs from HPDv3 / Pick-a-Pic v2 / Civitai-top. Four stages: `extract → construct_pairs → score → filter`. Outputs the CSV consumed by training. |
+| [`training_sd15/`](training_sd15/) | RealAlign **SD-1.5** two-stage trainers. `stage1_diffusion_dro/train-irl.py` (Stage 1) and `stage2_dpo/train-lora_init.py` (Stage 2, LoRA-init from Stage 1). |
+| [`flow_grpo_github/scripts/`](flow_grpo_github/scripts/) | RealAlign **SD-3.5-M** two-stage trainers: `train-sd-3-5-medium-irl.py` (Stage 1) and `train-sd-3-5-medium-dpo.py` (Stage 2). Live here because they `import flow_grpo.*` and depend on the local `diffusers_patch/` SDE samplers. |
+| [`evaluate_metric/`](evaluate_metric/) | PickScore / HPSv3 / Aesthetic / CLIPScore / DeQA / VILA + vendored Clean-FID, CMMD, CPBD. |
+| [`benchmark-evaluation/`](benchmark-evaluation/) | GenEval / GenEval2 / DPG-Bench / OneIG-Benchmark / WISE, plus our **RealGen** benchmark. |
 
-[SPO-SDXL_4k-prompts_10-epochs_LoRA](https://huggingface.co/SPO-Diffusion-Models/SPO-SDXL_4k-p_10ep_LoRA)
+## 🚀 Quick start
 
-[SPO-SD-v1-5_4k-prompts_10-epochs](https://huggingface.co/SPO-Diffusion-Models/SPO-SD-v1-5_4k-p_10ep)
+### 1. Environment
 
-[SPO-SD-v1-5_4k-prompts_10-epochs_LoRA](https://huggingface.co/SPO-Diffusion-Models/SPO-SD-v1-5_4k-p_10ep_LoRA)
+Every shell script in this repo expects a single `alignprop` conda env
+and begins with:
 
-## Acknowledgement
-Our codebase references the code from [Diffusers](https://github.com/huggingface/diffusers), [D3PO](https://github.com/yk7333/d3po) and [PickScore](https://github.com/yuvalkirstain/PickScore). We extend our gratitude to their authors for open-sourcing their code.
-
-## :mailbox_with_mail: Citation
-If you find this code useful in your research, please consider citing:
-
+```bash
+source /data3/chenweiyan/miniconda3/etc/profile.d/conda.sh
+conda activate alignprop
+export HF_ENDPOINT=https://hf-mirror.com   # huggingface mirror (dev cluster)
 ```
-@article{liang2024step,
-  title={Aesthetic Post-Training Diffusion Models from Generic Preferences with Step-by-step Preference Optimization},
-  author={Liang, Zhanhao and Yuan, Yuhui and Gu, Shuyang and Chen, Bohan and Hang, Tiankai and Cheng, Mingxi and Li, Ji and Zheng, Liang},
-  journal={arXiv preprint arXiv:2406.04314},
-  year={2024}
-}
+
+Replace the `conda.sh` path when porting to a new machine. The env pins `torch==2.6.0`, `diffusers==0.33.1`, `transformers==4.40.0`, `accelerate==1.4.0`, Python 3.10. See [`flow_grpo_github/setup.py`](flow_grpo_github/setup.py) for the full install (`cd flow_grpo_github && pip install -e .`).
+
+### 2. Build training pairs
+
+```bash
+cd data_curation
+# follow data_curation/README.md: extract → construct_pairs → score → filter
 ```
+
+The pipeline outputs a CSV that both training stages consume as `csv_file_path` (SD-1.5) / `train_dataset` (SD-3.5-M). See [`data_curation/README.md`](data_curation/README.md).
+
+### 3. Train
+
+| Model | Stage 1 (Diffusion-DRO) | Stage 2 (Diffusion-DPO, LoRA-init) |
+|---|---|---|
+| **SD-1.5** | `bash training_sd15/stage1_diffusion_dro/train-irl.sh` | `bash training_sd15/stage2_dpo/lora_init.sh` |
+| **SD-3.5-M** | `bash flow_grpo_github/scripts/single_node/inverse_reinforcement_learning.sh` | `bash flow_grpo_github/scripts/single_node/dpo.sh` |
+
+Both stages read the same CSV. Stage 2 reads Stage 1's LoRA from `pretrained_lora_path` (SD-1.5) / `config.train.lora_path` (SD-3.5-M); edit the shell (SD-1.5) or `config/sd3_5_medium_dpo.py` (SD-3.5-M) to point at Stage 1's checkpoint before launching Stage 2.
+
+Full hyperparameters, launchers, and config schema: [`training_sd15/README.md`](training_sd15/README.md).
+
+### 4. Evaluate
+
+Generation + evaluation scripts per benchmark live in [`benchmark-evaluation/`](benchmark-evaluation/) (`*-sd-v1-5.sh`, `*-sd-3-5-medium.sh`). Reward-model and image-quality metrics live in [`evaluate_metric/`](evaluate_metric/) (`calculate_metric.py`, `evaluate_*.sh`).
+
+## 🤗 Acknowledgement
+
+Our codebase references the code from [Diffusion-DRO](https://github.com/basiclab/DiffusionDRO), [Diffusion-DPO](https://github.com/SalesforceAIResearch/DiffusionDPO), and [Flow-GRPO](https://github.com/yifan123/flow_grpo). We thank the authors for releasing their implementations.
+
+## ⭐ Citation
+
+> TODO: BibTeX will be added once the ICML 2026 proceedings entry is finalized.
