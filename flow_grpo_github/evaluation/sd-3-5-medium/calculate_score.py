@@ -27,7 +27,7 @@ SUPPORTED_METRICS = {
     "pickscore", "imagereward", "aesthetic",
     "hpsv3", "deqa", "unifiedreward",
 }
-SUPPORTED_DATASETS = {"pick_a_pic_v2", "partiprompts", "drawbench"}
+SUPPORTED_DATASETS = {"pick_a_pic_v2", "partiprompts", "drawbench", "drawbench-unique"}
 
 
 class TextPromptDataset(Dataset):
@@ -68,7 +68,7 @@ def main(args):
     base_image_dir = os.path.join(args.output_dir, "images")
     results_filepath = os.path.join(args.output_dir, "evaluation_results.jsonl")
 
-    dataset_path = f"../dataset/{args.dataset}"
+    dataset_path = f"../../dataset/{args.dataset}"
     print(f"Loading dataset from: {dataset_path}")
     dataset = TextPromptDataset(dataset_path, split="test")
 
