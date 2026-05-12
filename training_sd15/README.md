@@ -1,98 +1,97 @@
-# `training_sd15/` — RealAlign two-stage training
+# `training_sd15/` — RealAlign SD-1.5 training
 
-RealAlign trains in two stages on the (reference, fake) preference pairs
-produced by `data_curation/`:
+This folder contains the **SD-1.5** implementation of RealAlign's two-stage training pipeline. It uses the preference data produced by `../data_curation/`, but the two stages expect different input formats:
 
-1. **Stage 1 — Diffusion-DRO** (Inverse RL): learns a LoRA against the
-   reference image as the expert anchor, producing a warm-start initialization.
-2. **Stage 2 — Diffusion-DPO** with LoRA-init: standard Diffusion-DPO over the
-   same preference pairs, warm-started from the Stage 1 LoRA.
+- **Stage 1 — Diffusion-DRO / inverse RL** reads an expert-image dataset directory through `--train_dataset`. Each sample directory contains a
+  `caption.txt` file and a `.png` image.
+- **Stage 2 — Diffusion-DPO with LoRA-init** reads the paired `(real, fake)` CSV through `--csv_file_path_train` and warm-starts from the Stage 1 LoRA checkpoint through `--pretrained_lora_path`.
 
-Stage 2 reads Stage 1's LoRA checkpoint (`pretrained_lora_path` for SD-1.5,
-`config.train.lora_path` for SD-3.5-M). The data-curation step
-(`data_curation/filter/{hpdv3,external}.py`) writes the CSV both stages
-consume as their `csv_file_path` / `train_dataset`.
+SD-3.5-M training is maintained separately under `../training_sd35m/`; this README only documents the SD-1.5 code in this directory.
 
-This folder holds the **SD-1.5** code. SD-3.5-M scripts stay under
-`training_sd35m/` because they `import flow_grpo.*` and depend on
-`training_sd35m/diffusers_patch/` for the flow-matching SDE samplers —
-moving them would require dragging the whole library along.
+## Entry points
 
-## Per-model entry points
+| Stage | Launcher | Trainer | Main inputs |
+|---|---|---|---|
+| Stage 1 | [`stage1_diffusion_dro/train-irl.sh`](stage1_diffusion_dro/train-irl.sh) | [`stage1_diffusion_dro/train-irl.py`](stage1_diffusion_dro/train-irl.py) | `--train_dataset`, `--validation_dataset`, `--unet_init` |
+| Stage 2 | [`stage2_dpo/lora_init.sh`](stage2_dpo/lora_init.sh) | [`stage2_dpo/train-lora_init.py`](stage2_dpo/train-lora_init.py) | `--csv_file_path_train`, `--pretrained_lora_path`, `--unet_init` |
 
-| Model | Stage 1 (Diffusion-DRO) | Stage 2 (Diffusion-DPO) |
-|---|---|---|
-| **SD-1.5** | `stage1_diffusion_dro/train-irl.sh` → `train-irl.py` | `stage2_dpo/lora_init.sh` → `train-lora_init.py` |
-| **SD-3.5-M** | `../training_sd35m/scripts/single_node/inverse_reinforcement_learning.sh` → `train-sd-3-5-medium-irl.py` | `../training_sd35m/scripts/single_node/dpo.sh` → `train-sd-3-5-medium-dpo.py` |
+## Environment
 
-## Conda env
-
-Both stages share the project env. Every shell script begins with:
+Both launchers expect the shared `alignprop` conda environment and begin with:
 
 ```bash
 source /data3/chenweiyan/miniconda3/etc/profile.d/conda.sh
 conda activate alignprop
-export HF_ENDPOINT=https://hf-mirror.com   # huggingface mirror (dev cluster)
+export HF_ENDPOINT=https://hf-mirror.com
 ```
 
-Replace the `conda.sh` path when porting to a new machine.
+Replace the `conda.sh` path when porting to another machine. The launchers also set `CUDA_VISIBLE_DEVICES`; edit that variable before running if your GPU layout differs.
 
-## Running — SD-1.5
+## Run Stage 1
 
 ```bash
-# Stage 1 (Diffusion-DRO, LoRA)
 cd training_sd15/stage1_diffusion_dro
 bash train-irl.sh
-# → output: <output_dir>/checkpoints/checkpoint-<ckpt>/
+```
 
-# Stage 2 (Diffusion-DPO, LoRA-init from Stage 1)
-cd ../stage2_dpo
-# edit pretrained_lora_path inside the shell to point at Stage 1's checkpoint
+The launcher runs:
+
+```bash
+accelerate launch --multi_gpu --num_processes 4 train-irl.py ...
+```
+
+Edit the variables at the top of [`stage1_diffusion_dro/train-irl.sh`](stage1_diffusion_dro/train-irl.sh) before launching:
+
+- `train_dataset`: expert-image dataset directory used by Stage 1.
+- `validation_dataset`: validation prompt/image directory.
+- `unet_init`: base SD-1.5 model, usually `runwayml/stable-diffusion-v1-5`.
+- `output_dir` / `run_name`: where checkpoints and logs are written.
+- `num_steps`, `learning_rate`, `top_N`, `MASTER_PORT`, `CUDA_VISIBLE_DEVICES`.
+
+Stage 1 checkpoints are saved under:
+
+```text
+<output_dir>/checkpoints/checkpoint-<step>/
+```
+
+## Run Stage 2
+
+Before launching Stage 2, set `pretrained_lora_path` in [`stage2_dpo/lora_init.sh`](stage2_dpo/lora_init.sh) to the Stage 1 checkpoint you want to use.
+
+```bash
+cd training_sd15/stage2_dpo
 bash lora_init.sh
 ```
 
-Both shells declare their hyperparameters (`top_N`, `learning_rate`,
-`num_steps`, `beta_dpo`, `csv_file_path_train`, …) at the top — edit them in
-place rather than passing extra CLI flags.
-
-## Running — SD-3.5-M
+The launcher runs:
 
 ```bash
-cd training_sd35m
-
-# Stage 1 (Diffusion-DRO / IRL)
-bash scripts/single_node/inverse_reinforcement_learning.sh
-# → scripts/train-sd-3-5-medium-irl.py
-# → config/sd3_5_medium_irl.py:paired_real_fake_dataset_sd3
-
-# Stage 2 (Diffusion-DPO, LoRA-init from Stage 1)
-# edit config/sd3_5_medium_dpo.py: train.lora_path to point at Stage 1's checkpoint
-bash scripts/single_node/dpo.sh
-# → scripts/train-sd-3-5-medium-dpo.py
-# → config/sd3_5_medium_dpo.py:paired_real_fake_dataset_sd3
+accelerate launch --mixed_precision="fp16" train-lora_init.py ...
 ```
 
-Both SD-3.5-M scripts launch via `accelerate launch` on 8 GPUs by default
-(`--num_processes=8`); the `:paired_real_fake_dataset_sd3` variant in each
-config selects the RealAlign dataset binding. See
-`training_sd35m/config/sd3_5_medium_{irl,dpo}.py` for the full schema.
+Edit the variables at the top of
+[`stage2_dpo/lora_init.sh`](stage2_dpo/lora_init.sh) before launching:
+
+- `csv_file_path_train`: paired `(real, fake)` training CSV from data curation.
+- `pretrained_lora_path`: Stage 1 LoRA checkpoint.
+- `unet_init`: base SD-1.5 model, usually `runwayml/stable-diffusion-v1-5`.
+- `output_dir` / `run_name`: where checkpoints and logs are written.
+- `beta_dpo`, `top_N`, `ckpt`, `CUDA_VISIBLE_DEVICES`.
 
 ## Layout
 
-```
+```text
 training_sd15/
-├── README.md                      # this file
-├── stage1_diffusion_dro/          # SD-1.5 Stage 1 (Diffusion-DRO)
-│   ├── train-irl.sh                # canonical launcher
-│   ├── train-irl.py          # canonical Stage 1 trainer (LoRA + LoRA init)
-│   ├── inference.py / score.py
+├── README.md
+├── stage1_diffusion_dro/
+│   ├── train-irl.sh
+│   ├── train-irl.py
+│   ├── inference.py
+│   ├── score.py
 │   ├── requirements.txt
-│   └── tools/ docs/ gradio/ misc/   # upstream-cloned helpers, kept as-is
-└── stage2_dpo/                    # SD-1.5 Stage 2 (Diffusion-DPO)
-    ├── lora_init.sh               # canonical launcher
-    ├── train-lora_init.py         # LoRA-init DPO trainer
-    └── LICENSE.txt                # upstream Apache-2.0 (kept for attribution)
+│   └── tools/ docs/ gradio/ misc/
+└── stage2_dpo/
+    ├── lora_init.sh
+    ├── train-lora_init.py
+    └── LICENSE.txt
 ```
-
-SD-3.5-M code paths are listed in the entry-points table above; nothing of
-SD-3.5-M lives in this directory.

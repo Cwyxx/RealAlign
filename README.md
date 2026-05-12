@@ -10,11 +10,11 @@
 
 <p align="center"><em>Accepted at ICML 2026. Links above are placeholders — TODO before public release.</em></p>
 
-## Abstract
+## 📝 Abstract
 
 Preference alignment aims to guide generative models by learning from comparisons between preferred and non-preferred samples. In practice, most existing approaches rely on preference pairs constructed from model-generated images. Such supervision is inherently relative and can be ambiguous when both samples exhibit artifacts or limited visual quality, making it difficult to infer what constitutes a truly desirable output. In this work, we investigate whether real data can serve as an alternative source of supervision for preference alignment. We adopt a data-centric perspective and study a curation strategy that treats real images as reference points and constructs preference signals by contrasting them with generated or perturbed samples, without requiring manually annotated preference pairs. Through empirical analysis, we show that real-data-based supervision provides effective guidance for aligning diffusion models and achieves performance comparable to existing preference-based methods. Our results suggest that real data offers a practical and complementary source of supervision for preference alignment and highlight directions of label-efficient alignment strategies.
 
-## Gallery
+## 🖼️ Gallery
 
 <table align="center">
   <tr>
@@ -31,25 +31,43 @@ Preference alignment aims to guide generative models by learning from comparison
   </tr>
 </table>
 
-## Repository layout
+## 🗂️ Repository layout
 
-Only the directories listed below are part of RealAlign itself. `notebook/` holds the curated ICML 2026 analysis notebooks and paper figure artifacts.
+Only the directories below are part of RealAlign itself. Each top-level folder is an independent subproject with its own scripts and dependencies.
 
-| Path | What lives here |
-|---|---|
-| [`data_curation/`](data_curation/) | Builds (real, fake) preference pairs from HPDv3 / Pick-a-Pic v2 / Civitai-top. Four stages: `extract → construct_pairs → score → filter`. Outputs the CSV consumed by training. |
-| [`training_sd15/`](training_sd15/) | RealAlign **SD-1.5** two-stage trainers. `stage1_diffusion_dro/train-irl.py` (Stage 1) and `stage2_dpo/train-lora_init.py` (Stage 2, LoRA-init from Stage 1). |
-| [`training_sd35m/scripts/`](training_sd35m/scripts/) | RealAlign **SD-3.5-M** two-stage trainers: `train-sd-3-5-medium-irl.py` (Stage 1) and `train-sd-3-5-medium-dpo.py` (Stage 2). Live here because they `import flow_grpo.*` and depend on the local `diffusers_patch/` SDE samplers. |
-| [`training_sd35m/evaluation/`](training_sd35m/evaluation/) | SD-3.5-M eval harness: `sd-3-5-medium/{generate_image.py, calculate_score.py}`. Reads prompt lists from `training_sd35m/dataset/{pick_a_pic_v2, partiprompts, drawbench-unique}`. All six metrics (PickScore, ImageReward, Aesthetic, HPSv3, DeQA, UnifiedReward) go through `flow_grpo.rewards.multi_score`. |
-| [`DPG-Bench/`](DPG-Bench/) | DPG-Bench evaluation scripts for SD-1.5 and SD-3.5-M. |
-| [`notebook/`](notebook/) | Curated ICML 2026 analysis notebooks and figure artifacts used in the paper. |
+**Data curation**
+
+- [`data_curation/`](data_curation/) builds `(real, fake)` preference pairs from HPDv3, Pick-a-Pic v2, and Civitai-top.
+- The pipeline follows four stages: `extract/` → `construct_pairs/` → `score/` → `filter/`.
+- The curated CSV is consumed by both SD-1.5 and SD-3.5-M training.
+
+**Training**
+
+- [`training_sd15/`](training_sd15/) contains the RealAlign SD-1.5 two-stage trainers:
+  - `stage1_diffusion_dro/train-irl.py` for Stage 1 Diffusion-DRO / inverse RL.
+  - `stage2_dpo/train-lora_init.py` for Stage 2 Diffusion-DPO, warm-started from the Stage 1 LoRA.
+- [`training_sd35m/scripts/`](training_sd35m/scripts/) contains the RealAlign SD-3.5-M two-stage trainers:
+  - `train-sd-3-5-medium-irl.py` for Stage 1.
+  - `train-sd-3-5-medium-dpo.py` for Stage 2.
+  - These live inside `training_sd35m/` because they depend on `flow_grpo.*` and the local `diffusers_patch/` SDE samplers.
+
+**Evaluation**
+
+- [`training_sd35m/evaluation/`](training_sd35m/evaluation/) contains the reward-model evaluation harness for SD-3.5-M.
+- [`training_sd35m/evaluation/sd-3-5-medium/`](training_sd35m/evaluation/sd-3-5-medium/) provides `generate_image.py` and `calculate_score.py`.
+- Prompt lists live under `training_sd35m/dataset/`, including `pick_a_pic_v2/`, `partiprompts/`, and `drawbench-unique/`.
+- All six reward metrics, PickScore, ImageReward, Aesthetic, HPSv3, DeQA, and UnifiedReward, are routed through `flow_grpo.rewards.multi_score`.
+- [`DPG-Bench/`](DPG-Bench/) contains DPG-Bench evaluation scripts for SD-1.5 and SD-3.5-M.
+
+**Paper artifacts**
+
+- [`notebook/`](notebook/) contains curated ICML 2026 analysis notebooks and figure artifacts used in the paper.
 
 ## 🚀 Quick start
 
 ### 1. Environment
 
-Every shell script in this repo expects a single `alignprop` conda env
-and begins with:
+Every shell script in this repo expects a single `alignprop` conda env and begins with:
 
 ```bash
 source /data3/chenweiyan/miniconda3/etc/profile.d/conda.sh
@@ -81,11 +99,15 @@ Full hyperparameters, launchers, and config schema: [`training_sd15/README.md`](
 
 ### 4. Evaluate
 
-Reward-model evaluation lives in [`training_sd35m/evaluation/`](training_sd35m/evaluation/) for both SD-1.5 and SD-3.5-M. DPG-Bench generation + evaluation scripts live in [`DPG-Bench/`](DPG-Bench/) (`DPG-Bench-script-sd-v1-5.sh`, `DPG-Bench-script-sd-3-5-medium.sh`).
+Reward-model evaluation lives in [`training_sd35m/evaluation/`](training_sd35m/evaluation/) for both SD-1.5 and SD-3.5-M.
+
+DPG-Bench generation + evaluation scripts live in [`DPG-Bench/`](DPG-Bench/) (`DPG-Bench-script-sd-v1-5.sh`, `DPG-Bench-script-sd-3-5-medium.sh`).
 
 ## 🤗 Acknowledgement
 
-Our codebase references the code from [Diffusion-DRO](https://github.com/basiclab/DiffusionDRO), [Diffusion-DPO](https://github.com/SalesforceAIResearch/DiffusionDPO), and [Flow-GRPO](https://github.com/yifan123/flow_grpo). We thank the authors for releasing their implementations.
+Our codebase references the code from [Diffusion-DRO](https://github.com/basiclab/DiffusionDRO), [Diffusion-DPO](https://github.com/SalesforceAIResearch/DiffusionDPO), and [Flow-GRPO](https://github.com/yifan123/flow_grpo).
+
+We thank the authors for releasing their implementations.
 
 ## ⭐ Citation
 
