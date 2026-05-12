@@ -2,6 +2,7 @@
 **/__pycache__/
 *.py[cod]
 *$py.class
+.DS_Store
 
 evaluate_metric/hf_cache
 evaluate_metric/t2v_metrics_github
@@ -9,4 +10,3 @@ evaluate_metric/MA-AGIQA
 evaluate_metric/PKU-AIGIQA-4K
 evaluate_metric/General-Visual-Quality-RL
 tmp/
-benchmark-evaluation/RealGen/benchmark/real-img-benchmark

@@ -14,8 +14,8 @@ Stage 2 reads Stage 1's LoRA checkpoint (`pretrained_lora_path` for SD-1.5,
 consume as their `csv_file_path` / `train_dataset`.
 
 This folder holds the **SD-1.5** code. SD-3.5-M scripts stay under
-`flow_grpo_github/` because they `import flow_grpo.*` and depend on
-`flow_grpo_github/diffusers_patch/` for the flow-matching SDE samplers —
+`training_sd35m/` because they `import flow_grpo.*` and depend on
+`training_sd35m/diffusers_patch/` for the flow-matching SDE samplers —
 moving them would require dragging the whole library along.
 
 ## Per-model entry points
@@ -23,7 +23,7 @@ moving them would require dragging the whole library along.
 | Model | Stage 1 (Diffusion-DRO) | Stage 2 (Diffusion-DPO) |
 |---|---|---|
 | **SD-1.5** | `stage1_diffusion_dro/train-irl.sh` → `train-irl.py` | `stage2_dpo/lora_init.sh` → `train-lora_init.py` |
-| **SD-3.5-M** | `../flow_grpo_github/scripts/single_node/inverse_reinforcement_learning.sh` → `train-sd-3-5-medium-irl.py` | `../flow_grpo_github/scripts/single_node/dpo.sh` → `train-sd-3-5-medium-dpo.py` |
+| **SD-3.5-M** | `../training_sd35m/scripts/single_node/inverse_reinforcement_learning.sh` → `train-sd-3-5-medium-irl.py` | `../training_sd35m/scripts/single_node/dpo.sh` → `train-sd-3-5-medium-dpo.py` |
 
 ## Conda env
 
@@ -58,7 +58,7 @@ place rather than passing extra CLI flags.
 ## Running — SD-3.5-M
 
 ```bash
-cd flow_grpo_github
+cd training_sd35m
 
 # Stage 1 (Diffusion-DRO / IRL)
 bash scripts/single_node/inverse_reinforcement_learning.sh
@@ -75,7 +75,7 @@ bash scripts/single_node/dpo.sh
 Both SD-3.5-M scripts launch via `accelerate launch` on 8 GPUs by default
 (`--num_processes=8`); the `:paired_real_fake_dataset_sd3` variant in each
 config selects the RealAlign dataset binding. See
-`flow_grpo_github/config/sd3_5_medium_{irl,dpo}.py` for the full schema.
+`training_sd35m/config/sd3_5_medium_{irl,dpo}.py` for the full schema.
 
 ## Layout
 

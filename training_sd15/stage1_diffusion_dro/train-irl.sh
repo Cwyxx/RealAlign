@@ -25,7 +25,7 @@ echo "HF_ENDPOINT: ${HF_ENDPOINT}"
 echo "CUDA_VISIBLE_DEVICES: ${CUDA_VISIBLE_DEVICES}"
 echo "learning_rate: ${learning_rate}"
 
-accelerate launch --multi_gpu --num_processes 4 --main_process_port ${MASTER_PORT} train-next-irl.py \
+accelerate launch --multi_gpu --num_processes 4 --main_process_port ${MASTER_PORT} train-irl.py \
     --score pickscore \
     --train_dataset ${train_dataset} \
     --validation_dataset /data_center/data2/dataset/chenwy/21164-data/dpo_dataset/pick-a-pic-v2/DiffusionDRO-HPDv3-test \

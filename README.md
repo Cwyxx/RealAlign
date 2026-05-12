@@ -37,10 +37,10 @@ Only the directories listed below are part of RealAlign itself. `notebook/` hold
 |---|---|
 | [`data_curation/`](data_curation/) | Builds (real, fake) preference pairs from HPDv3 / Pick-a-Pic v2 / Civitai-top. Four stages: `extract → construct_pairs → score → filter`. Outputs the CSV consumed by training. |
 | [`training_sd15/`](training_sd15/) | RealAlign **SD-1.5** two-stage trainers. `stage1_diffusion_dro/train-irl.py` (Stage 1) and `stage2_dpo/train-lora_init.py` (Stage 2, LoRA-init from Stage 1). |
-| [`flow_grpo_github/scripts/`](flow_grpo_github/scripts/) | RealAlign **SD-3.5-M** two-stage trainers: `train-sd-3-5-medium-irl.py` (Stage 1) and `train-sd-3-5-medium-dpo.py` (Stage 2). Live here because they `import flow_grpo.*` and depend on the local `diffusers_patch/` SDE samplers. |
-| [`flow_grpo_github/evaluation/`](flow_grpo_github/evaluation/) | SD-3.5-M eval harness: `sd-3-5-medium/{generate_image.py, calculate_score.py}`. Reads prompt lists from `flow_grpo_github/dataset/{pick_a_pic_v2, partiprompts, drawbench-unique}`. All six metrics (PickScore, ImageReward, Aesthetic, HPSv3, DeQA, UnifiedReward) go through `flow_grpo.rewards.multi_score`. |
+| [`training_sd35m/scripts/`](training_sd35m/scripts/) | RealAlign **SD-3.5-M** two-stage trainers: `train-sd-3-5-medium-irl.py` (Stage 1) and `train-sd-3-5-medium-dpo.py` (Stage 2). Live here because they `import flow_grpo.*` and depend on the local `diffusers_patch/` SDE samplers. |
+| [`training_sd35m/evaluation/`](training_sd35m/evaluation/) | SD-3.5-M eval harness: `sd-3-5-medium/{generate_image.py, calculate_score.py}`. Reads prompt lists from `training_sd35m/dataset/{pick_a_pic_v2, partiprompts, drawbench-unique}`. All six metrics (PickScore, ImageReward, Aesthetic, HPSv3, DeQA, UnifiedReward) go through `flow_grpo.rewards.multi_score`. |
 | [`evaluate_metric/`](evaluate_metric/) | PickScore / HPSv3 / Aesthetic / CLIPScore / DeQA / VILA + vendored Clean-FID, CMMD, CPBD. |
-| [`benchmark-evaluation/`](benchmark-evaluation/) | GenEval / GenEval2 / DPG-Bench / OneIG-Benchmark / WISE, plus our **RealGen** benchmark. |
+| [`benchmark-evaluation/`](benchmark-evaluation/) | DPG-Bench evaluation scripts for SD-1.5 and SD-3.5-M. |
 
 ## 🚀 Quick start
 
@@ -55,7 +55,7 @@ conda activate alignprop
 export HF_ENDPOINT=https://hf-mirror.com   # huggingface mirror (dev cluster)
 ```
 
-Replace the `conda.sh` path when porting to a new machine. The env pins `torch==2.6.0`, `diffusers==0.33.1`, `transformers==4.40.0`, `accelerate==1.4.0`, Python 3.10. See [`flow_grpo_github/setup.py`](flow_grpo_github/setup.py) for the full install (`cd flow_grpo_github && pip install -e .`).
+Replace the `conda.sh` path when porting to a new machine. The env pins `torch==2.6.0`, `diffusers==0.33.1`, `transformers==4.40.0`, `accelerate==1.4.0`, Python 3.10. See [`training_sd35m/setup.py`](training_sd35m/setup.py) for the full install (`cd training_sd35m && pip install -e .`).
 
 ### 2. Build training pairs
 
@@ -71,7 +71,7 @@ The pipeline outputs a CSV that both training stages consume as `csv_file_path` 
 | Model | Stage 1 (Diffusion-DRO) | Stage 2 (Diffusion-DPO, LoRA-init) |
 |---|---|---|
 | **SD-1.5** | `bash training_sd15/stage1_diffusion_dro/train-irl.sh` | `bash training_sd15/stage2_dpo/lora_init.sh` |
-| **SD-3.5-M** | `bash flow_grpo_github/scripts/single_node/inverse_reinforcement_learning.sh` | `bash flow_grpo_github/scripts/single_node/dpo.sh` |
+| **SD-3.5-M** | `bash training_sd35m/scripts/single_node/inverse_reinforcement_learning.sh` | `bash training_sd35m/scripts/single_node/dpo.sh` |
 
 Both stages read the same CSV. Stage 2 reads Stage 1's LoRA from `pretrained_lora_path` (SD-1.5) / `config.train.lora_path` (SD-3.5-M); edit the shell (SD-1.5) or `config/sd3_5_medium_dpo.py` (SD-3.5-M) to point at Stage 1's checkpoint before launching Stage 2.
 
@@ -79,7 +79,7 @@ Full hyperparameters, launchers, and config schema: [`training_sd15/README.md`](
 
 ### 4. Evaluate
 
-Generation + evaluation scripts per benchmark live in [`benchmark-evaluation/`](benchmark-evaluation/) (`*-sd-v1-5.sh`, `*-sd-3-5-medium.sh`). Reward-model and image-quality metrics live in [`evaluate_metric/`](evaluate_metric/) (`calculate_metric.py`, `evaluate_*.sh`).
+DPG-Bench generation + evaluation scripts live in [`benchmark-evaluation/DPG-Bench/`](benchmark-evaluation/DPG-Bench/) (`DPG-Bench-script-sd-v1-5.sh`, `DPG-Bench-script-sd-3-5-medium.sh`). Reward-model and image-quality metrics live in [`evaluate_metric/`](evaluate_metric/) (`calculate_metric.py`, `evaluate_*.sh`).
 
 ## 🤗 Acknowledgement
 

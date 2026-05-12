@@ -55,19 +55,19 @@ echo "============================================================"
 # # ============================================================
 # # Step 1 – Generate images
 # # ============================================================
-# echo ""
-# echo "[1/2] Generating images..."
-# python "${dpg_bench_dir}/generate-image-sd-v1-5.py" \
-#     --prompts_dir "${prompts_dir}" \
-#     --checkpoint_path "${ckpt_dir}" \
-#     --output_dir "${image_dir}" \
-#     --unet_init "${unet_init}" \
-#     --resolution ${resolution} \
-#     --pic_num ${pic_num} \
-#     --num_inference_steps 50 \
-#     --guidance_scale 7.5 \
-#     --seed 42 \
-#     --skip_existing
+echo ""
+echo "[1/2] Generating images..."
+python "${dpg_bench_dir}/generate-image-sd-v1-5.py" \
+    --prompts_dir "${prompts_dir}" \
+    --checkpoint_path "${ckpt_dir}" \
+    --output_dir "${image_dir}" \
+    --unet_init "${unet_init}" \
+    --resolution ${resolution} \
+    --pic_num ${pic_num} \
+    --num_inference_steps 50 \
+    --guidance_scale 7.5 \
+    --seed 42 \
+    --skip_existing
 
 # ============================================================
 # Step 2 – Evaluate with DPG-Bench (mplug VQA)
