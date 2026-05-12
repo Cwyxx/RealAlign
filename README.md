@@ -49,14 +49,14 @@ Only the directories below are part of RealAlign itself. Each top-level folder i
 - [`training_sd35m/scripts/`](training_sd35m/scripts/) contains the RealAlign SD-3.5-M two-stage trainers:
   - `train-sd-3-5-medium-irl.py` for Stage 1.
   - `train-sd-3-5-medium-dpo.py` for Stage 2.
-  - These live inside `training_sd35m/` because they depend on `flow_grpo.*` and the local `diffusers_patch/` SDE samplers.
 
 **Evaluation**
 
-- [`training_sd35m/evaluation/`](training_sd35m/evaluation/) contains the reward-model evaluation harness for SD-3.5-M.
-- [`training_sd35m/evaluation/sd-3-5-medium/`](training_sd35m/evaluation/sd-3-5-medium/) provides `generate_image.py` and `calculate_score.py`.
-- Prompt lists live under `training_sd35m/dataset/`, including `pick_a_pic_v2/`, `partiprompts/`, and `drawbench-unique/`.
-- All six reward metrics, PickScore, ImageReward, Aesthetic, HPSv3, DeQA, and UnifiedReward, are routed through `flow_grpo.rewards.multi_score`.
+- [`training_sd35m/evaluation/`](training_sd35m/evaluation/) contains the reward-model evaluation harness for both SD-1.5 and SD-3.5-M.
+  - [`training_sd35m/evaluation/sd-v1-5/`](training_sd35m/evaluation/sd-v1-5/) provides SD-1.5 `generate_image.py`, `calculate_score.py`, and `run_multi_seed_eval.sh`.
+  - [`training_sd35m/evaluation/sd-3-5-medium/`](training_sd35m/evaluation/sd-3-5-medium/) provides SD-3.5-M `generate_image.py`, `calculate_score.py`, and `run_multi_seed_eval.sh`.
+  - Prompt lists live under `training_sd35m/dataset/`, including `pick_a_pic_v2/`, `partiprompts/`, and `drawbench-unique/`.
+  - All six reward metrics, PickScore, ImageReward, Aesthetic, HPSv3, DeQA, and UnifiedReward, are routed through `flow_grpo.rewards.multi_score`.
 - [`DPG-Bench/`](DPG-Bench/) contains DPG-Bench evaluation scripts for SD-1.5 and SD-3.5-M.
 
 **Paper artifacts**
