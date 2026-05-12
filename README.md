@@ -1,4 +1,4 @@
-<h1 align="center"> When Preference Labels Fall Short — Aligning Diffusion Models from Real Data </h1>
+<h1 align="center">When Preference Labels Fall Short: Aligning Diffusion Models from Real Data</h1>
 
 <div align="center">
   <a href='TODO'><img src='https://img.shields.io/badge/OpenReview-red?logo=openreview'></a> &nbsp;
@@ -16,18 +16,20 @@ Preference alignment aims to guide generative models by learning from comparison
 
 ## Gallery
 
-<p align="center">
-  <img src="assets/gallery/00009.png" alt="gallery 00009" width="220"/>
-  <img src="assets/gallery/00368.png" alt="gallery 00368" width="220"/>
-  <img src="assets/gallery/00149.png" alt="gallery 00149" width="220"/>
-  <img src="assets/gallery/00150.png" alt="gallery 00150" width="220"/>
-</p>
-<p align="center">
-  <img src="assets/gallery/00243.png" alt="gallery 00243" width="220"/>
-  <img src="assets/gallery/01175.png" alt="gallery 01175" width="220"/>
-  <img src="assets/gallery/00269.png" alt="gallery 00269" width="220"/>
-  <img src="assets/gallery/00264.png" alt="gallery 00264" width="220"/>
-</p>
+<table align="center">
+  <tr>
+    <td align="center" width="25%"><img src="assets/gallery/00009.png" alt="gallery 00009" width="100%"/></td>
+    <td align="center" width="25%"><img src="assets/gallery/00368.png" alt="gallery 00368" width="100%"/></td>
+    <td align="center" width="25%"><img src="assets/gallery/00149.png" alt="gallery 00149" width="100%"/></td>
+    <td align="center" width="25%"><img src="assets/gallery/00150.png" alt="gallery 00150" width="100%"/></td>
+  </tr>
+  <tr>
+    <td align="center" width="25%"><img src="assets/gallery/00243.png" alt="gallery 00243" width="100%"/></td>
+    <td align="center" width="25%"><img src="assets/gallery/01175.png" alt="gallery 01175" width="100%"/></td>
+    <td align="center" width="25%"><img src="assets/gallery/00269.png" alt="gallery 00269" width="100%"/></td>
+    <td align="center" width="25%"><img src="assets/gallery/00264.png" alt="gallery 00264" width="100%"/></td>
+  </tr>
+</table>
 
 ## Repository layout
 
