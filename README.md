@@ -1,4 +1,4 @@
-<h1 align="center">When Preference Labels Fall Short: Aligning Diffusion Models from Real Data</h1>
+<h1 align="center">When Preference Labels Fall Short:<br>Aligning Diffusion Models from Real Data</h1>
 
 <div align="center">
   <a href='TODO'><img src='https://img.shields.io/badge/OpenReview-red?logo=openreview'></a> &nbsp;
