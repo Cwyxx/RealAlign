@@ -33,7 +33,7 @@ Preference alignment aims to guide generative models by learning from comparison
 
 ## Repository layout
 
-Only the directories listed below are part of RealAlign itself. `notebook/` holds scratch analyses unrelated to the pipeline.
+Only the directories listed below are part of RealAlign itself. `notebook/` holds the curated ICML 2026 analysis notebooks and paper figure artifacts.
 
 | Path | What lives here |
 |---|---|
@@ -41,8 +41,8 @@ Only the directories listed below are part of RealAlign itself. `notebook/` hold
 | [`training_sd15/`](training_sd15/) | RealAlign **SD-1.5** two-stage trainers. `stage1_diffusion_dro/train-irl.py` (Stage 1) and `stage2_dpo/train-lora_init.py` (Stage 2, LoRA-init from Stage 1). |
 | [`training_sd35m/scripts/`](training_sd35m/scripts/) | RealAlign **SD-3.5-M** two-stage trainers: `train-sd-3-5-medium-irl.py` (Stage 1) and `train-sd-3-5-medium-dpo.py` (Stage 2). Live here because they `import flow_grpo.*` and depend on the local `diffusers_patch/` SDE samplers. |
 | [`training_sd35m/evaluation/`](training_sd35m/evaluation/) | SD-3.5-M eval harness: `sd-3-5-medium/{generate_image.py, calculate_score.py}`. Reads prompt lists from `training_sd35m/dataset/{pick_a_pic_v2, partiprompts, drawbench-unique}`. All six metrics (PickScore, ImageReward, Aesthetic, HPSv3, DeQA, UnifiedReward) go through `flow_grpo.rewards.multi_score`. |
-| [`evaluate_metric/`](evaluate_metric/) | PickScore / HPSv3 / Aesthetic / CLIPScore / DeQA / VILA + vendored Clean-FID, CMMD, CPBD. |
-| [`benchmark-evaluation/`](benchmark-evaluation/) | DPG-Bench evaluation scripts for SD-1.5 and SD-3.5-M. |
+| [`DPG-Bench/`](DPG-Bench/) | DPG-Bench evaluation scripts for SD-1.5 and SD-3.5-M. |
+| [`notebook/`](notebook/) | Curated ICML 2026 analysis notebooks and figure artifacts used in the paper. |
 
 ## 🚀 Quick start
 
@@ -81,7 +81,7 @@ Full hyperparameters, launchers, and config schema: [`training_sd15/README.md`](
 
 ### 4. Evaluate
 
-DPG-Bench generation + evaluation scripts live in [`benchmark-evaluation/DPG-Bench/`](benchmark-evaluation/DPG-Bench/) (`DPG-Bench-script-sd-v1-5.sh`, `DPG-Bench-script-sd-3-5-medium.sh`). Reward-model and image-quality metrics live in [`evaluate_metric/`](evaluate_metric/) (`calculate_metric.py`, `evaluate_*.sh`).
+Reward-model evaluation lives in [`training_sd35m/evaluation/`](training_sd35m/evaluation/) for both SD-1.5 and SD-3.5-M. DPG-Bench generation + evaluation scripts live in [`DPG-Bench/`](DPG-Bench/) (`DPG-Bench-script-sd-v1-5.sh`, `DPG-Bench-script-sd-3-5-medium.sh`).
 
 ## 🤗 Acknowledgement
 
