@@ -1,102 +1,75 @@
 # `data_curation/` — building the (real, fake) preference dataset
 
-RealAlign trains on preference pairs of the form *(reference image,
-inpainted fake)*. The reference is the positive anchor — either a real
-photo (HPDv3) or a high-quality generated image (Pick-a-Pic v2 /
-Civitai-top). This folder builds those pairs from a reference-image source
-and curates them into a high-quality training set.
+RealAlign is trained on **(reference, fake)** preference pairs, where the reference is the positive anchor — either a real photograph (HPDv3) or a high-quality generated image (Civitai-top, or top-PickScore from Pick-a-Pic v2). This folder produces such pairs from a reference-image source and curates them into a high-quality training set.
 
-## Reference image sources
+## 🖼️ Reference sources
 
-The paper draws (positive) reference anchors from three sources. All three
-go through the same `construct_pairs/` and `score/` steps; they differ in
-the *type* of reference image and in which curation steps they need at the
-`filter/` stage:
-
-| Source | Reference image type | Curation steps |
+| Source | Reference type | HuggingFace repo |
 |---|---|---|
-| **HPDv3** (`real_images` split) | real (photographic) | `anime drop` → `color filter` → `discard negative` → `top-512` |
-| **Pick-a-Pic v2** | generated | `discard negative` → `top-512` |
-| **Civitai-top** | generated | `discard negative` → `top-512` |
+| **HPDv3** (`real_images` split) | real photograph | 🤗 [`MizzenAI/HPDv3`](https://huggingface.co/datasets/MizzenAI/HPDv3) |
+| **Civitai-top** | generated | 🤗 [`wallstoneai/civitai-top-sfw-images-with-metadata`](https://huggingface.co/datasets/wallstoneai/civitai-top-sfw-images-with-metadata) |
+| **Pick-a-Pic v2** | generated | 🤗 [`liuhuohuo2/pick-a-pic-v2`](https://huggingface.co/datasets/liuhuohuo2/pick-a-pic-v2) |
 
-HPDv3's `real_images` split is noisier than the others — it mixes in
-illustrations / digital art and has uneven colorfulness — so it gets two
-extra cleanup steps (`anime drop` and `color filter`). Pick-a-Pic v2 and
-Civitai-top references are already curated for visual quality and content
-upstream (community ratings / preference annotations), so those steps are
-skipped.
+All three sources flow through the same `extract → construct_pairs → score → filter` pipeline; they differ only in which curation steps apply at the final `filter/` stage.
 
-Even when the reference is a *generated* image (Pick-a-Pic v2 / Civitai-top),
-the inpainted counterpart is still constructed by the same `construct_pairs/`
-pipeline — saliency mask + re-inpainting — and serves as the negative in the
-preference pair.
+## 🔄 Pipeline
 
-## Pipeline
+Four stages, run in order. Each stage's output is the next stage's input.
 
-```
-extract/        →  construct_pairs/   →  score/                    →  filter/
-real uid+prompt    real / fake / mask     colorfulness, pickscore     per-source
-CSV                triples on disk        CSVs                        curation steps
-```
+### 1. Extract — `extract/`
 
-1. **`extract/hpdv3.py`** — parse HPDv3 `all.json` and dump `(uid, prompt)`
-   for the `real_images` split into a CSV. (Pick-a-Pic v2 and Civitai-top
-   each have their own extraction logic — not yet checked in.)
-2. **`construct_pairs/`** — for each reference real image, generate a fake
-   counterpart (saliency-guided inpainting; four method variants). See
-   [`construct_pairs/README.md`](construct_pairs/README.md).
-3. **`score/`** — score every pair (and classify references, for HPDv3):
-   - `colorfulness.py` — Hasler & Süsstrunk colorfulness on
-     `(reference, fake)` (HPDv3 only).
-   - `pickscore.py` — PickScore on `(reference, prompt)` and
-     `(fake, prompt)`.
-   - `anime.py` — Qwen3-VL artwork/anime classifier on the reference image
-     (HPDv3 only).
-4. **`filter/`** — apply the per-source curation steps and select the final
-   training set. See [`filter/README.md`](filter/README.md).
+Parse the source dataset and emit a `(uid, prompt)` CSV.
 
-## The four curation primitives
+| Source | Script | Notes |
+|---|---|---|
+| HPDv3 | `extract/hpdv3.py` | filters `all.json` to entries whose source is `real_images`; writes `real_images_uid_prompt.csv`. |
+| Civitai-top | `extract/civitai_top.py` | parses `prompts.json`, uses each image's filename stem as `uid`; writes `uid_prompt.csv`. |
+| Pick-a-Pic v2 | — | skipped here; the dataset is too large for this lightweight extraction flow. |
 
-### `anime drop` (HPDv3 only)
+### 2. Construct pairs — `construct_pairs/`
 
-Drop rows where the reference image was classified as artwork or anime
-style by `score/anime.py`. HPDv3's `real_images` split mixes in
-illustrations and digital art that aren't photographic; these break the
-"real anchor" assumption of the paper, so they're removed before any
-per-pair filtering. Pick-a-Pic v2 / Civitai-top references are already
-known to be photo-style (or stylistically consistent) and don't need this.
+For each `(uid, prompt)` row in the CSV emitted by Stage 1, generate the **fake** counterpart (the reference image is loaded from the source dataset using `uid`). Two modes:
 
-### `color filter` (HPDv3 only)
+- **Inpainting** — U²-Net localizes the salient region of the reference; a generator fills it back in.
+  - `inpaint_sdv15.py` — `StableDiffusionInpaintPipeline`. **Main paper method.**
+  - `inpaint_pixart.py` — `PixArtAlphaInpaintPipeline`. DiT-based variant.
+  - `inpaint_sd35m.py` — `StableDiffusion3InpaintPipeline`. Stronger SD-3.5-M variant.
+- **Text-to-image** — `text2image.py` generates from the prompt directly, with no saliency mask.
 
-Keep pairs where `colorfulness(reference) > colorfulness(fake)`. HPDv3
-`real_images` contains many low-colorfulness photos; this drops cases where
-the inpainter actually produced something *more* colorful than the
-reference (which would invert the preference signal in colorfulness-
-sensitive metrics).
+### 3. Score — `score/`
 
-### `discard negative`
+Compute the per-pair signals that the `filter/` stage will threshold on.
 
-Keep pairs where `PickScore(reference, prompt) - PickScore(fake, prompt) >
-0.02`. A non-positive or small gap means the prompt aligns with the fake
-better than with the reference — usually because the source prompt drifted
-from the photo content. Such pairs would teach the model the wrong
-direction.
+| Script | Signal |
+|---|---|
+| `colorfulness.py` | Hasler & Süsstrunk colorfulness of the reference image. |
+| `pickscore.py` | `yuvalkirstain/PickScore_v1` alignment for `(image, prompt)`. |
+| `anime.py` | Qwen3-VL-8B-Instruct flag for non-photographic references (HPDv3 only). |
 
-### `top-512` selection
+### 4. Filter — `filter/`
 
-After the previous filter(s), sort the surviving pairs by
-`PickScore(reference)` (the reference image's PickScore alone, not the
-gap) descending, and take the top 512 as the training set. Sorting by the
-reference score keeps the highest-quality anchors. Paper Figure 7 ablates
-256 / 512 / 768 / 1024; 512 is the default.
+Apply source-specific curation to produce the final training CSV.
 
-## Layout
+| Source | Script | Steps (in order) |
+|---|---|---|
+| HPDv3 | `filter/hpdv3.py` | drop non-photographic → 🎨 colorfulness → 🔎 negligible-degradation → 🏆 top-512 |
+| Pick-a-Pic v2 / Civitai-top | `filter/external.py` | 🔎 negligible-degradation → 🏆 top-512 |
+
+The four curation steps:
+
+- **Drop non-photographic** *(HPDv3 only)* — discard rows that `score/anime.py` flags as artwork / anime. HPDv3's `real_images` split mixes in illustrations and digital art; this strips them so only real photographs survive.
+- **🎨 Colorfulness filter** *(HPDv3 only)* — keep pairs where `colorfulness(reference) > mean(colorfulness over the reference set)`. A lightweight heuristic against visually flat or low-contrast references.
+- **🔎 Negligible-degradation filter** — keep pairs where `PickScore(reference, prompt) − PickScore(fake, prompt) > 0.02`. Ensures every pair carries a clear and consistent preference signal.
+- **🏆 Top-512 by PickScore** — sort surviving pairs by `PickScore(reference)` descending and take the top 512. Paper Figure 7 ablates 256 / 512 / 768 / 1024; **512 is the default**.
+
+## 📁 Layout
 
 ```
 data_curation/
 ├── README.md                      # this file
 ├── extract/
-│   └── hpdv3.py
+│   ├── hpdv3.py
+│   └── civitai_top.py
 ├── construct_pairs/
 │   ├── README.md
 │   ├── runner.py / saliency.py

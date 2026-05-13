@@ -65,17 +65,15 @@ Only the directories below are part of RealAlign itself. Each top-level folder i
 
 ## 🚀 Quick start
 
-### 1. Environment
+### 1. Environment Set Up
 
-Every shell script in this repo expects a single `alignprop` conda env and begins with:
+Create and activate the shared `alignprop` environment:
 
 ```bash
-source /data3/chenweiyan/miniconda3/etc/profile.d/conda.sh
+conda create -n alignprop python=3.10
 conda activate alignprop
-export HF_ENDPOINT=https://hf-mirror.com   # huggingface mirror (dev cluster)
+pip install -r requirements.txt
 ```
-
-Replace the `conda.sh` path when porting to a new machine. The env pins `torch==2.6.0`, `diffusers==0.33.1`, `transformers==4.40.0`, `accelerate==1.4.0`, Python 3.10. See [`training_sd35m/setup.py`](training_sd35m/setup.py) for the full install (`cd training_sd35m && pip install -e .`).
 
 ### 2. Build training pairs
 

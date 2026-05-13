@@ -24,7 +24,7 @@ conda activate alignprop
 export HF_ENDPOINT=https://hf-mirror.com
 ```
 
-The pinned versions live in [`setup.py`](setup.py), including `torch==2.6.0`, `diffusers==0.33.1`, `transformers==4.40.0`, `accelerate==1.4.0`, and Python 3.10+.
+Dependency versions are recorded at the repository root in [`../requirements.txt`](../requirements.txt), based on the shared `alignprop` environment.
 
 ## Dataset inputs
 
