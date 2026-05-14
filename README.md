@@ -77,12 +77,7 @@ pip install -r requirements.txt
 
 ### 2. Build training pairs
 
-```bash
-cd data_curation
-# follow data_curation/README.md: extract → construct_pairs → score → filter
-```
-
-The pipeline outputs a CSV that both training stages consume as `csv_file_path` (SD-1.5) / `train_dataset` (SD-3.5-M). See [`data_curation/README.md`](data_curation/README.md).
+Run the four-stage pipeline in [`data_curation/`](data_curation/) (`extract → construct_pairs → score → filter`) to produce the paired `(real, fake)` training CSV. Full details: [`data_curation/README.md`](data_curation/README.md).
 
 ### 3. Train
 
@@ -91,9 +86,10 @@ The pipeline outputs a CSV that both training stages consume as `csv_file_path` 
 | **SD-1.5** | `bash training_sd15/stage1_diffusion_dro/train-irl.sh` | `bash training_sd15/stage2_dpo/lora_init.sh` |
 | **SD-3.5-M** | `bash training_sd35m/scripts/single_node/inverse_reinforcement_learning.sh` | `bash training_sd35m/scripts/single_node/dpo.sh` |
 
-Both stages read the same CSV. Stage 2 reads Stage 1's LoRA from `pretrained_lora_path` (SD-1.5) / `config.train.lora_path` (SD-3.5-M); edit the shell (SD-1.5) or `config/sd3_5_medium_dpo.py` (SD-3.5-M) to point at Stage 1's checkpoint before launching Stage 2.
+- **Shared input.** Both stages read the same CSV — `csv_file_path_train` for SD-1.5, `config.{irl,dpo}.csv_file_path` for SD-3.5-M. SD-3.5-M also expects precomputed prompt embeddings (see [`training_sd35m/README.md`](training_sd35m/README.md)).
+- **Stage 2 warm-starts from Stage 1.** Before launching Stage 2, point it at the Stage 1 LoRA checkpoint: set `pretrained_lora_path` in [`training_sd15/stage2_dpo/lora_init.sh`](training_sd15/stage2_dpo/lora_init.sh) (SD-1.5) or `config.train.lora_path` in [`training_sd35m/config/sd3_5_medium_dpo.py`](training_sd35m/config/sd3_5_medium_dpo.py) (SD-3.5-M).
 
-Full hyperparameters, launchers, and config schema: [`training_sd15/README.md`](training_sd15/README.md).
+Full hyperparameters, launchers, and config schema: [`training_sd15/README.md`](training_sd15/README.md), [`training_sd35m/README.md`](training_sd35m/README.md).
 
 ### 4. Evaluate
 

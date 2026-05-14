@@ -62,6 +62,18 @@ The four curation steps:
 - **🔎 Negligible-degradation filter** — keep pairs where `PickScore(reference, prompt) − PickScore(fake, prompt) > 0.02`. Ensures every pair carries a clear and consistent preference signal.
 - **🏆 Top-512 by PickScore** — sort surviving pairs by `PickScore(reference)` descending and take the top 512. Paper Figure 7 ablates 256 / 512 / 768 / 1024; **512 is the default**.
 
+
+## 🧾 Final training CSV schema
+
+```
+final_training.csv
+├── uid                  # unique pair id; also used to find precomputed SD-3.5-M prompt embeddings
+├── prompt               # text prompt paired with both images
+├── real_image_path      # preferred image path; the real / high-quality reference anchor
+├── fake_image_path      # dispreferred image path; the generated fake counterpart
+```
+
+
 ## 📁 Layout
 
 ```
