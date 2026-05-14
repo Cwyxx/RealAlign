@@ -2,8 +2,8 @@
 
 <div align="center">
   <a href='TODO'><img src='https://img.shields.io/badge/OpenReview-red?logo=openreview'></a> &nbsp;
-  <a href='https://cwyxx.github.io/RealAlign/'><img src='https://img.shields.io/badge/Project_Page-9E95B7?logo=github'></a> &nbsp;
-  <a href='https://github.com/Cwyxx/RealAlign'><img src='https://img.shields.io/badge/Code-9E95B7?logo=github'></a> &nbsp;
+  <a href='https://cwyxx.github.io/RealAlign/'><img src='https://img.shields.io/badge/Project_Page-4CAF50?logo=github'></a> &nbsp;
+  <a href='https://github.com/Cwyxx/RealAlign'><img src='https://img.shields.io/badge/Code-181717?logo=github'></a> &nbsp;
   <a href='TODO'><img src='https://img.shields.io/badge/Model-blue?logo=huggingface'></a> &nbsp;
   <a href='TODO'><img src='https://img.shields.io/badge/Dataset-blue?logo=huggingface'></a>
 </div>
