@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="description"
+        content="RealAlign: aligning text-to-image diffusion models from real data, without manually annotated preference pairs. ICML 2026.">
+  <meta name="keywords" content="RealAlign, ICML 2026, Diffusion Models, Preference Alignment, Stable Diffusion, SD-3.5, DPO, Diffusion-DRO">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta property="og:title" content="When Preference Labels Fall Short: Aligning Diffusion Models from Real Data">
+  <meta property="og:description" content="RealAlign (ICML 2026) uses real images as reference points to align diffusion models without manually annotated preference pairs.">
+  <meta property="og:image" content="./static/images/qualitative/sd35m_main.png">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <title>RealAlign &middot; When Preference Labels Fall Short (ICML 2026)</title>
+
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@creativebulma/bulma-tooltip@1.2.0/dist/bulma-tooltip.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/academicons@1.9.4/css/academicons.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+</head>
+
+<body>
+
+<!-- ========== HERO ========== -->
+<section class="hero">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">
+            When Preference Labels Fall Short:<br>
+            Aligning Diffusion Models from Real Data
+          </h1>
+          <h2 class="subtitle is-4 conference-badge">ICML 2026</h2>
+
+          <!-- TODO: Replace with actual authors and affiliations. -->
+          <div class="is-size-5 publication-authors">
+            <span class="author-block"><a href="#">First Author</a><sup>1</sup>,</span>
+            <span class="author-block"><a href="#">Second Author</a><sup>1</sup>,</span>
+            <span class="author-block"><a href="#">Third Author</a><sup>2</sup>,</span>
+            <span class="author-block"><a href="#">Fourth Author</a><sup>1,2</sup></span>
+          </div>
+
+          <div class="is-size-5 publication-authors">
+            <span class="author-block"><sup>1</sup>Affiliation One,</span>
+            <span class="author-block"><sup>2</sup>Affiliation Two</span>
+          </div>
+
+          <div class="column has-text-centered">
+            <div class="publication-links">
+              <!-- Paper PDF -->
+              <span class="link-block">
+                <a href="./static/pdfs/paper.pdf" class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                  <span>Paper</span>
+                </a>
+              </span>
+              <!-- arXiv : TODO replace href once available -->
+              <span class="link-block">
+                <a href="#" class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="ai ai-arxiv"></i></span>
+                  <span>arXiv</span>
+                </a>
+              </span>
+              <!-- HuggingFace Models : TODO -->
+              <span class="link-block">
+                <a href="#" class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">&#129303;</span>
+                  <span>Model</span>
+                </a>
+              </span>
+              <!-- HuggingFace Dataset : TODO -->
+              <span class="link-block">
+                <a href="#" class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">&#129303;</span>
+                  <span>Dataset</span>
+                </a>
+              </span>
+              <!-- Code (GitHub) : TODO replace YOUR-USERNAME -->
+              <span class="link-block">
+                <a href="https://github.com/Cwyxx/RealAlign" class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fab fa-github"></i></span>
+                  <span>Code</span>
+                </a>
+              </span>
+              <!-- OpenReview : TODO -->
+              <span class="link-block">
+                <a href="#" class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fas fa-book-open"></i></span>
+                  <span>OpenReview</span>
+                </a>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== GALLERY (top banner, 3 rows x 5 cols, gapless) ========== -->
+<!-- 15 of 16 selected; 00149 dropped due to glyph-like artifacts in the background. -->
+<section class="gallery-hero">
+  <div class="container is-max-desktop">
+    <div class="columns is-multiline is-mobile is-gapless gallery-grid">
+      <div class="column is-one-fifth-tablet is-one-third-mobile"><img src="./static/images/gallery/00009.png" alt="gallery sample 00009"></div>
+      <div class="column is-one-fifth-tablet is-one-third-mobile"><img src="./static/images/gallery/00014.png" alt="gallery sample 00014"></div>
+      <div class="column is-one-fifth-tablet is-one-third-mobile"><img src="./static/images/gallery/00043.png" alt="gallery sample 00043"></div>
+      <div class="column is-one-fifth-tablet is-one-third-mobile"><img src="./static/images/gallery/00060.png" alt="gallery sample 00060"></div>
+      <div class="column is-one-fifth-tablet is-one-third-mobile"><img src="./static/images/gallery/00078.png" alt="gallery sample 00078"></div>
+      <div class="column is-one-fifth-tablet is-one-third-mobile"><img src="./static/images/gallery/00150.png" alt="gallery sample 00150"></div>
+      <div class="column is-one-fifth-tablet is-one-third-mobile"><img src="./static/images/gallery/00186.png" alt="gallery sample 00186"></div>
+      <div class="column is-one-fifth-tablet is-one-third-mobile"><img src="./static/images/gallery/00198.png" alt="gallery sample 00198"></div>
+      <div class="column is-one-fifth-tablet is-one-third-mobile"><img src="./static/images/gallery/00243.png" alt="gallery sample 00243"></div>
+      <div class="column is-one-fifth-tablet is-one-third-mobile"><img src="./static/images/gallery/00264.png" alt="gallery sample 00264"></div>
+      <div class="column is-one-fifth-tablet is-one-third-mobile"><img src="./static/images/gallery/00269.png" alt="gallery sample 00269"></div>
+      <div class="column is-one-fifth-tablet is-one-third-mobile"><img src="./static/images/gallery/00368.png" alt="gallery sample 00368"></div>
+      <div class="column is-one-fifth-tablet is-one-third-mobile"><img src="./static/images/gallery/00451.png" alt="gallery sample 00451"></div>
+      <div class="column is-one-fifth-tablet is-one-third-mobile"><img src="./static/images/gallery/00654.png" alt="gallery sample 00654"></div>
+      <div class="column is-one-fifth-tablet is-one-third-mobile"><img src="./static/images/gallery/01175.png" alt="gallery sample 01175"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== ABSTRACT ========== -->
+<section class="section" id="abstract">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Abstract</h2>
+        <div class="content has-text-justified">
+          <p>
+            Preference alignment aims to guide generative models by learning from comparisons between
+            preferred and non-preferred samples. In practice, most existing approaches rely on preference
+            pairs constructed from model-generated images. Such supervision is inherently relative and can
+            be ambiguous when both samples exhibit artifacts or limited visual quality, making it difficult
+            to infer what constitutes a truly desirable output. In this work, we investigate whether real
+            data can serve as an alternative source of supervision for preference alignment. We adopt a
+            data-centric perspective and study a curation strategy that treats real images as reference
+            points and constructs preference signals by contrasting them with generated or perturbed
+            samples, without requiring manually annotated preference pairs. Through empirical analysis, we
+            show that real-data-based supervision provides effective guidance for aligning diffusion models
+            and achieves performance comparable to existing preference-based methods. Our results suggest
+            that real data offers a practical and complementary source of supervision for preference
+            alignment and highlight directions of label-efficient alignment strategies.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

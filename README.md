@@ -2,8 +2,8 @@
 
 <div align="center">
   <a href='TODO'><img src='https://img.shields.io/badge/OpenReview-red?logo=openreview'></a> &nbsp;
-  <a href='TODO'><img src='https://img.shields.io/badge/Project_Page-9E95B7?logo=github'></a> &nbsp;
-  <a href='TODO'><img src='https://img.shields.io/badge/Code-9E95B7?logo=github'></a> &nbsp;
+  <a href='https://cwyxx.github.io/RealAlign/'><img src='https://img.shields.io/badge/Project_Page-9E95B7?logo=github'></a> &nbsp;
+  <a href='https://github.com/Cwyxx/RealAlign'><img src='https://img.shields.io/badge/Code-9E95B7?logo=github'></a> &nbsp;
   <a href='TODO'><img src='https://img.shields.io/badge/Model-blue?logo=huggingface'></a> &nbsp;
   <a href='TODO'><img src='https://img.shields.io/badge/Dataset-blue?logo=huggingface'></a>
 </div>
@@ -19,15 +19,27 @@ Preference alignment aims to guide generative models by learning from comparison
 <table align="center">
   <tr>
     <td align="center" width="25%"><img src="assets/gallery/00009.png" alt="gallery 00009" width="100%"/></td>
-    <td align="center" width="25%"><img src="assets/gallery/00368.png" alt="gallery 00368" width="100%"/></td>
     <td align="center" width="25%"><img src="assets/gallery/00149.png" alt="gallery 00149" width="100%"/></td>
-    <td align="center" width="25%"><img src="assets/gallery/00150.png" alt="gallery 00150" width="100%"/></td>
+    <td align="center" width="25%"><img src="assets/gallery/00269.png" alt="gallery 00269" width="100%"/></td>
+    <td align="center" width="25%"><img src="assets/gallery/00451.png" alt="gallery 00451" width="100%"/></td>
   </tr>
   <tr>
+    <td align="center" width="25%"><img src="assets/gallery/00014.png" alt="gallery 00014" width="100%"/></td>
+    <td align="center" width="25%"><img src="assets/gallery/00186.png" alt="gallery 00186" width="100%"/></td>
+    <td align="center" width="25%"><img src="assets/gallery/00150.png" alt="gallery 00150" width="100%"/></td>
     <td align="center" width="25%"><img src="assets/gallery/00243.png" alt="gallery 00243" width="100%"/></td>
-    <td align="center" width="25%"><img src="assets/gallery/01175.png" alt="gallery 01175" width="100%"/></td>
-    <td align="center" width="25%"><img src="assets/gallery/00269.png" alt="gallery 00269" width="100%"/></td>
+  </tr>
+  <tr>
+    <td align="center" width="25%"><img src="assets/gallery/00043.png" alt="gallery 00043" width="100%"/></td>
+    <td align="center" width="25%"><img src="assets/gallery/00198.png" alt="gallery 00198" width="100%"/></td>
     <td align="center" width="25%"><img src="assets/gallery/00264.png" alt="gallery 00264" width="100%"/></td>
+    <td align="center" width="25%"><img src="assets/gallery/01175.png" alt="gallery 01175" width="100%"/></td>
+  </tr>
+  <tr>
+    <td align="center" width="25%"><img src="assets/gallery/00060.png" alt="gallery 00060" width="100%"/></td>
+    <td align="center" width="25%"><img src="assets/gallery/00654.png" alt="gallery 00654" width="100%"/></td>
+    <td align="center" width="25%"><img src="assets/gallery/00368.png" alt="gallery 00368" width="100%"/></td>
+    <td align="center" width="25%"><img src="assets/gallery/00078.png" alt="gallery 00078" width="100%"/></td>
   </tr>
 </table>
 
@@ -81,10 +93,23 @@ Run the four-stage pipeline in [`data_curation/`](data_curation/) (`extract → 
 
 ### 3. Train
 
-| Model | Stage 1 (Diffusion-DRO) | Stage 2 (Diffusion-DPO, LoRA-init) |
-|---|---|---|
-| **SD-1.5** | `bash training_sd15/stage1_diffusion_dro/train-irl.sh` | `bash training_sd15/stage2_dpo/lora_init.sh` |
-| **SD-3.5-M** | `bash training_sd35m/scripts/single_node/inverse_reinforcement_learning.sh` | `bash training_sd35m/scripts/single_node/dpo.sh` |
+**SD-1.5**
+
+```bash
+# Stage 1: Diffusion-DRO
+bash training_sd15/stage1_diffusion_dro/train-irl.sh
+# Stage 2: Diffusion-DPO (LoRA-init)
+bash training_sd15/stage2_dpo/lora_init.sh
+```
+
+**SD-3.5-M**
+
+```bash
+# Stage 1: Diffusion-DRO
+bash training_sd35m/scripts/single_node/inverse_reinforcement_learning.sh
+# Stage 2: Diffusion-DPO (LoRA-init)
+bash training_sd35m/scripts/single_node/dpo.sh
+```
 
 - **Shared input.** Both stages read the same CSV — `csv_file_path_train` for SD-1.5, `config.{irl,dpo}.csv_file_path` for SD-3.5-M. SD-3.5-M also expects precomputed prompt embeddings (see [`training_sd35m/README.md`](training_sd35m/README.md)).
 - **Stage 2 warm-starts from Stage 1.** Before launching Stage 2, point it at the Stage 1 LoRA checkpoint: set `pretrained_lora_path` in [`training_sd15/stage2_dpo/lora_init.sh`](training_sd15/stage2_dpo/lora_init.sh) (SD-1.5) or `config.train.lora_path` in [`training_sd35m/config/sd3_5_medium_dpo.py`](training_sd35m/config/sd3_5_medium_dpo.py) (SD-3.5-M).
