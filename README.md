@@ -5,6 +5,9 @@
   <a href="TODO"><img src="https://img.shields.io/badge/%F0%9F%93%96_OpenReview-Forum-red" alt="OpenReview"></a>
   <a href="https://cwyxx.github.io/RealAlign/"><img src="https://img.shields.io/badge/%F0%9F%8C%90_Project_WebPage-green" alt="Project Page"></a>
   <a href="https://github.com/Cwyxx/RealAlign"><img src="https://img.shields.io/badge/%F0%9F%9A%80_Code-GitHub-blue" alt="Code"></a>
+</p>
+
+<p align="center">
   <a href="https://huggingface.co/Xixixixihahahaha/RealAlign-SD-1.5"><img src="https://img.shields.io/badge/%F0%9F%A4%97_Model_%28SD1.5%29-HuggingFace-yellow" alt="Model SD-1.5"></a>
   <a href="https://huggingface.co/Xixixixihahahaha/RealAlign-SD-3.5-M"><img src="https://img.shields.io/badge/%F0%9F%A4%97_Model_%28SD3.5M%29-HuggingFace-yellow" alt="Model SD-3.5-M"></a>
   <a href="TODO"><img src="https://img.shields.io/badge/%F0%9F%A4%97_Dataset-HuggingFace-yellow" alt="Dataset"></a>
