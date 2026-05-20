@@ -1,12 +1,14 @@
 <h1 align="center">When Preference Labels Fall Short:<br>Aligning Diffusion Models from Real Data</h1>
 
-<div align="center">
-  <a href='TODO'><img src='https://img.shields.io/badge/OpenReview-red?logo=openreview'></a> &nbsp;
-  <a href='https://cwyxx.github.io/RealAlign/'><img src='https://img.shields.io/badge/Project_Page-4CAF50?logo=github'></a> &nbsp;
-  <a href='https://github.com/Cwyxx/RealAlign'><img src='https://img.shields.io/badge/Code-181717?logo=github'></a> &nbsp;
-  <a href='TODO'><img src='https://img.shields.io/badge/Model-blue?logo=huggingface'></a> &nbsp;
-  <a href='TODO'><img src='https://img.shields.io/badge/Dataset-blue?logo=huggingface'></a>
-</div>
+<p align="center">
+  <a href="https://arxiv.org/abs/2605.19839"><img src="https://img.shields.io/badge/%F0%9F%93%84_Paper-arXiv:2605.19839-red" alt="Paper"></a>
+  <a href="TODO"><img src="https://img.shields.io/badge/%F0%9F%93%96_OpenReview-Forum-red" alt="OpenReview"></a>
+  <a href="https://cwyxx.github.io/RealAlign/"><img src="https://img.shields.io/badge/%F0%9F%8C%90_Project_WebPage-green" alt="Project Page"></a>
+  <a href="https://github.com/Cwyxx/RealAlign"><img src="https://img.shields.io/badge/%F0%9F%9A%80_Code-GitHub-blue" alt="Code"></a>
+  <a href="https://huggingface.co/Xixixixihahahaha/RealAlign-SD-1.5"><img src="https://img.shields.io/badge/%F0%9F%A4%97_Model_%28SD1.5%29-HuggingFace-yellow" alt="Model SD-1.5"></a>
+  <a href="https://huggingface.co/Xixixixihahahaha/RealAlign-SD-3.5-M"><img src="https://img.shields.io/badge/%F0%9F%A4%97_Model_%28SD3.5M%29-HuggingFace-yellow" alt="Model SD-3.5-M"></a>
+  <a href="TODO"><img src="https://img.shields.io/badge/%F0%9F%A4%97_Dataset-HuggingFace-yellow" alt="Dataset"></a>
+</p>
 
 <p align="center"><em>Accepted at ICML 2026. Links above are placeholders — TODO before public release.</em></p>
 
@@ -122,12 +124,12 @@ Reward-model evaluation lives in [`training_sd35m/evaluation/`](training_sd35m/e
 
 DPG-Bench generation + evaluation scripts live in [`DPG-Bench/`](DPG-Bench/) (`DPG-Bench-script-sd-v1-5.sh`, `DPG-Bench-script-sd-3-5-medium.sh`).
 
-## 🤗 Acknowledgement
+## 🙏 Acknowledgement
 
 Our codebase references the code from [Diffusion-DRO](https://github.com/basiclab/DiffusionDRO), [Diffusion-DPO](https://github.com/SalesforceAIResearch/DiffusionDPO), and [Flow-GRPO](https://github.com/yifan123/flow_grpo).
 
 We thank the authors for releasing their implementations.
 
-## ⭐ Citation
+## 📚 Citation
 
 > TODO: BibTeX will be added once the ICML 2026 proceedings entry is finalized.
