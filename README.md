@@ -13,7 +13,6 @@
   <a href="https://huggingface.co/datasets/Xixixixihahahaha/RealAlign-Dataset"><img src="https://img.shields.io/badge/%F0%9F%A4%97_Dataset-HuggingFace-yellow" alt="Dataset"></a>
 </p>
 
-<p align="center"><em>Accepted at ICML 2026. Links above are placeholders — TODO before public release.</em></p>
 
 ## 📝 Abstract
 
