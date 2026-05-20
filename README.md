@@ -10,7 +10,7 @@
 <p align="center">
   <a href="https://huggingface.co/Xixixixihahahaha/RealAlign-SD-1.5"><img src="https://img.shields.io/badge/%F0%9F%A4%97_Model_%28SD1.5%29-HuggingFace-yellow" alt="Model SD-1.5"></a>
   <a href="https://huggingface.co/Xixixixihahahaha/RealAlign-SD-3.5-M"><img src="https://img.shields.io/badge/%F0%9F%A4%97_Model_%28SD3.5M%29-HuggingFace-yellow" alt="Model SD-3.5-M"></a>
-  <a href="TODO"><img src="https://img.shields.io/badge/%F0%9F%A4%97_Dataset-HuggingFace-yellow" alt="Dataset"></a>
+  <a href="https://huggingface.co/datasets/Xixixixihahahaha/RealAlign-Dataset"><img src="https://img.shields.io/badge/%F0%9F%A4%97_Dataset-HuggingFace-yellow" alt="Dataset"></a>
 </p>
 
 <p align="center"><em>Accepted at ICML 2026. Links above are placeholders — TODO before public release.</em></p>
