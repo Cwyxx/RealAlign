@@ -134,4 +134,13 @@ We thank the authors for releasing their implementations.
 
 ## 📚 Citation
 
-> TODO: BibTeX will be added once the ICML 2026 proceedings entry is finalized.
+If you find our work useful, please consider citing:
+
+```bibtex
+@article{chen2026preference,
+  title={When Preference Labels Fall Short: Aligning Diffusion Models from Real Data},
+  author={Chen, Weiyan and Deng, Weijian and Xiao, Yao and Tu, Weijie and Dong, ZiYi and Radwan, Ibrahim and Lin, Liang and Wei, Pengxu},
+  journal={arXiv preprint arXiv:2605.19839},
+  year={2026}
+}
+```
