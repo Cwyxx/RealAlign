@@ -20,19 +20,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/academicons/1.9.4/css/academicons.min.css">
   <link rel="stylesheet" href="./static/css/index.css">
 
-  <!-- MathJax for the Stage-1 / Stage-2 objectives -->
-  <script>
-    window.MathJax = {
-      tex: {
-        inlineMath: [['\\(', '\\)']],
-        displayMath: [['\\[', '\\]']],
-        macros: { bm: ['\\boldsymbol{#1}', 1] }
-      },
-      svg: { fontCache: 'global' }
-    };
-  </script>
-  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" id="MathJax-script" async></script>
-
   <!-- Page-specific styling (kept here so static/css/index.css stays untouched) -->
   <style>
     .figure-block { margin: 2.25rem 0 0.5rem; }
@@ -49,6 +36,15 @@
     @media (max-width: 768px) { .results-grid { grid-template-columns: 1fr; } }
     .fig-placeholder { border: 2px dashed #cfd4dc; border-radius: 10px; background: #fafbfc; color: #8a93a2; text-align: center; padding: 3.25rem 1rem; font-size: 0.95rem; line-height: 1.6; }
     .fig-placeholder code { background: #eef0f3; color: #5a6472; padding: 0.1rem 0.35rem; border-radius: 4px; }
+    .publication-title { text-align: left !important; }
+    .figure-caption.is-left { text-align: left; }
+    .figure-note { margin-top: 0.55rem; font-size: 0.82rem; line-height: 1.45; color: #7a828c; text-align: left; }
+    .figure-note b { color: #5a6472; }
+    .gain { color: #3a9d3a; font-weight: 600; }
+    .qual-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.75rem 2rem; align-items: start; }
+    .qual-grid figure { margin: 0; }
+    .qual-grid figure img { width: 100%; height: auto; display: block; }
+    @media (max-width: 768px) { .qual-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 
@@ -221,8 +217,10 @@
           <img src="./static/images/fig1_motivation.svg" alt="preferred model-generated samples still contain artifacts">
           <figcaption class="figure-caption">
             <span class="fig-label">Figure 1.</span>
-            Samples labeled as <i>preferred</i> within model-generated preference pairs still exhibit
-            artifacts and limited realism, capping the quality the aligned model can reach.
+            <b>Preference pairs from Pick-a-Pic v2.</b> The left group shows preferred images with local
+            generation artifacts, while the right presents preferred images with unnatural global color.
+            These cases highlight limitations of preference-based supervision in capturing holistic image
+            quality.
           </figcaption>
         </figure>
 
@@ -239,19 +237,31 @@
         <figure class="figure-block">
           <div class="results-grid">
             <figure>
-              <img src="./static/images/fig2a_detail_vs_realism.svg" alt="local detail versus overall realism">
-              <figcaption class="figure-caption">Improving local detail does not translate into balanced realism gains.</figcaption>
+              <img src="./static/images/fig2a_detail_vs_realism.svg" alt="realism versus texture detail on SD-1.5">
+              <figcaption class="figure-caption"><b>(a) Preference pairs</b></figcaption>
             </figure>
             <figure>
-              <img src="./static/images/fig2b_human_pref_vs_stylization.svg" alt="human preference versus stylistic diversity">
-              <figcaption class="figure-caption">Higher preference scores come at the cost of stylistic diversity.</figcaption>
+              <img src="./static/images/fig2b_human_pref_vs_stylization.svg" alt="human preference versus stylization on SD-3.5-M">
+              <figcaption class="figure-caption"><b>(b) Reward model</b></figcaption>
             </figure>
           </div>
           <figcaption class="figure-caption">
             <span class="fig-label">Figure 2.</span>
-            Two views of the same trade-off: gains on a targeted property (left) or in preference score
-            (right) do not yield consistent, well-rounded improvements in realism and diversity.
+            <b>Analysis of preference- and reward-based alignment behaviors.</b>
+            (a) Comparison of realism and texture detail across different preference-based methods on
+            SD-1.5. Methods optimized using pairwise preferences often improve specific visual aspects
+            (e.g., smoothness or texture consistency) but do not consistently yield balanced gains in
+            overall realism across diverse prompts. (b) Comparison of human preference and stylization
+            on SD-3.5-M. Reward-based approaches achieve higher preference scores but tend to produce
+            more uniform stylistic patterns.
           </figcaption>
+          <div class="figure-note">
+            <b>Texture Detail:</b> Laplacian variance of the generated images.
+            <b>Realism:</b> SGP-PickScore [SRPO], defined as the difference between PickScore evaluated
+            on prompts prefixed with &ldquo;Realistic photo&rdquo; and &ldquo;CG render&rdquo;.
+            <b>Stylization:</b> stylization score on OneIG-Bench [OneIG-Bench].
+            <b>Human Preference Score:</b> normalized average of HPSv3 and UnifiedReward evaluated on DrawBench.
+          </div>
         </figure>
       </div>
     </div>
@@ -281,8 +291,11 @@
           <img src="./static/images/fig3_preference_pairs.svg" alt="examples of preference pairs derived from real images">
           <figcaption class="figure-caption">
             <span class="fig-label">Figure 3.</span>
-            Examples of preference pairs derived from real images: a real reference (preferred) paired
-            with a controlled degradation (non-preferred).
+            <b>Examples of preference pairs derived from real images.</b> Red contours indicate salient
+            regions where controlled inpainting introduces localized artifacts. The original images act
+            as preferred references, while the degraded counterparts expose interpretable deviations in
+            texture, structure, or semantics, providing effective supervision for preference alignment
+            without labeling.
           </figcaption>
         </figure>
 
@@ -293,38 +306,32 @@
             A practical consideration is that real images and their perturbed versions may differ from
             the model's initial generation distribution, which can make direct preference optimization
             less stable. To account for this, we adopt a <b>two-stage</b> alignment strategy that
-            incorporates real-data-based signals gradually. The first stage encourages the model to move
-            closer to the distribution represented by the reference images; the second stage introduces
-            structured comparisons using the constructed contrastive samples.
+            incorporates real-data-based signals gradually.
           </p>
         </div>
 
-        <span class="stage-label">Stage 1 &middot; Distribution Alignment with Real Images</span>
+        <div class="subsec-title">Stage 1 &middot; Distribution Alignment with Real Images</div>
         <div class="content has-text-justified">
-          <p>A Diffusion-DRO (inverse-RL) objective pulls the model toward the reference distribution:</p>
-        </div>
-        <div class="eq-card">
-          \[
-          \begin{aligned}
-          \mathcal{L}_{\text{stage-1}}(\bm{\phi}) = \sum_{t=1}^{T} \mathbb{E}_{\bar{\bm{x}}_0, \bm{x}_0, \bm{c}} \Big[ \max\Big( m,\
-          & -\big( \|\bar{\bm{\epsilon}} - \bm{\epsilon}_{\bm{\theta}_{\text{ref}}}(\bar{\bm{x}}_t, \bm{c}, t)\|^2 - \|\bar{\bm{\epsilon}} - \bm{\epsilon}_{\bm{\phi}}(\bar{\bm{x}}_t, \bm{c}, t)\|^2 \big) \\
-          & +\big( \|\bm{\epsilon} - \bm{\epsilon}_{\bm{\theta}_{\text{ref}}}(\bm{x}_t, \bm{c}, t)\|^2 - \|\bm{\epsilon} - \bm{\epsilon}_{\bm{\phi}}(\bm{x}_t, \bm{c}, t)\|^2 \big) \Big) \Big]
-          \end{aligned}
-          \]
+          <p>
+            The first stage moves the model closer to the distribution represented by the reference
+            images. Using a <b>Diffusion-DRO</b> (inverse reinforcement learning) objective, the model is
+            trained so that real reference images become more likely under its own distribution than
+            under a frozen reference model, while generated samples are pushed in the opposite direction.
+            This warms up the model toward the realistic, high-quality region described by the curated
+            data before any explicit preference comparison is introduced.
+          </p>
         </div>
 
-        <span class="stage-label">Stage 2 &middot; Preference Learning with Constructed Contrastive Samples</span>
+        <div class="subsec-title">Stage 2 &middot; Preference Learning with Constructed Contrastive Samples</div>
         <div class="content has-text-justified">
-          <p>A Diffusion-DPO objective, warm-started from Stage 1, learns from the real-vs-perturbed contrasts:</p>
-        </div>
-        <div class="eq-card">
-          \[
-          \begin{aligned}
-          \mathcal{L}_{\text{stage-2}}(\bm{\theta}) = -\mathbb{E}_{\bm{x}_0^w, \bm{x}_0^l, \bm{c}} \Big[ \log \sigma \Big( -\beta T \big(
-          & \|\bm{\epsilon}^w - \bm{\epsilon}_{\bm{\theta}}(\bm{x}_t^w, \bm{c}, t)\|^2 - \|\bm{\epsilon}^w - \bm{\epsilon}_{\bm{\theta}_{\text{ref}}}(\bm{x}_t^w, \bm{c}, t)\|^2 \\
-          & - \|\bm{\epsilon}^l - \bm{\epsilon}_{\bm{\theta}}(\bm{x}_t^l, \bm{c}, t)\|^2 + \|\bm{\epsilon}^l - \bm{\epsilon}_{\bm{\theta}_{\text{ref}}}(\bm{x}_t^l, \bm{c}, t)\|^2 \big) \Big) \Big]
-          \end{aligned}
-          \]
+          <p>
+            The second stage, warm-started from Stage 1, introduces the structured contrasts built
+            during curation. With a <b>Diffusion-DPO</b> objective, each preferred real image is compared
+            against its controlled degradation, teaching the model to favor the interpretable,
+            higher-quality reference over its perturbed counterpart. Because both stages draw their
+            signal entirely from real data and controlled perturbations, the whole pipeline aligns the
+            model <b>without any manually annotated preference labels</b>.
+          </p>
         </div>
       </div>
     </div>
@@ -349,13 +356,21 @@
         <figure class="figure-block">
           <img src="./static/images/table1_method_comparison.png" alt="Table 1: method comparison">
           <figcaption class="figure-caption">
-            <span class="fig-label">Table 1.</span> Method comparison across alignment objectives and metrics.
+            <span class="fig-label">Table 1.</span>
+            <b>Method comparison.</b> Relative improvements are highlighted in
+            <span class="gain">(+gain)</span>. ImgRwd: ImageReward [ImageReward]; UniRwd: UnifiedReward
+            [UnifiedReward]; Aes: LAION aesthetic classifier [Aesthetic]. &dagger; denotes our
+            re-implementation, trained on Pick-a-Pic v2 [PickScore] using official code. Best and
+            second-best results are in <b>bold</b> and <u>underlined</u>, respectively.
           </figcaption>
         </figure>
         <figure class="figure-block">
           <img src="./static/images/fig4_user_study.svg" alt="user study on SD-3.5-M" style="max-width:760px;">
           <figcaption class="figure-caption">
-            <span class="fig-label">Figure 4.</span> User study on SD-3.5-M.
+            <span class="fig-label">Figure 4.</span>
+            <b>User study on SD-3.5-M.</b> Following the protocol of Diffusion-DRO [Diffusion-DRO], we
+            randomly sample 60 prompts from HPDv2 and ask users to compare our fine-tuned SD-3.5-M with
+            baselines. Across both comparisons, users prefer our model.
           </figcaption>
         </figure>
 
@@ -370,24 +385,48 @@
         <figure class="figure-block">
           <img src="./static/images/fig5_complementarity.svg" alt="complementarity with existing preference alignment models">
           <figcaption class="figure-caption">
-            <span class="fig-label">Figure 5.</span> Complementarity with existing preference alignment
-            models, across two backbones and multiple prompt benchmarks.
+            <span class="fig-label">Figure 5.</span>
+            <b>Complementarity with existing preference alignment models.</b> Top row: quantitative
+            results on Pick-a-Pic v2 using SD-1.5 as the base model; real-data-based supervision is
+            integrated with Diffusion-DPO. Bottom row: quantitative results on DrawBench using SD-3.5-M
+            as the base model; real-data-based supervision is used as a complementary post-training step
+            on top of FlowGRPO.
           </figcaption>
         </figure>
 
         <!-- 3.3 -->
         <h3 class="title is-4" style="margin-top:2rem;">Qualitative Comparison</h3>
         <figure class="figure-block">
-          <img src="./static/images/fig6_sd15_qualitative.svg" alt="qualitative comparison on SD-1.5">
-          <figcaption class="figure-caption">
-            <span class="fig-label">Figure 6.</span> Qualitative comparison based on SD-1.5.
-          </figcaption>
-        </figure>
-        <figure class="figure-block">
-          <img src="./static/images/fig7_sd35m_qualitative.svg" alt="qualitative comparison on SD-3.5-M">
-          <figcaption class="figure-caption">
-            <span class="fig-label">Figure 7.</span> Qualitative comparison based on SD-3.5-M.
-          </figcaption>
+          <div class="qual-grid">
+            <figure>
+              <img src="./static/images/fig6_sd15_qualitative.svg" alt="qualitative comparison on SD-1.5">
+              <figcaption class="figure-caption is-left">
+                <span class="fig-label">Figure 6.</span>
+                <b>Qualitative comparison based on SD-1.5.</b> Post-training with real data produces
+                images with improved visual realism and richer texture details. When applied as an
+                additional post-training stage on top of Diffusion-DPO [Diffusion-DPO], it also improves
+                the visual realism of the resulting generations. Prompts from top to bottom:
+                (1)&nbsp;<i>a plant.</i>
+                (2)&nbsp;<i>a woman sitting on a table drinking coffee, long shot, wide shot, highly
+                detailed, intricate, professional photography, RAW color, night shot, bokeh, sharp focus,
+                taken with EOS 5D, UHD 8K.</i>
+                (3)&nbsp;<i>a corgi's head.</i>
+              </figcaption>
+            </figure>
+            <figure>
+              <img src="./static/images/fig7_sd35m_qualitative.svg" alt="qualitative comparison on SD-3.5-M">
+              <figcaption class="figure-caption is-left">
+                <span class="fig-label">Figure 7.</span>
+                <b>Qualitative comparison based on SD-3.5-M.</b> Compared to FlowGRPO [FlowGRPO],
+                post-training with real data yields more realistic lighting and more natural color
+                distributions. When applied as an additional post-training step on top of FlowGRPO, it
+                further alleviates stylistic homogenization. Prompts from top to bottom:
+                (1)&nbsp;<i>a fire hydrant.</i>
+                (2)&nbsp;<i>a person.</i>
+                (3)&nbsp;<i>Anime illustration of Gundam mech suit on Pixiv.</i>
+              </figcaption>
+            </figure>
+          </div>
         </figure>
       </div>
     </div>
