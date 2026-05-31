@@ -238,11 +238,11 @@
           <div class="results-grid">
             <figure>
               <img src="./static/images/fig2a_detail_vs_realism.svg" alt="realism versus texture detail on SD-1.5">
-              <figcaption class="figure-caption"><b>(a) Preference pairs</b></figcaption>
+              <figcaption class="figure-caption" style="text-align:center;"><b>(a) Preference pairs</b></figcaption>
             </figure>
             <figure>
               <img src="./static/images/fig2b_human_pref_vs_stylization.svg" alt="human preference versus stylization on SD-3.5-M">
-              <figcaption class="figure-caption"><b>(b) Reward model</b></figcaption>
+              <figcaption class="figure-caption" style="text-align:center;"><b>(b) Reward model</b></figcaption>
             </figure>
           </div>
           <figcaption class="figure-caption">
@@ -257,9 +257,9 @@
           </figcaption>
           <div class="figure-note">
             <b>Texture Detail:</b> Laplacian variance of the generated images.
-            <b>Realism:</b> SGP-PickScore [SRPO], defined as the difference between PickScore evaluated
+            <b>Realism:</b> SGP-PickScore, defined as the difference between PickScore evaluated
             on prompts prefixed with &ldquo;Realistic photo&rdquo; and &ldquo;CG render&rdquo;.
-            <b>Stylization:</b> stylization score on OneIG-Bench [OneIG-Bench].
+            <b>Stylization:</b> stylization score on OneIG-Bench.
             <b>Human Preference Score:</b> normalized average of HPSv3 and UnifiedReward evaluated on DrawBench.
           </div>
         </figure>
@@ -368,7 +368,7 @@
           <img src="./static/images/fig4_user_study.svg" alt="user study on SD-3.5-M" style="max-width:760px;">
           <figcaption class="figure-caption">
             <span class="fig-label">Figure 4.</span>
-            <b>User study on SD-3.5-M.</b> Following the protocol of Diffusion-DRO [Diffusion-DRO], we
+            <b>User study on SD-3.5-M.</b> Following the protocol of Diffusion-DRO, we
             randomly sample 60 prompts from HPDv2 and ask users to compare our fine-tuned SD-3.5-M with
             baselines. Across both comparisons, users prefer our model.
           </figcaption>
@@ -404,7 +404,7 @@
                 <span class="fig-label">Figure 6.</span>
                 <b>Qualitative comparison based on SD-1.5.</b> Post-training with real data produces
                 images with improved visual realism and richer texture details. When applied as an
-                additional post-training stage on top of Diffusion-DPO [Diffusion-DPO], it also improves
+                additional post-training stage on top of Diffusion-DPO, it also improves
                 the visual realism of the resulting generations. Prompts from top to bottom:
                 (1)&nbsp;<i>a plant.</i>
                 (2)&nbsp;<i>a woman sitting on a table drinking coffee, long shot, wide shot, highly
@@ -417,7 +417,7 @@
               <img src="./static/images/fig7_sd35m_qualitative.svg" alt="qualitative comparison on SD-3.5-M">
               <figcaption class="figure-caption is-left">
                 <span class="fig-label">Figure 7.</span>
-                <b>Qualitative comparison based on SD-3.5-M.</b> Compared to FlowGRPO [FlowGRPO],
+                <b>Qualitative comparison based on SD-3.5-M.</b> Compared to FlowGRPO,
                 post-training with real data yields more realistic lighting and more natural color
                 distributions. When applied as an additional post-training step on top of FlowGRPO, it
                 further alleviates stylistic homogenization. Prompts from top to bottom:
