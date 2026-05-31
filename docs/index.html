@@ -19,6 +19,37 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@creativebulma/bulma-tooltip@1.2.0/dist/bulma-tooltip.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/academicons/1.9.4/css/academicons.min.css">
   <link rel="stylesheet" href="./static/css/index.css">
+
+  <!-- MathJax for the Stage-1 / Stage-2 objectives -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']],
+        macros: { bm: ['\\boldsymbol{#1}', 1] }
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" id="MathJax-script" async></script>
+
+  <!-- Page-specific styling (kept here so static/css/index.css stays untouched) -->
+  <style>
+    .figure-block { margin: 2.25rem 0 0.5rem; }
+    .figure-block img { display: block; margin: 0 auto; max-width: 100%; height: auto; border-radius: 6px; }
+    .figure-caption { margin-top: 0.9rem; font-size: 0.95rem; line-height: 1.5; color: #4a4a4a; text-align: center; }
+    .figure-caption .fig-label { font-weight: 700; color: #1f1f1f; }
+    .subsec-title { font-size: 1.2rem; font-weight: 600; color: #1f1f1f; margin: 1.8rem 0 0.5rem; }
+    .problem-tag { color: #c0392b; font-weight: 700; }
+    .eq-card { background: #f7f8fa; border: 1px solid #e6e8eb; border-radius: 10px; padding: 1.1rem 1.25rem; margin: 1.1rem 0 1.6rem; overflow-x: auto; }
+    .stage-label { display: inline-block; background: #eef2ff; color: #3b4ce2; border-radius: 999px; padding: 0.18rem 0.75rem; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.02em; margin-bottom: 0.55rem; }
+    .results-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem 1.75rem; align-items: end; }
+    .results-grid figure { margin: 0; }
+    .results-grid figure img { width: 100%; height: auto; display: block; }
+    @media (max-width: 768px) { .results-grid { grid-template-columns: 1fr; } }
+    .fig-placeholder { border: 2px dashed #cfd4dc; border-radius: 10px; background: #fafbfc; color: #8a93a2; text-align: center; padding: 3.25rem 1rem; font-size: 0.95rem; line-height: 1.6; }
+    .fig-placeholder code { background: #eef0f3; color: #5a6472; padding: 0.1rem 0.35rem; border-radius: 4px; }
+  </style>
 </head>
 
 <body>
@@ -161,6 +192,241 @@
     </div>
   </div>
 </section>
+
+<!-- ========== MOTIVATION ========== -->
+<section class="section" id="motivation">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered">
+      <div class="column is-full">
+        <h2 class="title is-3 has-text-centered">When Do Preference Labels Fall Short?</h2>
+        <div class="content has-text-justified">
+          <p>
+            Most existing preference alignment methods rely on <b>pairwise comparisons between
+            generated samples</b>, where one image is labeled as preferred over another. While effective,
+            this formulation carries two limitations that are easy to overlook.
+          </p>
+        </div>
+
+        <div class="subsec-title"><span class="problem-tag">Problem 1.</span>&nbsp; Supervision is bounded by the generators.</div>
+        <div class="content has-text-justified">
+          <p>
+            The supervision signal is inherently constrained by the quality of the generators that
+            produce the candidates. Even samples labeled as <i>preferred</i> may still contain
+            artifacts, lack realism, or exhibit limited stylistic diversity. The model can therefore
+            only learn to favor the <i>less flawed</i> of two imperfect options, rather than what a
+            genuinely desirable output looks like.
+          </p>
+        </div>
+        <figure class="figure-block">
+          <!-- TODO(figure-1): drop the motivation example image at ./static/images/motivation_artifacts.png and replace the placeholder below with an <img>. -->
+          <div class="fig-placeholder">
+            Figure&nbsp;1 image not yet added.<br>
+            Place the file at <code>./static/images/motivation_artifacts.png</code> to render it here.
+          </div>
+          <figcaption class="figure-caption">
+            <span class="fig-label">Figure 1.</span>
+            Samples labeled as <i>preferred</i> within model-generated preference pairs still exhibit
+            artifacts and limited realism, capping the quality the aligned model can reach.
+          </figcaption>
+        </figure>
+
+        <div class="subsec-title"><span class="problem-tag">Problem 2.</span>&nbsp; Existing objectives trade realism against diversity.</div>
+        <div class="content has-text-justified">
+          <p>
+            Different alignment objectives improve different aspects, but rarely deliver balanced gains.
+            Objectives that target specific visual properties (e.g., smoothness or texture consistency)
+            do not consistently improve <i>overall</i> realism across diverse prompts, while reward-based
+            approaches reach higher preference scores but tend to collapse toward more uniform stylistic
+            patterns.
+          </p>
+        </div>
+        <figure class="figure-block">
+          <div class="results-grid">
+            <figure>
+              <img src="./static/images/detail_vs_realism.svg" alt="local detail versus overall realism">
+              <figcaption class="figure-caption">Improving local detail does not translate into balanced realism gains.</figcaption>
+            </figure>
+            <figure>
+              <img src="./static/images/human_pref_vs_stylization.svg" alt="human preference versus stylistic diversity">
+              <figcaption class="figure-caption">Higher preference scores come at the cost of stylistic diversity.</figcaption>
+            </figure>
+          </div>
+          <figcaption class="figure-caption">
+            <span class="fig-label">Figure 2.</span>
+            Two views of the same trade-off: gains on a targeted property (left) or in preference score
+            (right) do not yield consistent, well-rounded improvements in realism and diversity.
+          </figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== METHOD ========== -->
+<section class="section" id="method" style="background:#fbfbfd;">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered">
+      <div class="column is-full">
+        <h2 class="title is-3 has-text-centered">Preference Signals from Real Data</h2>
+
+        <!-- 2.1 -->
+        <h3 class="title is-4" style="margin-top:1rem;">Real-Data Curation for Preference Alignment</h3>
+        <div class="content has-text-justified">
+          <p>
+            We present a data curation strategy that constructs structured supervision signals by
+            contrasting real images with controlled variations, <b>without using explicit preference
+            labels</b>. The idea is to first identify a set of images that represent desirable visual
+            properties, and then introduce controlled degradations to create informative contrasts.
+            This lets preference-related signals be derived directly from real data, while keeping the
+            learning process grounded and interpretable.
+          </p>
+        </div>
+        <figure class="figure-block">
+          <!-- TODO(figure-3): drop the preference-pair examples image at ./static/images/preference_pairs.png and replace the placeholder below with an <img>. -->
+          <div class="fig-placeholder">
+            Figure&nbsp;3 image not yet added.<br>
+            Place the file at <code>./static/images/preference_pairs.png</code> to render it here.
+          </div>
+          <figcaption class="figure-caption">
+            <span class="fig-label">Figure 3.</span>
+            Examples of preference pairs derived from real images: a real reference (preferred) paired
+            with a controlled degradation (non-preferred).
+          </figcaption>
+        </figure>
+
+        <!-- 2.2 -->
+        <h3 class="title is-4" style="margin-top:2rem;">Preference Alignment with Real-Data-Based Signals</h3>
+        <div class="content has-text-justified">
+          <p>
+            A practical consideration is that real images and their perturbed versions may differ from
+            the model's initial generation distribution, which can make direct preference optimization
+            less stable. To account for this, we adopt a <b>two-stage</b> alignment strategy that
+            incorporates real-data-based signals gradually. The first stage encourages the model to move
+            closer to the distribution represented by the reference images; the second stage introduces
+            structured comparisons using the constructed contrastive samples.
+          </p>
+        </div>
+
+        <span class="stage-label">Stage 1 &middot; Distribution Alignment with Real Images</span>
+        <div class="content has-text-justified">
+          <p>A Diffusion-DRO (inverse-RL) objective pulls the model toward the reference distribution:</p>
+        </div>
+        <div class="eq-card">
+          \[
+          \begin{aligned}
+          \mathcal{L}_{\text{stage-1}}(\bm{\phi}) = \sum_{t=1}^{T} \mathbb{E}_{\bar{\bm{x}}_0, \bm{x}_0, \bm{c}} \Big[ \max\Big( m,\
+          & -\big( \|\bar{\bm{\epsilon}} - \bm{\epsilon}_{\bm{\theta}_{\text{ref}}}(\bar{\bm{x}}_t, \bm{c}, t)\|^2 - \|\bar{\bm{\epsilon}} - \bm{\epsilon}_{\bm{\phi}}(\bar{\bm{x}}_t, \bm{c}, t)\|^2 \big) \\
+          & +\big( \|\bm{\epsilon} - \bm{\epsilon}_{\bm{\theta}_{\text{ref}}}(\bm{x}_t, \bm{c}, t)\|^2 - \|\bm{\epsilon} - \bm{\epsilon}_{\bm{\phi}}(\bm{x}_t, \bm{c}, t)\|^2 \big) \Big) \Big]
+          \end{aligned}
+          \]
+        </div>
+
+        <span class="stage-label">Stage 2 &middot; Preference Learning with Constructed Contrastive Samples</span>
+        <div class="content has-text-justified">
+          <p>A Diffusion-DPO objective, warm-started from Stage 1, learns from the real-vs-perturbed contrasts:</p>
+        </div>
+        <div class="eq-card">
+          \[
+          \begin{aligned}
+          \mathcal{L}_{\text{stage-2}}(\bm{\theta}) = -\mathbb{E}_{\bm{x}_0^w, \bm{x}_0^l, \bm{c}} \Big[ \log \sigma \Big( -\beta T \big(
+          & \|\bm{\epsilon}^w - \bm{\epsilon}_{\bm{\theta}}(\bm{x}_t^w, \bm{c}, t)\|^2 - \|\bm{\epsilon}^w - \bm{\epsilon}_{\bm{\theta}_{\text{ref}}}(\bm{x}_t^w, \bm{c}, t)\|^2 \\
+          & - \|\bm{\epsilon}^l - \bm{\epsilon}_{\bm{\theta}}(\bm{x}_t^l, \bm{c}, t)\|^2 + \|\bm{\epsilon}^l - \bm{\epsilon}_{\bm{\theta}_{\text{ref}}}(\bm{x}_t^l, \bm{c}, t)\|^2 \big) \Big) \Big]
+          \end{aligned}
+          \]
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== EXPERIMENTS ========== -->
+<section class="section" id="experiments">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered">
+      <div class="column is-full">
+        <h2 class="title is-3 has-text-centered">Experiments</h2>
+
+        <!-- 3.1 -->
+        <h3 class="title is-4" style="margin-top:1rem;">Effectiveness of Real-Data-Based Preference Signals</h3>
+        <div class="content has-text-justified">
+          <p>
+            Real-data-based supervision aligns diffusion models effectively, reaching quality comparable
+            to methods that rely on manually annotated preference pairs.
+          </p>
+        </div>
+        <figure class="figure-block">
+          <img src="./static/images/table1_method_comparison.png" alt="Table 1: method comparison">
+          <figcaption class="figure-caption">
+            <span class="fig-label">Table 1.</span> Method comparison across alignment objectives and metrics.
+          </figcaption>
+        </figure>
+        <figure class="figure-block">
+          <img src="./static/images/user_study.svg" alt="user study on SD-3.5-M" style="max-width:760px;">
+          <figcaption class="figure-caption">
+            <span class="fig-label">Figure 4.</span> User study on SD-3.5-M.
+          </figcaption>
+        </figure>
+
+        <!-- 3.2 -->
+        <h3 class="title is-4" style="margin-top:2rem;">Complementarity with Existing Preference Alignment Models</h3>
+        <div class="content has-text-justified">
+          <p>
+            Real-data-based alignment is complementary to existing preference-based methods: combining the
+            two yields further gains across benchmarks and backbones.
+          </p>
+        </div>
+        <figure class="figure-block">
+          <div class="results-grid">
+            <figure>
+              <img src="./static/images/results/sd15_pick_a_pic_v2_bar.svg" alt="SD-1.5 Pick-a-Pic v2">
+              <figcaption class="figure-caption">SD-1.5 &middot; Pick-a-Pic v2</figcaption>
+            </figure>
+            <figure>
+              <img src="./static/images/results/sd15_partiprompts_bar.svg" alt="SD-1.5 PartiPrompts">
+              <figcaption class="figure-caption">SD-1.5 &middot; PartiPrompts</figcaption>
+            </figure>
+            <figure>
+              <img src="./static/images/results/sd35m_drawbench_bar.svg" alt="SD-3.5-M DrawBench">
+              <figcaption class="figure-caption">SD-3.5-M &middot; DrawBench</figcaption>
+            </figure>
+            <figure>
+              <img src="./static/images/results/sd35m_partiprompts_bar.svg" alt="SD-3.5-M PartiPrompts">
+              <figcaption class="figure-caption">SD-3.5-M &middot; PartiPrompts</figcaption>
+            </figure>
+          </div>
+          <figcaption class="figure-caption">
+            <span class="fig-label">Figure 5.</span> Complementarity with existing preference alignment
+            models, across two backbones and multiple prompt benchmarks.
+          </figcaption>
+        </figure>
+
+        <!-- 3.3 -->
+        <h3 class="title is-4" style="margin-top:2rem;">Qualitative Comparison</h3>
+        <figure class="figure-block">
+          <img src="./static/images/qualitative/sd15_main.png" alt="qualitative comparison on SD-1.5">
+          <figcaption class="figure-caption">
+            <span class="fig-label">Figure 6.</span> Qualitative comparison based on SD-1.5.
+          </figcaption>
+        </figure>
+        <figure class="figure-block">
+          <img src="./static/images/qualitative/sd35m_main.png" alt="qualitative comparison on SD-3.5-M">
+          <figcaption class="figure-caption">
+            <span class="fig-label">Figure 7.</span> Qualitative comparison based on SD-3.5-M.
+          </figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== FOOTER ========== -->
+<footer class="footer" style="padding:2.5rem 1.5rem;">
+  <div class="container is-max-desktop has-text-centered">
+    <p class="is-size-7" style="color:#8a93a2;">
+      RealAlign &middot; When Preference Labels Fall Short: Aligning Diffusion Models from Real Data &middot; ICML 2026
+    </p>
+  </div>
+</footer>
 
 </body>
 </html>
